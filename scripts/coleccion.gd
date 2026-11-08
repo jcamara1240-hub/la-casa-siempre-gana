@@ -10,6 +10,9 @@ const COLOR_GRIS := Color8(168, 154, 142)
 const CAJA_VOLVER := Rect2(240, 336, 160, 18)
 const POR_FILA := 15
 const INICIO := Vector2(44, 36)
+const PESTANAS := [Rect2(150, 16, 74, 16), Rect2(228, 16, 74, 16)]
+
+var _pagina := 0  # 0: cartas, 1: objetos y transformaciones
 
 var _cartas: Array = []
 var _objetos: Array = []
@@ -45,11 +48,11 @@ func _caja_carta(i: int) -> Rect2:
 
 
 func _caja_objeto(i: int) -> Rect2:
-	return Rect2(Vector2(44.0 + i * 35.0, 182.0), Vector2(24, 24))
+	return Rect2(Vector2(44.0 + (i % POR_FILA) * 37.0, 44.0 + (i / POR_FILA) * 36.0), Vector2(24, 24))
 
 
 func _caja_transformacion(i: int) -> Rect2:
-	return Rect2(Vector2(44.0 + i * 112.0, 216.0), Vector2(106, 18))
+	return Rect2(Vector2(44.0 + (i % 5) * 112.0, 132.0 + (i / 5) * 24.0), Vector2(106, 18))
 
 
 func _gui_input(evento: InputEvent) -> void:
@@ -58,12 +61,29 @@ func _gui_input(evento: InputEvent) -> void:
 		queue_redraw()
 	elif evento is InputEventMouseButton and evento.pressed and evento.button_index == MOUSE_BUTTON_LEFT:
 		_mirar(evento.position)  # con el dedo no hay "pasar por encima"
+		for i in PESTANAS.size():
+			if PESTANAS[i].has_point(evento.position):
+				_cambiar_pagina(i)
 		queue_redraw()
 		if CAJA_VOLVER.has_point(evento.position):
 			_volver()
 
 
+func _cambiar_pagina(pagina: int) -> void:
+	if pagina == _pagina:
+		return
+	_pagina = pagina
+	_titulo_info = ""
+	_texto_info = ""
+	Sonido.tocar("clic")
+	queue_redraw()
+
+
 func _unhandled_input(evento: InputEvent) -> void:
+	if visible and evento is InputEventKey and evento.pressed and evento.keycode in [KEY_LEFT, KEY_RIGHT, KEY_A, KEY_D]:
+		_cambiar_pagina(1 - _pagina)
+		get_viewport().set_input_as_handled()
+		return
 	if visible and evento is InputEventKey and evento.pressed and not evento.echo \
 			and evento.keycode in [KEY_ESCAPE, KEY_ENTER, KEY_KP_ENTER]:
 		_volver()
@@ -79,13 +99,13 @@ func _volver() -> void:
 func _mirar(p: Vector2) -> void:
 	_titulo_info = ""
 	_texto_info = ""
-	for i in _cartas.size():
+	for i in (_cartas.size() if _pagina == 0 else 0):
 		if _caja_carta(i).has_point(p):
 			_info(Progreso.carta_libre(_cartas[i]), CartasDB.nombre(_cartas[i]), CartasDB.descripcion(_cartas[i]))
-	for i in _objetos.size():
+	for i in (_objetos.size() if _pagina == 1 else 0):
 		if _caja_objeto(i).has_point(p):
 			_info(Progreso.objeto_libre(_objetos[i]), ObjetosDB.nombre(_objetos[i]), ObjetosDB.descripcion(_objetos[i]))
-	var ids: Array = ObjetosDB.TRANSFORMACIONES.keys()
+	var ids: Array = ObjetosDB.TRANSFORMACIONES.keys() if _pagina == 1 else []
 	for i in ids.size():
 		if _caja_transformacion(i).has_point(p):
 			var datos: Dictionary = ObjetosDB.TRANSFORMACIONES[ids[i]]
@@ -104,14 +124,18 @@ func _draw() -> void:
 		Progreso.cartas_libres(), _cartas.size(), Progreso.objetos_libres(), _objetos.size(),
 		Progreso.jefes_vencidos.size(), Jefe.NOMBRES.size(), Progreso.victorias]
 	draw_string(Juego.fuente, Vector2(0, 28), resumen, HORIZONTAL_ALIGNMENT_RIGHT, 596, 8, COLOR_GRIS)
-	for i in _cartas.size():
+	for i in PESTANAS.size():
+		draw_rect(PESTANAS[i], Color8(74, 52, 102) if i == _pagina else Color8(42, 31, 61))
+		draw_string(Juego.fuente, PESTANAS[i].position + Vector2(0, 11), Idioma.t(["CARTAS", "OBJETOS"][i]), HORIZONTAL_ALIGNMENT_CENTER,
+				PESTANAS[i].size.x, 8, COLOR_ORO if i == _pagina else COLOR_GRIS)
+	for i in (_cartas.size() if _pagina == 0 else 0):
 		draw_texture(_tex_cartas[_cartas[i]] if Progreso.carta_libre(_cartas[i]) else _cerrada, _caja_carta(i).position)
-	for i in _objetos.size():
+	for i in (_objetos.size() if _pagina == 1 else 0):
 		var caja := _caja_objeto(i)
 		draw_rect(caja, Color8(42, 31, 61))
 		var tinte := Color.WHITE if Progreso.objeto_libre(_objetos[i]) else Color(0.08, 0.06, 0.12)
 		draw_texture(_tex_objetos[_objetos[i]], caja.position + Vector2(6, 6), tinte)
-	var ids: Array = ObjetosDB.TRANSFORMACIONES.keys()
+	var ids: Array = ObjetosDB.TRANSFORMACIONES.keys() if _pagina == 1 else []
 	for i in ids.size():
 		var caja := _caja_transformacion(i)
 		var conocida: bool = Progreso.transformaciones.has(ids[i])

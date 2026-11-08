@@ -10,6 +10,7 @@ const INVULNERABLE_SEG := 1.1
 
 var invulnerable := false  # lo usa la prueba automática
 var seguro_listo := false
+var arrastre := Vector2.ZERO  # lo que tira de ti: la Caja Registradora, por ejemplo
 
 var _invulnerable_t := 0.0
 var _anim_t := 0.0
@@ -22,7 +23,11 @@ var _mirando_izquierda := false
 func _physics_process(delta: float) -> void:
 	var direccion := _leer_direccion()
 	velocity = velocity.move_toward(direccion * velocidad * (1.0 + Juego.stat("velocidad")), aceleracion * delta)
+	var propia := velocity
+	velocity += arrastre
+	arrastre = Vector2.ZERO
 	move_and_slide()
+	velocity = propia
 	_animar(direccion, delta)
 	if _invulnerable_t > 0.0:
 		_invulnerable_t -= delta

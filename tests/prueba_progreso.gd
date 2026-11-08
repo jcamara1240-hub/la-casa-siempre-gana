@@ -189,7 +189,7 @@ func comprobar_logros(m) -> void:
 	var a := Progreso.logros.size()
 	J.revisar_logros()
 	_ok(Progreso.logros.size() == a, "un logro no se consigue dos veces")
-	_ok(J.orden_jefes.size() == 5 and J.orden_jefes[0] == "pez", "cinco jefes por partida y el pez primero")
+	_ok(J.orden_jefes.size() == 5 and J.orden_jefes[0] == "pez" and J.orden_jefes[4] == "dueno", "cinco jefes por partida: el pez abre y el Dueño cierra")
 	var hoy: String = J.fecha_hoy()
 	Progreso.reto_fecha = ""
 	Progreso.registrar_reto(hoy, 100)

@@ -157,6 +157,9 @@ const EN := {
 	"Ojo de Halcón": "Hawk Eye", "Gana a los trileros.": "Beat the shell game.", "Nervios de Acero": "Nerves of Steel", "Dobla 5 veces seguidas en el doble o nada.": "Double 5 times in a row at double or nothing.",
 	"Moroso": "Deadbeat", "Deja que el prestamista te cobre un corazón.": "Let the loan shark take a heart.", "Buen Corazón": "Big Heart", "Dale monedas al mendigo.": "Give coins to the beggar.", "Cita Diaria": "Daily Date", "Juega un reto diario.": "Play a daily challenge.",
 	"La Baraja Entera": "The Whole Deck", "Desbloquea todas las cartas.": "Unlock every card.",
+	"EL TRILERO MAYOR": "THE SHELL MASTER", "LA CAJA REGISTRADORA": "THE CASH REGISTER", "EL COCTELERO": "THE BARTENDER", "EL JUGADOR DE PÓKER": "THE POKER PLAYER", "EL DUEÑO DEL CASINO": "THE CASINO OWNER",
+	"CARTAS": "CARDS",
+	"¡AQUÍ!": "HERE!", "¡PILLADO!": "CAUGHT YOU!", "¡A CAJA!": "PAY UP!", "VOY CON TODO": "ALL IN", "FAROL": "BLUFF", "¡SEGURIDAD!": "SECURITY!",
 	# Menú
 	"LA CASA SIEMPRE GANA": "THE HOUSE ALWAYS WINS", "JUGAR": "PLAY", "OPCIONES": "OPTIONS", "SALIR": "QUIT",
 	"CONTINUAR": "CONTINUE", "MENÚ PRINCIPAL": "MAIN MENU", "PAUSA": "PAUSED", "VOLVER": "BACK",

@@ -11,7 +11,7 @@ const RANURAS_INICIALES := 5
 const RANURAS_MAX := 8
 const PISOS_TOTALES := 5
 const RUTA_AJUSTES := "user://ajustes.cfg"
-const JEFES_CASINO := ["tragaperras", "ruleta", "baccarat", "blackjack", "dados", "revolver", "bingo"]
+const JEFES_CASINO := ["tragaperras", "ruleta", "baccarat", "blackjack", "dados", "revolver", "bingo", "trilero", "cajero", "coctelero", "poker"]
 
 const OBJETOS_PROHIBIDOS_EXTREMO := ["herradura", "seguro"]
 
@@ -161,7 +161,8 @@ func nueva_partida(semilla := 0, id_personaje := "", id_mesa := -1, modo_extremo
 		var t = resto[i]
 		resto[i] = resto[j]
 		resto[j] = t
-	orden_jefes = ["pez"] + resto.slice(0, PISOS_TOTALES - 1)
+	# El pez abre y el Dueño cierra, siempre; en medio, tres al azar.
+	orden_jefes = ["pez"] + resto.slice(0, PISOS_TOTALES - 2) + ["dueno"]
 	cartas_cambiadas.emit()
 	estado_cambiado.emit()
 

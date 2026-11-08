@@ -146,8 +146,9 @@ func _empujar_fuera(p: Vector2, r: float, caja: Rect2) -> Vector2:
 
 func _comprobar_contacto() -> void:
 	for e in en_radio(jugador.global_position, 5.0):
-		jugador.recibir_golpe(1)
-		break
+		if e.hace_contacto:
+			jugador.recibir_golpe(1)
+			break
 
 
 func _humo_del_puro(delta: float) -> void:

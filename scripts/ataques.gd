@@ -104,9 +104,9 @@ func golpear(e: Enemigo, a: Dictionary, retroceso: Vector2) -> void:
 
 
 ## Un aviso en el suelo que, pasado un momento, explota: lo usa el Bingo.
-func zona_peligro(centro: Vector2, radio: float, retardo: float) -> void:
+func zona_peligro(centro: Vector2, radio: float, retardo: float, duracion := 0.0) -> void:
 	var z := ZonaPeligro.new()
-	z.iniciar(centro, radio, retardo, self)
+	z.iniciar(centro, radio, retardo, self, duracion)
 	add_child(z)
 
 

@@ -26,6 +26,8 @@ const JEFES := {
 	"pez": "EL PEZ ROJO", "tragaperras": "LA TRAGAPERRAS", "ruleta": "LA RULETA",
 	"baccarat": "LA MOSCA CRUPIER", "blackjack": "EL REY DEL 21",
 	"dados": "LOS DADOS LOCOS", "revolver": "EL REVÓLVER", "bingo": "LA BINGO",
+	"trilero": "EL TRILERO MAYOR", "cajero": "LA CAJA REGISTRADORA", "coctelero": "EL COCTELERO",
+	"poker": "EL JUGADOR DE PÓKER", "dueno": "EL DUEÑO DEL CASINO",
 }
 
 const MESAS := [

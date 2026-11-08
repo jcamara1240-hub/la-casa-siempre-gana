@@ -21,6 +21,11 @@ static func crear(id: String) -> Jefe:
 		"dados": return JefeDados.new()
 		"revolver": return JefeRevolver.new()
 		"bingo": return JefeBingo.new()
+		"trilero": return JefeTrilero.new()
+		"cajero": return JefeCajero.new()
+		"coctelero": return JefeCoctelero.new()
+		"poker": return JefePoker.new()
+		"dueno": return JefeDueno.new()
 	push_error("Jefe desconocido: " + id)
 	return JefePez.new()
 
@@ -82,6 +87,24 @@ func _abanico(horda: Horda, cuantas: int, apertura: float, velocidad: float, cla
 	var hacia: Vector2 = (horda.jugador.global_position - position).normalized()
 	for i in cuantas:
 		horda.ataques.bala_enemiga(position, hacia.rotated((i - (cuantas - 1) * 0.5) * apertura) * velocidad, clase)
+
+
+## Un muro de balas que cruza la sala y deja un hueco para pasar.
+func _muro(horda: Horda, vertical: bool, clase: String) -> void:
+	var zona := Sala.INTERIOR
+	var total := int((zona.size.y if vertical else zona.size.x) / 18.0)
+	var hueco := randi_range(2, total - 5)
+	var desde_inicio := randf() < 0.5
+	for i in total:
+		if i >= hueco and i < hueco + 4:
+			continue
+		var base := 9.0 + i * 18.0
+		if vertical:
+			var x := zona.position.x + 4.0 if desde_inicio else zona.end.x - 4.0
+			horda.ataques.bala_enemiga(Vector2(x, zona.position.y + base), Vector2(170.0 if desde_inicio else -170.0, 0.0), clase)
+		else:
+			var y := zona.position.y + 4.0 if desde_inicio else zona.end.y - 4.0
+			horda.ataques.bala_enemiga(Vector2(zona.position.x + base, y), Vector2(0.0, 170.0 if desde_inicio else -170.0), clase)
 
 
 func _invocar(horda: Horda, tipos: Array) -> void:

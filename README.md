@@ -13,7 +13,7 @@ Solo te mueves. Tu personaje ataca por su cuenta, y lo que hace depende de una f
 ## Qué hay dentro
 
 - 5 pisos generados al azar. Al entrar en una sala se cierran las puertas hasta que no quede nadie.
-- 8 jefes: el Pez Rojo siempre abre la partida, y luego salen cuatro más entre la Tragaperras, la Ruleta, la Mosca Crupier, el Rey del 21, los Dados Locos, el Revólver y la Bingo. Cada uno funciona con las reglas de su juego: la Mosca reparte manos de baccarat y el Rey se queda aturdido si se pasa de 21.
+- 13 jefes: el Pez Rojo siempre abre la partida y el Dueño del Casino siempre la cierra. En medio salen tres entre la Tragaperras, la Ruleta, la Mosca Crupier, el Rey del 21, los Dados Locos, el Revólver, la Bingo, el Trilero Mayor, la Caja Registradora, el Coctelero y el Jugador de Póker. Cada uno funciona con las reglas de su juego: la Mosca reparte manos de baccarat y el Rey se queda aturdido si se pasa de 21.
 - 60 cartas (Pareja, Full, Comodín, All In, Mano del Muerto...) y 28 objetos pasivos.
 - 7 transformaciones si juntas ciertos objetos.
 - 6 personajes con su propio mazo y 5 niveles de dificultad.

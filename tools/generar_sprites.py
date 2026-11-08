@@ -756,6 +756,64 @@ def bingo():
     guardar(hoja(frames), "personajes/bingo.png")
 
 
+def cajero():
+    frames = []
+    for f in range(3):
+        img = lienzo(48, 48)
+        rect(img, 6, 16, 36, 24, "s"); rect(img, 8, 18, 32, 20, "p"); rect(img, 12, 6, 24, 12, "s"); rect(img, 14, 8, 20, 8, "k")
+        texto(img, 16, 10, "777", "m")
+        for j in range(3):
+            for i in range(5):
+                rect(img, 11 + i * 6, 21 + j * 5, 4, 3, "c" if (i + j + f) % 3 else "y")
+        cajon = 40 if f < 2 else 42
+        rect(img, 4, cajon, 40, 6, "k"); rect(img, 6, cajon + 1, 36, 3, "y" if f == 2 else "r")
+        frames.append(contorno(img))
+    guardar(hoja(frames), "personajes/cajero.png")
+
+
+def coctelero():
+    frames = []
+    for f in range(4):
+        img = lienzo(48, 48)
+        d = (0, 0, 2, -2)[f]
+        for y in range(12, 44):
+            ancho = 10 + (y - 12) // 4
+            rect(img, 24 - ancho + d, y, ancho * 2, 1, "s" if y % 7 else "c")
+        rect(img, 18 + d, 3, 12, 9, "s"); rect(img, 21 + d, 0, 6, 4, "o")
+        rect(img, 16 + d, 22, 5, 5, "k"); rect(img, 28 + d, 22, 5, 5, "k"); pon(img, 18 + d, 24, "R"); pon(img, 30 + d, 24, "R")
+        rect(img, 18 + d, 33, 12, 3, "k")
+        frames.append(contorno(img))
+    guardar(hoja(frames), "personajes/coctelero.png")
+
+
+def poker():
+    frames = []
+    for f in range(2):
+        img = lienzo(48, 48)
+        elipse(img, 23.5, 26, 16, 18, "o"); rect(img, 12, 8, 24, 7, "k"); rect(img, 7, 14, 34, 4, "G"); rect(img, 4, 17, 40, 3, "g")
+        rect(img, 15, 24, 7, 3, "k"); rect(img, 27, 24, 7, 3, "k")
+        if f:
+            pon(img, 18, 25, "R"); pon(img, 30, 25, "R")
+        rect(img, 18, 35, 12, 2, "k")
+        rect(img, 8, 41, 32, 7, "p"); rect(img, 20, 41, 8, 4, "c")
+        frames.append(contorno(img))
+    guardar(hoja(frames), "personajes/poker.png")
+
+
+def dueno():
+    frames = []
+    for f in range(3):
+        img = lienzo(48, 48)
+        elipse(img, 23.5, 34, 20, 13, "p"); rect(img, 18, 24, 12, 16, "v"); rect(img, 20, 24, 8, 12, "c"); rect(img, 22, 26, 4, 12, "R")
+        elipse(img, 23.5, 17, 12, 11, "o"); rect(img, 16, 0, 16, 7, "k"); rect(img, 12, 6, 24, 3, "k"); rect(img, 16, 4, 16, 2, "R")
+        rect(img, 16, 14, 6, 3, "k"); rect(img, 26, 14, 6, 3, "k"); pon(img, 18, 15, "y"); pon(img, 28, 15, "y")
+        rect(img, 28, 22, 12, 3, "c"); rect(img, 40, 22, 2, 3, "R")
+        rect(img, 18, 22, 8, 3 if f == 2 else 1, "k")
+        rect(img, 8, 40 + (f % 2), 10, 8 - (f % 2), "k"); rect(img, 30, 40 + ((f + 1) % 2), 10, 8 - ((f + 1) % 2), "k")
+        frames.append(contorno(img))
+    guardar(hoja(frames), "personajes/dueno.png")
+
+
 def mosca():
     frames = []
     for f in range(3):
@@ -1262,6 +1320,7 @@ def main():
     crear_fuente("pixel2", 2)
     protagonista(); ficha(); dado(); sota(); naipe(); joker(); cubilete(); portero()
     ficha_oro_sprite(); camara(); ratero(); dado_bomba(); reina(); dado_jefe(); revolver(); bingo()
+    cajero(); coctelero(); poker(); dueno()
     jefe(); pez_rojo(); ruleta(); mosca(); rey_blackjack()
     proyectiles(); objetos(); baldosas(); cartas(); pasivos(); eventos(); icono_app()
 

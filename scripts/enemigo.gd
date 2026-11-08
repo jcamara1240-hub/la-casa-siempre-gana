@@ -31,6 +31,7 @@ var muerto := false
 var empuje := Vector2.ZERO
 var monedas_al_morir := 0
 var elite := false
+var hace_contacto := true
 
 var _t := 0.0
 var _nacer := NACIMIENTO_SEG
