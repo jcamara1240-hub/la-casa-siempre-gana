@@ -8,6 +8,7 @@ const ARTICULO_REBARAJAR := "_rebarajar"
 const PREFIJO_OBJETO := "obj:"
 const PRECIO_REBARAJAR := 6
 const VIDA_JEFE_EXTREMO := 3.0
+const VIDA_JEFE_NORMAL := 1.4
 const PROB_ELITE := 0.08
 const TINTE_PISO := [Color.WHITE, Color(0.8, 0.9, 1.1), Color(0.8, 1.05, 0.85), Color(1.1, 0.9, 0.75), Color(1.15, 0.75, 0.8)]
 # tipo, coste en el presupuesto, piso mínimo, salas limpiadas mínimas, peso
@@ -47,7 +48,7 @@ var _panel: PanelEvento
 var _tactiles: ControlesTactiles
 var _logros: PantallaLogros
 var _reto: PantallaReto
-var _prob_carta := 0.7
+var _prob_carta := 0.55
 var _cambiando_sala := false
 var _carta_pendiente := ""
 var _hint_tienda := ""
@@ -215,7 +216,7 @@ func _al_tenir(id: String) -> void:
 func _arrancar() -> void:
 	jugador.aplicar_personaje()
 	Sonido.musica("piso")
-	_prob_carta = 0.7
+	_prob_carta = 0.55
 	_generar_piso()
 	get_tree().paused = false
 
@@ -334,7 +335,7 @@ func _empezar_combate() -> void:
 
 
 func _planificar_oleadas() -> Array:
-	var presupuesto := 7 + _salas_limpiadas * 2 + (Juego.piso - 1) * 7
+	var presupuesto := 11 + _salas_limpiadas * 3 + (Juego.piso - 1) * 10
 	if Juego.mesa >= 2:
 		presupuesto = int(presupuesto * 1.3)
 	var numero_oleadas := 2 + mini(_salas_limpiadas / 3, 2)
@@ -378,7 +379,7 @@ func _actualizar_combate(delta: float) -> void:
 
 func _soltar_oleada(grupo: Array) -> void:
 	var azar := Juego.azar
-	var mult := 1.0 + (Juego.piso - 1) * 0.6 + _salas_limpiadas * 0.05
+	var mult := 1.3 + (Juego.piso - 1) * 0.8 + _salas_limpiadas * 0.08
 	if Juego.mesa >= 1:
 		mult *= 1.25
 	for tipo in grupo:
@@ -408,8 +409,7 @@ func _empezar_jefe() -> void:
 	var jefe := Jefe.crear(Juego.jefe_del_piso())
 	jefe.position = Vector2(320, 110)
 	var vida_jefe := (1.0 + (Juego.piso - 1) * 0.9) * (1.4 if Juego.mesa >= 4 else 1.0)
-	if Juego.extremo:
-		vida_jefe *= VIDA_JEFE_EXTREMO
+	vida_jefe *= VIDA_JEFE_EXTREMO if Juego.extremo else VIDA_JEFE_NORMAL
 	jefe.preparar(vida_jefe)
 	mostrar_cartel(Idioma.t(jefe.nombre), "")
 	Sonido.tocar("jefe_aparece")
