@@ -216,8 +216,34 @@ def musica_jefe():
     guardar("musica_jefe", p.mezcla, 0.55)
 
 
+def musica_victoria():
+    """Fanfarria en mayor con aire de orquesta de casino."""
+    p = Pista(136, 8)
+    prog = ["C", "F", "G7", "C", "F", "G7", "C", "C"]
+    for c, nombre in enumerate(prog):
+        ac = ACORDES[nombre]
+        base = c * 4
+        for i in range(8):
+            p.nota(base + i * 0.5, ac[0] - 24 + (7 if i % 2 else 0), 0.45, triangular, 0.5, 5)
+        for golpe in (0.5, 1.5, 2.5, 3.5):
+            for nota in ac[:3]:
+                p.nota(base + golpe, nota + 12, 0.4, cuadrada, 0.06, 8, 0.25)
+        for b in (0, 2):
+            p.bombo(base + b, 0.55)
+        for b in (1, 3):
+            p.caja(base + b, 0.25)
+        for i in range(8):
+            p.charles(base + i * 0.5, 0.06)
+    tema = [(0, 15), (1, 19), (2, 22), (3, 27), (4, 24), (6, 27), (8, 26), (10, 22), (12, 19), (14, 22),
+            (16, 24), (17, 27), (18, 29), (20, 26), (22, 22), (24, 27), (26, 31), (28, 27)]
+    for pulso, nota in tema:
+        p.nota(pulso, nota, 1.8, cuadrada, 0.14, 2.4, 0.5)
+    guardar("musica_victoria", p.mezcla, 0.6)
+
+
 if __name__ == "__main__":
     efectos()
     musica_menu()
     musica_piso()
     musica_jefe()
+    musica_victoria()

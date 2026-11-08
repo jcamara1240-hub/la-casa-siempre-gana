@@ -1095,13 +1095,20 @@ def eventos():
     guardar(contorno(copa), "objetos/copa_trile.png")
 
 
+def icono_app():
+    icono = icono_ficha("R", "r").resize((120, 120), Image.NEAREST)
+    lienzo_icono = lienzo(128, 128)
+    lienzo_icono.alpha_composite(icono, (4, 4))
+    lienzo_icono.save(RAIZ / "icon.png")
+
+
 def main():
     (SALIDA / "fuente").mkdir(parents=True, exist_ok=True)
     crear_fuente("pixel", 1)
     crear_fuente("pixel2", 2)
     protagonista(); ficha(); dado(); sota(); naipe(); joker(); cubilete(); portero()
     jefe(); pez_rojo(); ruleta(); mosca(); rey_blackjack()
-    proyectiles(); objetos(); baldosas(); cartas(); pasivos(); eventos()
+    proyectiles(); objetos(); baldosas(); cartas(); pasivos(); eventos(); icono_app()
 
 
 if __name__ == "__main__":

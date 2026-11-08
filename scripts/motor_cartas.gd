@@ -49,6 +49,7 @@ func _physics_process(delta: float) -> void:
 
 func _nuevo_ciclo() -> void:
 	var plan := Combo.resolver(Juego.cartas, Juego.contexto_combo(true))
+	Juego.mejor_combo = maxf(Juego.mejor_combo, plan.total)
 	if plan.coste > 0:
 		Juego.gastar_oro(mini(plan.coste, Juego.oro))
 	ciclo_empezado.emit(plan)

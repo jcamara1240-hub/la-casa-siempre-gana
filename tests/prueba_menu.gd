@@ -95,6 +95,8 @@ func _correr() -> void:
 	await process_frame
 	_ok(m._pantalla.visible, "al morir sale la pantalla final")
 	await _tecla(KEY_ENTER)
+	_ok(m._pantalla.visible and m._pantalla.animacion_terminada(), "Enter salta la animación sin cerrar")
+	await _tecla(KEY_ENTER)
 	_ok(menu.visible and menu._items[0] == "jugar" and not m._pantalla.visible, "Enter vuelve al menú")
 
 	print("FALLOS: ", _fallos)

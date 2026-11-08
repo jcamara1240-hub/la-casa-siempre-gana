@@ -30,6 +30,9 @@ var mesa := 0
 var deuda := 0
 var transformaciones: Array = []
 var novedades: Array = []  # lo desbloqueado en esta partida
+var tiempo_partida := 0.0
+var mejor_combo := 0.0
+var oro_total := 0
 var orden_jefes: Array = []
 var cartas: Array = []
 var objetos: Array = []
@@ -129,6 +132,9 @@ func nueva_partida(semilla := 0, id_personaje := "", id_mesa := -1) -> void:
 	deuda = 0
 	transformaciones = []
 	novedades = []
+	tiempo_partida = 0.0
+	mejor_combo = 0.0
+	oro_total = 0
 	enemigos_eliminados = 0
 	cartas = datos.cartas.duplicate()
 	while cartas.size() < RANURAS_INICIALES:
@@ -296,6 +302,7 @@ func anadir_ranura() -> void:
 
 func ganar_oro(cantidad: int) -> void:
 	oro += cantidad
+	oro_total += cantidad
 	estado_cambiado.emit()
 
 

@@ -7,7 +7,7 @@ const EFECTOS := [
 	"comprar", "carta_coger", "objeto", "transformacion", "tick", "mult", "clic", "mover", "jefe_aparece",
 	"jefe_muere", "bajar", "victoria", "derrota", "ganar", "perder", "mezclar",
 ]
-const MUSICAS := ["menu", "piso", "jefe"]
+const MUSICAS := ["menu", "piso", "jefe", "victoria"]
 const VOCES := 14
 const SEPARACION_MS := 45  # si suenan veinte golpes a la vez, solo se oyen unos pocos
 

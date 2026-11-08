@@ -74,12 +74,12 @@ static func al_vencer_jefe(jefe: String, azar: RandomNumberGenerator) -> Array:
 			break
 		var id: String = cartas.pop_at(azar.randi() % cartas.size())
 		cartas_extra.append(id)
-		nuevo.append(CartasDB.nombre(id))
+		nuevo.append({"tipo": "carta", "id": id})
 	var objetos: Array = ObjetosDB.OBJETOS.keys().filter(func(id): return not objeto_libre(id))
 	if not objetos.is_empty():
 		var id: String = objetos[azar.randi() % objetos.size()]
 		objetos_extra.append(id)
-		nuevo.append(ObjetosDB.nombre(id))
+		nuevo.append({"tipo": "objeto", "id": id})
 	if jefe == "pez":
 		_abrir_personaje("borracho", nuevo)
 	if jefes_vencidos.size() >= 3:
@@ -94,7 +94,7 @@ static func al_ganar(mesa: int) -> Array:
 	_abrir_personaje("heredera", nuevo)
 	if mesa >= mesa_max and mesa_max < PersonajesDB.MESAS.size() - 1:
 		mesa_max = mesa + 1
-		nuevo.append(Idioma.t(PersonajesDB.MESAS[mesa_max].nombre))
+		nuevo.append({"tipo": "mesa", "id": str(mesa_max)})
 	guardar()
 	return nuevo
 
@@ -113,4 +113,4 @@ static func anotar_transformacion(id: String) -> void:
 static func _abrir_personaje(id: String, nuevo: Array) -> void:
 	if not personajes.has(id):
 		personajes.append(id)
-		nuevo.append(PersonajesDB.nombre(id))
+		nuevo.append({"tipo": "personaje", "id": id})

@@ -114,6 +114,7 @@ func _crear_pantallas_extra() -> void:
 
 
 func _ir_al_menu() -> void:
+	_pantalla.visible = false
 	en_combate = false
 	_barra.en_combate = false
 	_motor.parar()
@@ -217,6 +218,7 @@ func _colocar_jugador(venimos: Vector2i) -> void:
 func _physics_process(delta: float) -> void:
 	if get_tree().paused:
 		return
+	Juego.tiempo_partida += delta
 	_aplicar_sacudida(delta)
 	if en_combate:
 		_actualizar_combate(delta)
@@ -790,16 +792,15 @@ func _cerrar_selector() -> void:
 
 func _perder() -> void:
 	Sonido.tocar("derrota")
-	_acabar(Idioma.t("LA CASA GANA"), Idioma.t("HAS CAÍDO EN EL PISO %d DE %d.") % [Juego.piso, Juego.PISOS_TOTALES])
+	_acabar(false)
 
 
 func _ganar() -> void:
-	Sonido.tocar("victoria")
 	Juego.novedades += Progreso.al_ganar(Juego.mesa)
-	_acabar(Idioma.t("HAS DESBANCADO A LA CASA"), Idioma.t("POR ESTA VEZ, LA CASA HA PERDIDO."))
+	_acabar(true)
 
 
-func _acabar(titulo: String, frase: String) -> void:
+func _acabar(gano: bool) -> void:
 	en_combate = false
 	_barra.en_combate = false
 	_motor.parar()
@@ -809,13 +810,4 @@ func _acabar(titulo: String, frase: String) -> void:
 	get_tree().paused = true
 	Sonido.musica("")
 	Progreso.al_terminar_partida()
-	var lineas_novedades: Array = []
-	for texto in Juego.novedades.slice(0, 7):
-		lineas_novedades.append(Idioma.t("DESBLOQUEADO: %s") % String(texto).to_upper())
-	_pantalla.mostrar(titulo, [
-		frase,
-		Idioma.t("ENEMIGOS ELIMINADOS: %d") % Juego.enemigos_eliminados,
-		Idioma.t("MONEDAS EN EL BOLSILLO: %d") % Juego.oro,
-		Idioma.t("OBJETOS: %d") % Juego.objetos.size(),
-		"",
-	] + lineas_novedades)
+	_pantalla.mostrar_final(gano)
