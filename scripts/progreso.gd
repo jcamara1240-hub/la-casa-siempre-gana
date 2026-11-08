@@ -18,7 +18,6 @@ static var transformaciones: Array = []
 static var logros: Array = []
 static var contadores: Dictionary = {}
 static var personajes_ganadores: Array = []
-static var nombre := ""
 static var reto_fecha := ""
 static var reto_mejor := 0
 
@@ -39,7 +38,6 @@ static func cargar() -> void:
 	logros = cfg.get_value("progreso", "logros", [])
 	contadores = cfg.get_value("progreso", "contadores", {})
 	personajes_ganadores = cfg.get_value("progreso", "personajes_ganadores", [])
-	nombre = cfg.get_value("progreso", "nombre", "")
 	reto_fecha = cfg.get_value("progreso", "reto_fecha", "")
 	reto_mejor = cfg.get_value("progreso", "reto_mejor", 0)
 
@@ -58,7 +56,6 @@ static func guardar() -> void:
 	cfg.set_value("progreso", "logros", logros)
 	cfg.set_value("progreso", "contadores", contadores)
 	cfg.set_value("progreso", "personajes_ganadores", personajes_ganadores)
-	cfg.set_value("progreso", "nombre", nombre)
 	cfg.set_value("progreso", "reto_fecha", reto_fecha)
 	cfg.set_value("progreso", "reto_mejor", reto_mejor)
 	cfg.save(RUTA)
@@ -143,16 +140,14 @@ static func reto_mejor_hoy(fecha: String) -> int:
 	return reto_mejor if reto_fecha == fecha else 0
 
 
-## Anota la marca del reto. Devuelve true si es tu primer intento de hoy.
-static func registrar_reto(fecha: String, puntos: int) -> bool:
-	var primero := reto_fecha != fecha
-	if primero:
+## Anota la marca del reto: se queda la mejor de cada día.
+static func registrar_reto(fecha: String, puntos: int) -> void:
+	if reto_fecha != fecha:
 		reto_fecha = fecha
 		reto_mejor = puntos
 	else:
 		reto_mejor = maxi(reto_mejor, puntos)
 	guardar()
-	return primero
 
 
 static func anotar_transformacion(id: String) -> Array:

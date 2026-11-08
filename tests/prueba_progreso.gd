@@ -192,7 +192,10 @@ func comprobar_logros(m) -> void:
 	_ok(J.orden_jefes.size() == 5 and J.orden_jefes[0] == "pez", "cinco jefes por partida y el pez primero")
 	var hoy: String = J.fecha_hoy()
 	Progreso.reto_fecha = ""
-	_ok(Progreso.registrar_reto(hoy, 100) and not Progreso.registrar_reto(hoy, 300) and Progreso.reto_mejor_hoy(hoy) == 300, "solo el primer intento se envía, pero se guarda la mejor marca")
+	Progreso.registrar_reto(hoy, 100)
+	Progreso.registrar_reto(hoy, 300)
+	Progreso.registrar_reto(hoy, 200)
+	_ok(Progreso.reto_mejor_hoy(hoy) == 300, "el reto guarda la mejor marca del día")
 	m.empezar_reto()
 	var a1: Dictionary = {}
 	for k in m.salas:

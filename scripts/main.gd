@@ -47,13 +47,11 @@ var _panel: PanelEvento
 var _tactiles: ControlesTactiles
 var _logros: PantallaLogros
 var _reto: PantallaReto
-var _marcador: Marcador
 var _prob_carta := 0.7
 var _cambiando_sala := false
 var _carta_pendiente := ""
 var _hint_tienda := ""
 var _articulo_mostrado := ""
-var _puntos_pendientes := -1
 var _sacudida := 0.0
 
 @onready var _mundo: Node2D = $Mundo
@@ -119,8 +117,6 @@ func _crear_pantallas_extra() -> void:
 	get_tree().quit_on_go_back = false
 	_logros = PantallaLogros.new()
 	_reto = PantallaReto.new()
-	_marcador = Marcador.new()
-	add_child(_marcador)
 	for pantalla in [_tactiles, _panel, _seleccion, _coleccion, _logros, _reto]:
 		$UI.add_child(pantalla)
 	$UI.move_child(_tactiles, _menu.get_index())
@@ -130,9 +126,8 @@ func _crear_pantallas_extra() -> void:
 	_seleccion.atras.connect(_menu.abrir_principal)
 	_coleccion.atras.connect(_menu.abrir_principal)
 	_panel.cerrado.connect(_al_cerrar_evento)
-	_reto.conectar(_marcador)
 	_menu.ver_logros.connect(_logros.abrir)
-	_menu.ver_reto.connect(func(): _reto.abrir())
+	_menu.ver_reto.connect(_reto.abrir)
 	_menu.reanudar.connect(continuar_partida)
 	_logros.atras.connect(_menu.abrir_principal)
 	_reto.atras.connect(_menu.abrir_principal)
@@ -156,13 +151,11 @@ func _ir_al_menu() -> void:
 
 
 func _al_cerrar_final() -> void:
-	if not Juego.diario:
-		_ir_al_menu()
-		return
-	var puntos := _puntos_pendientes
+	var era_reto: bool = Juego.diario
 	_ir_al_menu()
-	_menu.cerrar()
-	_reto.abrir(puntos)
+	if era_reto:
+		_menu.cerrar()
+		_reto.abrir()
 
 
 func _reanudar() -> void:
@@ -933,9 +926,6 @@ func _acabar(gano: bool) -> void:
 	Guardado.borrar()
 	Juego.novedades += Progreso.al_terminar_partida()
 	Juego.revisar_logros(gano)
-	_puntos_pendientes = -1
 	if Juego.diario:
-		var puntos := Juego.puntos_reto(gano)
-		if Progreso.registrar_reto(Juego.fecha_hoy(), puntos):
-			_puntos_pendientes = puntos
+		Progreso.registrar_reto(Juego.fecha_hoy(), Juego.puntos_reto(gano))
 	_pantalla.mostrar_final(gano)
