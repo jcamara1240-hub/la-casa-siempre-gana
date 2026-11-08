@@ -32,8 +32,8 @@ func _correr() -> void:
 	var libres_antes := Progreso.cartas_libres()
 	_ok(libres_antes < CartasDB.CARTAS.size(), "hay cartas por desbloquear (%d de %d)" % [libres_antes, CartasDB.CARTAS.size()])
 	var nuevo := Progreso.al_vencer_jefe("pez", azar)
-	_ok(Progreso.personaje_libre("borracho") and nuevo.size() == 4, "el pez abre 2 cartas, 1 objeto y el Borracho")
-	_ok(Progreso.cartas_libres() == libres_antes + 2, "las cartas quedan libres")
+	_ok(Progreso.personaje_libre("borracho") and nuevo.size() == 6, "el pez abre 3 cartas, 2 objetos y el Borracho")
+	_ok(Progreso.cartas_libres() == libres_antes + 3, "las cartas quedan libres")
 	Progreso.al_vencer_jefe("ruleta", azar)
 	_ok(not Progreso.personaje_libre("crupier"), "con 2 jefes aún no sale la Crupier")
 	Progreso.al_vencer_jefe("baccarat", azar)
@@ -116,6 +116,8 @@ func _correr() -> void:
 	_ok(true, "los cuatro eventos terminan siempre")
 
 	comprobar_extremo(m)
+	await comprobar_guardado(m)
+	comprobar_logros(m)
 	await process_frame
 	print("FALLOS: ", _fallos)
 	quit(1 if _fallos > 0 else 0)
@@ -150,3 +152,55 @@ func comprobar_extremo(m) -> void:
 	m._ir_al_menu()
 	m.empezar_partida("heredera", 0, false)
 	_ok(not J.extremo and J.vida_max == 4, "fuera del extremo todo sigue igual")
+
+
+func comprobar_guardado(m) -> void:
+	m.empezar_partida("crupier", 2, false)
+	await process_frame
+	J.oro = 77
+	J.dar_objeto("gafas")
+	var c: Vector2i = m.salas.keys().filter(func(k): return m.salas[k].tipo == 3)[0]
+	m.entrar_sala(c, Vector2i.ZERO)  # guarda al entrar
+	var pos_salas: int = m.salas.size()
+	var azar_antes: int = J.azar.state
+	var cartas_antes: Array = J.cartas.duplicate()
+	_ok(load("res://scripts/guardado.gd").hay_partida(), "se guarda al entrar en una sala")
+	J.oro = 1
+	J.objetos = []
+	m._ir_al_menu()
+	_ok("reanudar" in m._menu._items, "el menú ofrece continuar")
+	m.continuar_partida()
+	await process_frame
+	_ok(J.oro == 77 and J.objetos == ["gafas"] and J.personaje == "crupier" and J.mesa == 2, "se recupera la partida")
+	_ok(m.salas.size() == pos_salas and m.actual.pos == c and J.cartas == cartas_antes and J.azar.state == azar_antes, "se recupera la mazmorra y la sala")
+	m._acabar(false)
+	_ok(not load("res://scripts/guardado.gd").hay_partida(), "al terminar se borra el guardado")
+	m._ir_al_menu()
+
+
+func comprobar_logros(m) -> void:
+	Progreso.logros = []
+	Progreso.contadores = {"enemigos": 150}
+	m.empezar_partida("tahur", 0)
+	J.novedades = []
+	J.revisar_logros()
+	_ok(Progreso.logros.has("cien") and not Progreso.logros.has("mil"), "los logros miran los contadores")
+	_ok(J.novedades.size() >= 2 and J.novedades[0].tipo == "logro", "los logros salen en la pantalla final")
+	var a := Progreso.logros.size()
+	J.revisar_logros()
+	_ok(Progreso.logros.size() == a, "un logro no se consigue dos veces")
+	_ok(J.orden_jefes.size() == 5 and J.orden_jefes[0] == "pez", "cinco jefes por partida y el pez primero")
+	var hoy: String = J.fecha_hoy()
+	Progreso.reto_fecha = ""
+	_ok(Progreso.registrar_reto(hoy, 100) and not Progreso.registrar_reto(hoy, 300) and Progreso.reto_mejor_hoy(hoy) == 300, "solo el primer intento se envía, pero se guarda la mejor marca")
+	m.empezar_reto()
+	var a1: Dictionary = {}
+	for k in m.salas:
+		a1[k] = m.salas[k].tipo
+	m.empezar_reto()
+	var igual: bool = a1.size() == m.salas.size()
+	for k in a1:
+		igual = igual and m.salas.has(k) and m.salas[k].tipo == a1[k]
+	_ok(igual and J.diario and J.personaje == "tahur", "el reto diario da la misma mazmorra")
+	m._ir_al_menu()
+

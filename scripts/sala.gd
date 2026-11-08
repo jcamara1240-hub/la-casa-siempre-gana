@@ -19,6 +19,10 @@ const PLANTILLAS := [
 	[Vector2i(-10, 0), Vector2i(10, 0)],
 	[Vector2i(-4, -3), Vector2i(4, -3), Vector2i(-4, 3), Vector2i(4, 3), Vector2i(-12, 0), Vector2i(12, 0)],
 	[Vector2i(-8, -3), Vector2i(8, 3)],
+	[Vector2i(-3, -3), Vector2i(3, -3), Vector2i(-3, 3), Vector2i(3, 3)],
+	[Vector2i(-12, -3), Vector2i(-12, 3), Vector2i(12, -3), Vector2i(12, 3), Vector2i(-6, 0), Vector2i(6, 0)],
+	[Vector2i(-9, -2), Vector2i(-5, 2), Vector2i(5, -2), Vector2i(9, 2)],
+	[Vector2i(0, -3), Vector2i(0, 3), Vector2i(-13, 0), Vector2i(13, 0)],
 ]
 
 var solidos: Array = []  # Rect2 de las columnas: los enemigos las esquivan empujándose.

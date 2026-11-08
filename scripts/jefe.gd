@@ -18,6 +18,9 @@ static func crear(id: String) -> Jefe:
 		"ruleta": return JefeRuleta.new()
 		"baccarat": return JefeBaccarat.new()
 		"blackjack": return JefeBlackjack.new()
+		"dados": return JefeDados.new()
+		"revolver": return JefeRevolver.new()
+		"bingo": return JefeBingo.new()
 	push_error("Jefe desconocido: " + id)
 	return JefePez.new()
 

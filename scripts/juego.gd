@@ -4,13 +4,14 @@ extends Node
 signal estado_cambiado
 signal cartas_cambiadas
 signal transformacion_obtenida(id: String)
+signal logro_obtenido(id: String)
 
 const VIDA_INICIAL := 8
 const RANURAS_INICIALES := 5
 const RANURAS_MAX := 8
 const PISOS_TOTALES := 5
 const RUTA_AJUSTES := "user://ajustes.cfg"
-const JEFES_CASINO := ["tragaperras", "ruleta", "baccarat", "blackjack"]
+const JEFES_CASINO := ["tragaperras", "ruleta", "baccarat", "blackjack", "dados", "revolver", "bingo"]
 
 const OBJETOS_PROHIBIDOS_EXTREMO := ["herradura", "seguro"]
 
@@ -18,7 +19,7 @@ const STATS_BASE := {
 	"crit": 0.0, "suerte": 0.0, "velocidad": 0.0, "invulnerable": 0.0, "bala_lenta": 0.0, "puro": 0.0,
 	"ciclo": 0.0, "descuento": 0.0, "monedas_sala": 0.0, "iman": 0.0, "intereses": 0.0,
 	"doble_ciclo": 0.0, "seguro": 0.0, "dano_global": 0.0, "crit_mult": 0.0, "moneda_extra": 0.0,
-	"tambaleo": 0.0, "golpe_monedas": 0.0,
+	"tambaleo": 0.0, "golpe_monedas": 0.0, "quema_global": 0.0,
 }
 
 var vida := VIDA_INICIAL
@@ -31,6 +32,7 @@ var personaje := "tahur"
 var mesa := 0
 var deuda := 0
 var extremo := false
+var diario := false
 var transformaciones: Array = []
 var novedades: Array = []  # lo desbloqueado en esta partida
 var tiempo_partida := 0.0
@@ -121,8 +123,9 @@ func _aplicar_pantalla() -> void:
 			DisplayServer.WINDOW_MODE_FULLSCREEN if pantalla_completa else DisplayServer.WINDOW_MODE_WINDOWED)
 
 
-func nueva_partida(semilla := 0, id_personaje := "", id_mesa := -1, modo_extremo := false) -> void:
+func nueva_partida(semilla := 0, id_personaje := "", id_mesa := -1, modo_extremo := false, reto_diario := false) -> void:
 	extremo = modo_extremo
+	diario = reto_diario
 	if id_personaje != "":
 		personaje = id_personaje
 	if id_mesa >= 0:
@@ -146,7 +149,7 @@ func nueva_partida(semilla := 0, id_personaje := "", id_mesa := -1, modo_extremo
 	oro_total = 0
 	enemigos_eliminados = 0
 	cartas = datos.cartas.duplicate()
-	while cartas.size() < RANURAS_INICIALES:
+	while cartas.size() < int(datos.get("ranuras", RANURAS_INICIALES)):
 		cartas.append("")
 	objetos = []
 	stats = STATS_BASE.duplicate()
@@ -158,9 +161,75 @@ func nueva_partida(semilla := 0, id_personaje := "", id_mesa := -1, modo_extremo
 		var t = resto[i]
 		resto[i] = resto[j]
 		resto[j] = t
-	orden_jefes = ["pez"] + resto
+	orden_jefes = ["pez"] + resto.slice(0, PISOS_TOTALES - 1)
 	cartas_cambiadas.emit()
 	estado_cambiado.emit()
+
+
+func fecha_hoy() -> String:
+	return Time.get_date_string_from_system(true)
+
+
+func puntos_reto(gano: bool) -> int:
+	return (piso - 1) * 1000 + (5000 if gano else 0) + enemigos_eliminados * 2 + mini(roundi(mejor_combo), 3000) + oro_total
+
+
+# ---------------------------------------------------------------- guardado
+const CAMPOS_PARTIDA := ["vida", "vida_max", "oro", "piso", "enemigos_eliminados", "racha", "personaje", "mesa", "extremo",
+	"diario", "deuda", "orden_jefes", "cartas", "objetos", "stats", "transformaciones", "novedades", "tiempo_partida",
+	"mejor_combo", "oro_total"]
+
+
+func volcar() -> Dictionary:
+	var datos := {"azar_seed": azar.seed, "azar_state": azar.state}
+	for campo in CAMPOS_PARTIDA:
+		datos[campo] = get(campo)
+	return datos
+
+
+func restaurar(datos: Dictionary) -> void:
+	for campo in CAMPOS_PARTIDA:
+		if datos.has(campo):
+			set(campo, datos[campo])
+	azar.seed = datos.azar_seed
+	azar.state = datos.azar_state
+	cartas_cambiadas.emit()
+	estado_cambiado.emit()
+
+
+# ---------------------------------------------------------------- logros
+func marcar_logro(id: String) -> void:
+	if not Progreso.logros.has(id):
+		Progreso.logros.append(id)
+		Progreso.guardar()
+		novedades.append({"tipo": "logro", "id": id})
+		logro_obtenido.emit(id)
+
+
+func revisar_logros(gano := false) -> void:
+	var c: Dictionary = Progreso.contadores
+	var e := int(c.get("enemigos", 0))
+	Progreso.contadores["combo"] = maxi(int(c.get("combo", 0)), roundi(mejor_combo))
+	var combo := int(Progreso.contadores["combo"])
+	var condiciones := {
+		"primera_sangre": e >= 1, "cien": e >= 100, "mil": e >= 1000, "cinco_mil": e >= 5000,
+		"pez": Progreso.jefes_vencidos.has("pez"),
+		"tres_jefes": Progreso.jefes_vencidos.size() >= 3,
+		"todos_jefes": Progreso.jefes_vencidos.size() >= PersonajesDB.JEFES.size(),
+		"combo_100": combo >= 100, "combo_1000": combo >= 1000, "combo_5000": combo >= 5000,
+		"rico": oro_total >= 500, "objetos": objetos.size() >= 10,
+		"transformacion": not Progreso.transformaciones.is_empty(),
+		"todas_transf": Progreso.transformaciones.size() >= ObjetosDB.TRANSFORMACIONES.size(),
+		"fila_llena": cartas.size() == RANURAS_MAX and not cartas.has(""),
+		"ganar": Progreso.victorias >= 1, "tres_victorias": Progreso.victorias >= 3,
+		"todos_ganan": Progreso.personajes_ganadores.size() >= 4,
+		"mesa_oro": gano and mesa >= 4, "extremo": gano and extremo,
+		"reto": diario,
+		"cartas": Progreso.cartas_libres() >= CartasDB.CARTAS.size(),
+	}
+	for id in condiciones:
+		if condiciones[id]:
+			marcar_logro(id)
 
 
 func jefe_del_piso() -> String:
@@ -214,7 +283,7 @@ func _comprobar_transformaciones() -> void:
 		if tengo >= int(datos.necesarias):
 			transformaciones.append(id)
 			_sumar_efecto(datos.efecto)
-			Progreso.anotar_transformacion(id)
+			novedades += Progreso.anotar_transformacion(id)
 			transformacion_obtenida.emit(id)
 
 
@@ -242,6 +311,7 @@ func cobrar_deuda() -> String:
 	vida_max = maxi(vida_max - 2, 2)
 	vida = mini(vida, vida_max)
 	estado_cambiado.emit()
+	marcar_logro("deudor")
 	return Idioma.t("EL PRESTAMISTA TE COBRA UN CORAZÓN")
 
 

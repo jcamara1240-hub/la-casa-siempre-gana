@@ -6,7 +6,7 @@ signal cerrado(carta: String)
 
 enum Fase { MENU, ENSENAR, MEZCLA, ELEGIR, RESULTADO, LANZANDO, FIN }
 
-const TIPOS := ["trileros", "doble_nada", "prestamista", "barra"]
+const TIPOS := ["trileros", "doble_nada", "prestamista", "barra", "mendigo", "caja_fuerte"]
 const APUESTAS := [5, 10, 20]
 const PAGO_TRILEROS := 2.5
 const RONDAS_TRILEROS := 3
@@ -84,6 +84,8 @@ func _titulo() -> String:
 		"trileros": return Idioma.t("LOS TRILEROS")
 		"doble_nada": return Idioma.t("DOBLE O NADA")
 		"prestamista": return Idioma.t("EL PRESTAMISTA")
+		"mendigo": return Idioma.t("EL MENDIGO")
+		"caja_fuerte": return Idioma.t("LA CAJA FUERTE")
 	return Idioma.t("LA BARRA")
 
 
@@ -99,6 +101,15 @@ func _menu_inicial() -> void:
 			_menu_prestamista()
 		"barra":
 			_menu_barra()
+		"mendigo":
+			_ir_a(Fase.MENU, Idioma.t("UNA AYUDITA, QUE SE LO DEVUELVO EN LA PRÓXIMA MANO."))
+			_boton(Idioma.t("DAR 10 MONEDAS"), _dar_mendigo, Juego.oro >= 10)
+			_salir()
+		"caja_fuerte":
+			_ir_a(Fase.MENU, Idioma.t("TRES CAJAS Y UNA SOLA LLAVE. NO TODAS TRAEN COSAS BUENAS."))
+			for letra in ["A", "B", "C"]:
+				_boton(Idioma.t("ABRIR LA CAJA %s") % letra, _abrir_caja)
+			_salir()
 
 
 func _botones_apuesta(accion: Callable) -> void:
@@ -147,6 +158,7 @@ func _elegir(copa: int) -> void:
 	if acierto:
 		var premio := floori(_apuesta * PAGO_TRILEROS)
 		Juego.ganar_oro(premio)
+		Juego.marcar_logro("trilero")
 		Sonido.tocar("ganar")
 		_ir_a(Fase.RESULTADO, Idioma.t("¡BIEN VISTO! COBRAS %d.") % premio)
 	else:
@@ -186,6 +198,8 @@ func _resolver_lanzamiento() -> void:
 	if randf() < PROB_DOBLAR:
 		_pote *= 2
 		_dobles += 1
+		if _dobles >= MAX_DOBLES:
+			Juego.marcar_logro("doble_cinco")
 		Sonido.tocar("ganar")
 		_menu_doble(Idioma.t("¡CARA! EN JUEGO: %d") % _pote)
 	else:
@@ -222,6 +236,40 @@ func _prestamo() -> void:
 	Juego.pedir_prestamo()
 	Sonido.tocar("comprar")
 	_ir_a(Fase.FIN, Idioma.t("SI NO PAGAS, TE COBRO UN CORAZÓN."))
+	_salir()
+
+
+# ---------------------------------------------------------------- mendigo y caja fuerte
+func _dar_mendigo() -> void:
+	Juego.gastar_oro(10)
+	Juego.marcar_logro("mendigo")
+	var objeto := Juego.robar_objeto() if randf() < 0.5 else ""
+	if objeto != "":
+		Juego.dar_objeto(objeto)
+		Sonido.tocar("objeto")
+		_ir_a(Fase.FIN, Idioma.t("A CAMBIO TE DA ESTO: %s.") % ObjetosDB.nombre(objeto).to_upper())
+	else:
+		Sonido.tocar("clic")
+		_ir_a(Fase.FIN, Idioma.t("TE LO AGRADECE MUCHO. Y YA ESTÁ."))
+	_salir()
+
+
+func _abrir_caja() -> void:
+	var texto := ""
+	match randi() % 3:
+		0:
+			Juego.ganar_oro(25)
+			Sonido.tocar("ganar")
+			texto = Idioma.t("DENTRO HAY 25 MONEDAS.")
+		1:
+			_carta = Juego.robar_cartas(1, 1.0)[0]
+			Sonido.tocar("carta_coger")
+			texto = Idioma.t("DENTRO HAY UNA CARTA: %s.") % CartasDB.nombre(_carta).to_upper()
+		_:
+			Juego.gastar_oro(Juego.oro / 2)
+			Sonido.tocar("perder")
+			texto = Idioma.t("ERA UNA TRAMPA: PIERDES LA MITAD DE TUS MONEDAS.")
+	_ir_a(Fase.FIN, texto)
 	_salir()
 
 

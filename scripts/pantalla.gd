@@ -16,6 +16,7 @@ const SEG_POR_DATO := 0.55
 const SEG_POR_DESBLOQUEO := 0.2
 const POR_FILA := 16
 const ANCHO_CASILLA := 36.0
+const MAX_NOVEDADES := 32
 
 var _gano := false
 var _t := 0.0
@@ -30,6 +31,7 @@ var _tex_rodillos: Texture2D
 var _tex_moneda: Texture2D
 var _tex_jugador: Texture2D
 var _tex_cerrada: Texture2D
+var _tex_trofeo: Texture2D
 
 
 func _ready() -> void:
@@ -39,6 +41,7 @@ func _ready() -> void:
 	_tex_rodillos = load("res://assets/personajes/rodillos.png")
 	_tex_moneda = load("res://assets/objetos/moneda.png")
 	_tex_cerrada = load("res://assets/cartas/_hueco.png")
+	_tex_trofeo = load("res://assets/objetos/trofeo.png")
 
 
 func mostrar_final(gano: bool) -> void:
@@ -66,7 +69,7 @@ func _preparar_datos() -> void:
 		{"texto": "ENEMIGOS", "valor": Juego.enemigos_eliminados},
 		{"texto": "MEJOR COMBO", "valor": roundi(Juego.mejor_combo)},
 		{"texto": "MONEDAS GANADAS", "valor": Juego.oro_total},
-		{"texto": "OBJETOS", "valor": Juego.objetos.size()},
+		{"texto": "PUNTOS", "valor": Juego.puntos_reto(_gano)} if Juego.diario else {"texto": "OBJETOS", "valor": Juego.objetos.size()},
 		{"texto": "TIEMPO", "fijo": "%d:%02d" % [minutos, segundos]},
 		{"texto": "PERSONAJE", "fijo": PersonajesDB.nombre(Juego.personaje).to_upper()},
 		{"texto": "MESA", "fijo": Idioma.t("EXTREMO") if Juego.extremo else Idioma.t(PersonajesDB.MESAS[Juego.mesa].nombre).to_upper()},
@@ -76,7 +79,7 @@ func _preparar_datos() -> void:
 ## Se cargan aquí y no al pintar: una textura cargada durante _draw sale en blanco.
 func _preparar_novedades() -> void:
 	_novedades = []
-	for n in Juego.novedades:
+	for n in Juego.novedades.slice(0, MAX_NOVEDADES):
 		var entrada: Dictionary = n.duplicate()
 		match String(n.tipo):
 			"carta":
@@ -88,6 +91,9 @@ func _preparar_novedades() -> void:
 			"personaje":
 				entrada["tex"] = PersonajesDB.textura(n.id)
 				entrada["nombre"] = PersonajesDB.nombre(n.id)
+			"logro":
+				entrada["tex"] = _tex_trofeo
+				entrada["nombre"] = LogrosDB.nombre(n.id)
 			"mesa":
 				entrada["nombre"] = Idioma.t(PersonajesDB.MESAS[int(n.id)].nombre)
 		_novedades.append(entrada)
@@ -279,7 +285,7 @@ func _dibujar_novedad(n: Dictionary, p: Vector2) -> void:
 	match String(n.tipo):
 		"carta":
 			draw_texture(n.tex, p)
-		"objeto":
+		"objeto", "logro":
 			draw_texture(_tex_cerrada, p)
 			draw_texture(n.tex, p + Vector2(10, 16))
 		"personaje":

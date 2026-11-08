@@ -15,6 +15,12 @@ static var cartas_extra: Array = []
 static var objetos_extra: Array = []
 static var personajes: Array = ["tahur"]
 static var transformaciones: Array = []
+static var logros: Array = []
+static var contadores: Dictionary = {}
+static var personajes_ganadores: Array = []
+static var nombre := ""
+static var reto_fecha := ""
+static var reto_mejor := 0
 
 
 static func cargar() -> void:
@@ -30,6 +36,12 @@ static func cargar() -> void:
 	objetos_extra = cfg.get_value("progreso", "objetos_extra", [])
 	personajes = cfg.get_value("progreso", "personajes", ["tahur"])
 	transformaciones = cfg.get_value("progreso", "transformaciones", [])
+	logros = cfg.get_value("progreso", "logros", [])
+	contadores = cfg.get_value("progreso", "contadores", {})
+	personajes_ganadores = cfg.get_value("progreso", "personajes_ganadores", [])
+	nombre = cfg.get_value("progreso", "nombre", "")
+	reto_fecha = cfg.get_value("progreso", "reto_fecha", "")
+	reto_mejor = cfg.get_value("progreso", "reto_mejor", 0)
 
 
 static func guardar() -> void:
@@ -43,6 +55,12 @@ static func guardar() -> void:
 	cfg.set_value("progreso", "objetos_extra", objetos_extra)
 	cfg.set_value("progreso", "personajes", personajes)
 	cfg.set_value("progreso", "transformaciones", transformaciones)
+	cfg.set_value("progreso", "logros", logros)
+	cfg.set_value("progreso", "contadores", contadores)
+	cfg.set_value("progreso", "personajes_ganadores", personajes_ganadores)
+	cfg.set_value("progreso", "nombre", nombre)
+	cfg.set_value("progreso", "reto_fecha", reto_fecha)
+	cfg.set_value("progreso", "reto_mejor", reto_mejor)
 	cfg.save(RUTA)
 
 
@@ -72,15 +90,17 @@ static func al_vencer_jefe(jefe: String, azar: RandomNumberGenerator) -> Array:
 	if not jefes_vencidos.has(jefe):
 		jefes_vencidos.append(jefe)
 	var cartas: Array = CartasDB.CARTAS.keys().filter(func(id): return not carta_libre(id))
-	for _i in 2:
+	for _i in 3:
 		if cartas.is_empty():
 			break
 		var id: String = cartas.pop_at(azar.randi() % cartas.size())
 		cartas_extra.append(id)
 		nuevo.append({"tipo": "carta", "id": id})
 	var objetos: Array = ObjetosDB.OBJETOS.keys().filter(func(id): return not objeto_libre(id))
-	if not objetos.is_empty():
-		var id: String = objetos[azar.randi() % objetos.size()]
+	for _i in 2:
+		if objetos.is_empty():
+			break
+		var id: String = objetos.pop_at(azar.randi() % objetos.size())
 		objetos_extra.append(id)
 		nuevo.append({"tipo": "objeto", "id": id})
 	if jefe == "pez":
@@ -91,9 +111,11 @@ static func al_vencer_jefe(jefe: String, azar: RandomNumberGenerator) -> Array:
 	return nuevo
 
 
-static func al_ganar(mesa: int, extremo := false) -> Array:
+static func al_ganar(mesa: int, extremo := false, personaje := "tahur") -> Array:
 	var nuevo: Array = []
 	victorias += 1
+	if not personajes_ganadores.has(personaje):
+		personajes_ganadores.append(personaje)
 	if extremo:
 		victorias_extremo += 1
 	_abrir_personaje("heredera", nuevo)
@@ -104,15 +126,42 @@ static func al_ganar(mesa: int, extremo := false) -> Array:
 	return nuevo
 
 
-static func al_terminar_partida() -> void:
+static func al_terminar_partida() -> Array:
+	var nuevo: Array = []
 	partidas += 1
+	if int(contadores.get("enemigos", 0)) >= 1000:
+		_abrir_personaje("guarda", nuevo)
 	guardar()
+	return nuevo
 
 
-static func anotar_transformacion(id: String) -> void:
+static func sumar(clave: String, cantidad: int) -> void:
+	contadores[clave] = int(contadores.get(clave, 0)) + cantidad
+
+
+static func reto_mejor_hoy(fecha: String) -> int:
+	return reto_mejor if reto_fecha == fecha else 0
+
+
+## Anota la marca del reto. Devuelve true si es tu primer intento de hoy.
+static func registrar_reto(fecha: String, puntos: int) -> bool:
+	var primero := reto_fecha != fecha
+	if primero:
+		reto_fecha = fecha
+		reto_mejor = puntos
+	else:
+		reto_mejor = maxi(reto_mejor, puntos)
+	guardar()
+	return primero
+
+
+static func anotar_transformacion(id: String) -> Array:
+	var nuevo: Array = []
 	if not transformaciones.has(id):
 		transformaciones.append(id)
+		_abrir_personaje("mago", nuevo)
 		guardar()
+	return nuevo
 
 
 static func _abrir_personaje(id: String, nuevo: Array) -> void:

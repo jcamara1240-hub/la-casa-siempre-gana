@@ -376,6 +376,8 @@ MAPAS_PERSONAJE = {
     "borracho": {"v": "s", "p": "p", "R": "o", "r": "r", "y": "R"},
     "crupier": {"v": "G", "p": "g", "R": "c", "r": "s", "y": "R"},
     "heredera": {"v": "y", "p": "o", "R": "B", "r": "b", "y": "c"},
+    "mago": {"v": "b", "p": "k", "R": "v", "r": "p", "y": "B"},
+    "guarda": {"v": "k", "p": "d", "R": "d", "r": "k", "y": "R"},
 }
 
 
@@ -486,6 +488,60 @@ def cubilete():
         rect(img, 6 + dx, 12, 4, 1, "k")
         frames.append(contorno(img))
     guardar(hoja(frames), "personajes/cubilete.png")
+
+
+def ficha_oro_sprite():
+    ficha_de(16, "y", "o", "ficha_oro")
+
+
+def camara():
+    frames = []
+    for f in range(4):
+        img = lienzo(16, 16)
+        rect(img, 2, 5, 12, 8, "k"); rect(img, 3, 6, 10, 6, "s")
+        rect(img, 6, 7, 4, 4, "k"); rect(img, 7, 8, 2, 2, "R" if f < 2 else "o")
+        rect(img, 7, 2, 2, 3, "k"); rect(img, 4, 1, 8, 2, "p")
+        frames.append(contorno(img))
+    guardar(hoja(frames), "personajes/camara.png")
+
+
+def ratero():
+    frames = []
+    for f in range(4):
+        img = lienzo(16, 16)
+        b = 1 if f % 2 else 0
+        elipse(img, 7.5, 5 + b, 4.5, 4.5, "o"); rect(img, 3, 3 + b, 10, 3, "k"); rect(img, 5, 4 + b, 2, 1, "c"); rect(img, 9, 4 + b, 2, 1, "c")
+        rect(img, 4, 9 + b, 8, 5, "p"); rect(img, 12, 8 + b, 3, 4, "y")
+        rect(img, 5, 14, 2, 2 if f % 2 else 1, "k"); rect(img, 9, 14, 2, 1 if f % 2 else 2, "k")
+        frames.append(contorno(img))
+    guardar(hoja(frames), "personajes/ratero.png")
+
+
+def dado_bomba():
+    frames = []
+    for f in range(4):
+        img = lienzo(16, 16)
+        y = 3 + (1 if f in (1, 3) else 0)
+        rect(img, 3, y, 10, 10, "k"); rect(img, 4, y + 1, 8, 8, "R" if f % 2 else "r")
+        for px, py in ((5, 2), (9, 2), (7, 4), (5, 6), (9, 6)):
+            rect(img, px, y + py, 2, 2, "c")
+        pon(img, 8, y - 1, "y"); pon(img, 9, y - 2, "o")
+        frames.append(img)
+    guardar(hoja(frames), "personajes/dado_bomba.png")
+
+
+def reina():
+    frames = []
+    for f in range(4):
+        img = lienzo(16, 16)
+        b = 1 if f in (1, 3) else 0
+        rect(img, 3, b + 2, 10, 13, "k"); rect(img, 4, b + 3, 8, 11, "c")
+        palo(img, 6, b + 5, "corazon", "R")
+        for x in (4, 7, 10):
+            rect(img, x, b, 2, 3, "y")
+        rect(img, 4, b + 12, 8, 1, "R")
+        frames.append(img)
+    guardar(hoja(frames), "personajes/reina.png")
 
 
 def portero():
@@ -657,6 +713,47 @@ def ruleta():
             pon(img, x, 28, "k")
         frames.append(img)
     guardar(hoja(frames), "personajes/ruleta.png")
+
+
+def dado_jefe():
+    frames = []
+    for f in range(4):
+        img = lienzo(48, 48)
+        d = (0, 2, 0, -2)[f]
+        rect(img, 7, 7 + d, 34, 34, "k"); rect(img, 9, 9 + d, 30, 30, "c"); rect(img, 9, 35 + d, 30, 4, "s")
+        for x, y in ((13, 13), (29, 13), (13, 29), (29, 29)):
+            rect(img, x, y + d, 6, 6, "R")
+        rect(img, 18, 22 + d, 4, 4, "k"); rect(img, 26, 22 + d, 4, 4, "k")
+        frames.append(img)
+    guardar(hoja(frames), "personajes/dados.png")
+
+
+def revolver():
+    frames = []
+    for f in range(6):
+        img = lienzo(48, 48)
+        elipse(img, 23.5, 23.5, 22, 22, "k"); elipse(img, 23.5, 23.5, 20, 20, "s"); elipse(img, 23.5, 23.5, 16, 16, "p")
+        for i in range(6):
+            a = math.tau * i / 6 + f * math.tau / 36
+            elipse(img, 23.5 + math.cos(a) * 12, 23.5 + math.sin(a) * 12, 4, 4, "k")
+        elipse(img, 23.5, 23.5, 5, 5, "y"); rect(img, 21, 22, 2, 2, "k"); rect(img, 25, 22, 2, 2, "k")
+        frames.append(img)
+    guardar(hoja(frames), "personajes/revolver.png")
+
+
+def bingo():
+    frames = []
+    for f in range(4):
+        img = lienzo(48, 48)
+        elipse(img, 23.5, 21, 19, 19, "k"); elipse(img, 23.5, 21, 17, 17, "B")
+        for i, c in enumerate("RyGo"):
+            a = f * 1.2 + i * 1.7
+            elipse(img, 23.5 + math.cos(a) * 9, 21 + math.sin(a) * 9, 4, 4, c)
+        for x in range(9, 40, 6):
+            rect(img, x, 6, 1, 30, "s")
+        rect(img, 12, 39, 24, 8, "k"); rect(img, 13, 40, 22, 5, "r")
+        frames.append(img)
+    guardar(hoja(frames), "personajes/bingo.png")
 
 
 def mosca():
@@ -967,6 +1064,35 @@ ICONOS.update({
 })
 ICONOS["mano_muerta"] = [f.replace("K", "k") for f in ICONOS["mano_muerta"]]
 
+def letra_icono(cad, color):
+    img = lienzo(12, 12)
+    rect(img, 0, 2, 12, 8, "k")
+    texto(img, 6 - ancho_texto(cad) // 2, 4, cad, color)
+    return img
+
+
+ICONOS.update({
+    "billete": ["............", "kkkkkkkkkkkk", "kGGGGGGGGGGk", "kGmGGkkGGmGk", "kGGGkyykGGGk", "kGGGkyykGGGk", "kGmGGkkGGmGk",
+                "kGGGGGGGGGGk", "kkkkkkkkkkkk"],
+    "taco": ["..........kk", ".........kok", "........koyk", ".......koyk.", "......koyk..", ".....koyk...", "....koyk....",
+             "...koyk.....", "..krrk......", ".krrk.......", "krrk........", "kkk........."],
+    "bola8": [".." + "kkkkkkkk" + "..", ".kkkkkkkkkk.", "kkkkccckkkkk", "kkkckkkckkkk", "kkkkccckkkkk", "kkkckkkckkkk", "kkkkccckkkkk",
+              "kkkkkkkkkkkk", ".kkkkkkkkkk.", "..kkkkkkkk.."],
+    "dardo": ["...........k", "..........kR", ".........kRk", "....k...kRk.", "....kk.kRk..", ".kkkkkkRk...", ".kyyyyyk....", ".kkkkkk.....",
+              "....kk......", "....k......."],
+    "ruleta_gira": icono_ficha("R", "k"),
+    "cortar": varios_naipes(["A", "2"], ["R", "k"]),
+    "sobre": ["............", "kkkkkkkkkkkk", "kckkccckkckk", "kcckcckkcckk", "kccckkkccckk", "kcccccccccck", "kcccccccccck", "kkkkkkkkkkkk"],
+    "mano": ICONOS["quemar"],
+    "doble_pareja": rejilla_palos([(0, 0, "corazon", "R"), (6, 0, "corazon", "R"), (0, 6, "diamante", "y"), (6, 6, "diamante", "y")]),
+    "carta_alta": icono_naipe("picas", "K"),
+    "siete": letra_icono("7", "y"),
+    "tres_ataques": letra_icono("3", "R"),
+    "bancarrota": letra_icono("0", "s"),
+    "mesa_llena": ["kkkkkkkkkkkk", "kGcGcGcGcGck", "kGGGGGGGGGGk", "kGcGcGcGcGck", "kGGGGGGGGGGk", "kGcGcGcGcGck", "kkkkkkkkkkkk"],
+    "rojo_negro": ["kkkkkkrRRRRR", "kkkkkkrRRRRR", "kkkkkkrRRRRR", "kkkkkkrRRRRR", "kkkkkkrRRRRR", "kkkkkkrRRRRR", "kkkkkkrRRRRR", "kkkkkkrRRRRR", "kkkkkkrRRRRR"],
+})
+
 CARTAS_VISUAL = {
     "bala": ("ataque", 0, "5"), "rayo": ("ataque", 0, "3"), "cuchilla": ("ataque", 1, "4"),
     "explosion": ("ataque", 1, "8"), "abanico": ("ataque", 0, "3"), "nova": ("ataque", 1, "2"),
@@ -984,6 +1110,10 @@ CARTAS_VISUAL = {
     "full": ("mult", 2, "X5"), "color": ("mult", 1, "X3"), "cara_cruz": ("mult", 1, "X1/3"),
     "all_in": ("mult", 1, "X3"), "racha": ("mult", 1, "X+"), "hucha": ("mult", 2, "X+"),
     "mano_muerta": ("mult", 1, "X3"), "solitario": ("mult", 1, "X3"), "casa": ("mult", 2, "X2.5"),
+    "billete": ("ataque", 0, "2"), "taco": ("ataque", 0, "6"), "bola8": ("ataque", 1, "6"), "dardo": ("ataque", 1, "9"),
+    "ruleta_gira": ("ataque", 1, "3"), "cortar": ("mod", 1, "+2"), "sobre": ("mod", 1, "+?"), "mano": ("mod", 0, "+2"),
+    "doble_pareja": ("mult", 1, "X4"), "carta_alta": ("mult", 0, "X3"), "siete": ("mult", 2, "X7"), "tres_ataques": ("mult", 1, "X3"),
+    "bancarrota": ("mult", 1, "X3"), "mesa_llena": ("mult", 1, "X+"), "rojo_negro": ("mult", 0, "X2"),
 }
 ESTILO_CARTA = {"ataque": ("R", "r"), "mod": ("B", "b"), "mult": ("y", "o")}
 
@@ -1045,6 +1175,18 @@ def pasivos():
                     ".krrrrrrrrk.", ".kkkkkkkkkk."],
         "ficha_vip": icono_ficha("v", "p"),
         "baraja_doble": varios_naipes(["J", "J"], ["R", "k"]),
+        "anillo_sello": ["....yyyy....", "...yRRRRy...", "...yRRRRy...", "....yyyy....", "...y....y...", "..y......y..", "..y......y..", "...y....y...", "....yyyy...."],
+        "baston": ["...kkkkk....", "..kyyyyyk...", "...kkkyyk...", ".....kdk....", ".....kdk....", ".....kdk....", ".....kdk....", ".....kdk....", ".....kdk....", ".....kyk...."],
+        "pajarita": ["............", "kk........kk", "kRRk....kRRk", "kRRRkkkkRRRk", "kRRRkyykRRRk", "kRRRkkkkRRRk", "kRRk....kRRk", "kk........kk"],
+        "cerveza": ["...cccccc...", "..cccccccc..", ".kyyyyyyyk..", ".kyoyyoyyk.k", ".kyyyoyyykkk", ".kyoyyyoyk.k", ".kyyyoyyykk.", ".kkkkkkkkk.."],
+        "pata_conejo": ["....cc......", "...cccc.....", "...cccc.....", "..ccccc.....", "..cccc......", "..ccc.......", "..yy........", ".kyyk.......", ".kkkk......."],
+        "fajo": ["kkkkkkkkkkkk", "kGGGGGGGGGGk", "kkkkkkkkkkkk", "kGGGGyGGGGGk", "kkkkkyykkkkk", "kGGGGyGGGGGk", "kkkkkkkkkkkk"],
+        "manga": ["kkkk........", "kddk.ccc....", "kddkkcRc....", "kdddkcRc....", "kdddkccc....", ".kddk.......", ".kkkk......."],
+        "corbata": ["....kkkk....", "....kRRk....", ".....kk.....", "....kRRk....", "...kRRRRk...", "...kRRRRk...", "...kRRRRk...", "....kRRk....", ".....kk....."],
+        "antifaz": ["............", "kkkkkkkkkkkk", "kpppkppkpppk", "kpkkpkkpkkpk", "kpppkkkkpppk", ".kkkk..kkkk."],
+        "guantes": ["..c.c.c.....", "..c.c.c.c...", "..c.c.c.c...", "..ccccccc...", "..ccccccc.c.", "..cccccccc..", "..ccccccc...", "...ccccc....", "...sssss...."],
+        "chapa": ["...yyyyyy...", "..yoooooyy..", ".yoyyyyyoyy.", ".yoyRRyyoyy.", ".yoyRRyyoyy.", ".yoyyyyyoyy.", "..yoooooyy..", "...yyyyyy..."],
+        "mechero": ["...o........", "..oyo.......", "..oyo.......", "...o........", ".kkkkkkk....", ".kyyyyyk....", ".kyoyoyk....", ".kyyyyyk....", ".kkkkkkk...."],
         "seguro": ["kkkkkkkkkkkk", "kGGGGGGGGGGk", "kGGGGcGGGGGk", "kGGGccGGGGGk", "kGGcGcGGcGGk", "kGGGGcGcGGGk",
                    "kGGGGccGGGGk", ".kGGGcGGGGk.", "..kkGGGGkk..", "....kkkk...."],
     }
@@ -1085,7 +1227,19 @@ def eventos():
     rect(d, 2, 11, 9, 10, "k"); rect(d, 4, 12, 5, 7, "c"); rect(d, 3, 21, 3, 3, "o"); rect(d, 7, 21, 3, 3, "o")
     rect(d, 10, 11, 6, 1, "s"); rect(d, 12, 7, 2, 4, "B")
     frames.append(contorno(d))
+    # El mendigo y la caja fuerte.
+    e = lienzo(16, 24)
+    elipse(e, 7.5, 7, 4.5, 4.5, "o"); rect(e, 3, 2, 10, 3, "s"); rect(e, 5, 6, 2, 2, "k"); rect(e, 9, 6, 2, 2, "k")
+    rect(e, 3, 12, 10, 10, "p"); rect(e, 5, 22, 7, 2, "y"); rect(e, 6, 16, 4, 3, "s")
+    frames.append(contorno(e))
+    f6 = lienzo(16, 24)
+    rect(f6, 2, 6, 12, 16, "s"); rect(f6, 3, 7, 10, 14, "p"); elipse(f6, 7.5, 14, 3.5, 3.5, "y"); rect(f6, 7, 11, 2, 7, "k")
+    frames.append(contorno(f6))
     guardar(hoja(frames), "personajes/npc.png")
+
+    trofeo = lienzo(12, 12)
+    rect(trofeo, 3, 0, 6, 6, "y"); rect(trofeo, 1, 1, 2, 3, "o"); rect(trofeo, 9, 1, 2, 3, "o"); rect(trofeo, 5, 6, 2, 3, "y"); rect(trofeo, 3, 9, 6, 2, "o")
+    guardar(contorno(trofeo), "objetos/trofeo.png")
 
     copa = lienzo(32, 28)
     for y in range(2, 26):
@@ -1107,6 +1261,7 @@ def main():
     crear_fuente("pixel", 1)
     crear_fuente("pixel2", 2)
     protagonista(); ficha(); dado(); sota(); naipe(); joker(); cubilete(); portero()
+    ficha_oro_sprite(); camara(); ratero(); dado_bomba(); reina(); dado_jefe(); revolver(); bingo()
     jefe(); pez_rojo(); ruleta(); mosca(); rey_blackjack()
     proyectiles(); objetos(); baldosas(); cartas(); pasivos(); eventos(); icono_app()
 

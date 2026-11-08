@@ -12,6 +12,11 @@ const TIPOS := {
 	"joker": {"vida": 18.0, "vel": 0.0, "radio": 6.0, "oro": 1.0},
 	"cubilete": {"vida": 26.0, "vel": 14.0, "radio": 7.0, "oro": 1.0},
 	"portero": {"vida": 55.0, "vel": 38.0, "radio": 9.0, "oro": 1.0},
+	"ficha_oro": {"vida": 22.0, "vel": 74.0, "radio": 6.0, "oro": 0.0},
+	"camara": {"vida": 20.0, "vel": 0.0, "radio": 7.0, "oro": 0.8},
+	"ratero": {"vida": 9.0, "vel": 100.0, "radio": 5.0, "oro": 0.5},
+	"dado_bomba": {"vida": 10.0, "vel": 66.0, "radio": 6.0, "oro": 0.5},
+	"reina": {"vida": 24.0, "vel": 26.0, "radio": 6.0, "oro": 1.0},
 }
 const NACIMIENTO_SEG := 0.55
 const TOPE_INVOCADOS := 60
@@ -24,6 +29,8 @@ var radio := 6.0
 var oro_prob := 0.3
 var muerto := false
 var empuje := Vector2.ZERO
+var monedas_al_morir := 0
+var elite := false
 
 var _t := 0.0
 var _nacer := NACIMIENTO_SEG
@@ -53,6 +60,18 @@ func configurar(nombre: String, multiplicador_vida: float) -> void:
 	modulate.a = 0.0
 
 
+## Un enemigo de élite: dorado, grande, duro y con premio.
+func hacer_elite() -> void:
+	elite = true
+	vida *= 3.0
+	vida_max = vida
+	scale = Vector2.ONE * 1.4
+	radio *= 1.3
+	self_modulate = Color(1.0, 0.82, 0.4)
+	monedas_al_morir += 3
+	oro_prob = 1.0
+
+
 func activo() -> bool:
 	return _nacer <= 0.0 and not muerto
 
@@ -77,7 +96,7 @@ func actualizar(delta: float, horda: Horda) -> void:
 	var movimiento := _decidir(direccion, dist, delta * factor, horda)
 	position += (movimiento * factor + empuje) * delta
 	empuje = empuje.lerp(Vector2.ZERO, clampf(delta * 8.0, 0.0, 1.0))
-	if tipo != "ficha" and tipo != "ficha_grande":
+	if tipo != "ficha" and tipo != "ficha_grande" and tipo != "ficha_oro" and tipo != "camara":
 		flip_h = hacia.x < 0.0
 
 
@@ -98,10 +117,61 @@ func _decidir(direccion: Vector2, dist: float, delta: float, horda: Horda) -> Ve
 		"cubilete":
 			_cubilete(delta, horda)
 			return direccion * vel
+		"ficha_oro":
+			# Sale corriendo y suelta un buen premio si la pillas.
+			monedas_al_morir = 8
+			return -direccion.rotated(sin(_t * 2.0 + _fase) * 0.8) * vel
+		"camara":
+			_camara(direccion, delta, horda)
+			return Vector2.ZERO
+		"ratero":
+			return _ratero(direccion, dist)
+		"dado_bomba":
+			if dist < 24.0:
+				_explotar(horda)
+			return direccion * vel
+		"reina":
+			_reina(delta, horda)
+			return direccion * vel
 		"portero":
 			# Cuanto más cerca te ve, más aprieta el paso.
 			return direccion * vel * (1.6 if dist < 90.0 else 1.0)
 	return direccion * vel
+
+
+func _camara(direccion: Vector2, delta: float, horda: Horda) -> void:
+	_accion -= delta
+	if _accion <= 0.0:
+		_accion = randf_range(1.8, 2.5)
+		horda.ataques.bala_enemiga(position, direccion * 120.0, "moneda")
+
+
+## Roba unas monedas y huye: si lo eliminas, las recuperas.
+func _ratero(direccion: Vector2, dist: float) -> Vector2:
+	if _modo == 0 and dist < 15.0:
+		var botin := mini(5, Juego.oro)
+		Juego.gastar_oro(botin)
+		monedas_al_morir += botin
+		_modo = 1
+	return (-direccion if _modo == 1 else direccion) * vel
+
+
+func _explotar(horda: Horda) -> void:
+	for i in 8:
+		horda.ataques.bala_enemiga(position, Vector2.RIGHT.rotated(TAU * i / 8.0) * 110.0, "moneda")
+	Sonido.tocar("explosion", 1.3, -6.0)
+	vida = 0.0
+	muerto = true
+
+
+func _reina(delta: float, horda: Horda) -> void:
+	_accion -= delta
+	if _accion > 0.0:
+		return
+	_accion = 2.2
+	for otro in horda.en_radio(position, 70.0):
+		if otro != self and otro.vida < otro.vida_max and not (otro is Jefe):
+			otro.vida = minf(otro.vida + otro.vida_max * 0.25, otro.vida_max)
 
 
 func _sota(direccion: Vector2, dist: float, delta: float, horda: Horda) -> Vector2:

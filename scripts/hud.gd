@@ -8,6 +8,9 @@ var horda: Horda
 var barra: BarraCartas
 
 var _texturas_objetos := {}
+var _cola_logros: Array = []
+var _logro_t := 0.0
+@onready var _trofeo: Texture2D = load("res://assets/objetos/trofeo.png")
 
 var _corazon: Texture2D = load("res://assets/objetos/corazon.png")
 var _moneda: Texture2D = load("res://assets/objetos/moneda.png")
@@ -28,9 +31,31 @@ func _ready() -> void:
 	Juego.estado_cambiado.connect(queue_redraw)
 
 
-func _process(_delta: float) -> void:
+func avisar_logro(id: String) -> void:
+	_cola_logros.append(id)
+	if _cola_logros.size() == 1:
+		_logro_t = 2.6
+
+
+func _process(delta: float) -> void:
 	queue_redraw()
 	_mirar_raton()
+	if not _cola_logros.is_empty():
+		_logro_t -= delta
+		if _logro_t <= 0.0:
+			_cola_logros.pop_front()
+			_logro_t = 2.6
+
+
+func _dibujar_logro() -> void:
+	if _cola_logros.is_empty():
+		return
+	var caja := Rect2(404, 36, 232, 22)
+	draw_rect(caja, Color8(20, 16, 30))
+	draw_rect(caja, Color8(247, 198, 74), false, 1.0)
+	draw_texture(_trofeo, caja.position + Vector2(5, 5))
+	draw_string(Juego.fuente, caja.position + Vector2(22, 9), Idioma.t("LOGRO"), HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color8(168, 154, 142))
+	draw_string(Juego.fuente, caja.position + Vector2(22, 18), LogrosDB.nombre(_cola_logros[0]).to_upper(), HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color8(247, 198, 74))
 
 
 func _caja_transformacion(i: int) -> Rect2:
@@ -73,7 +98,11 @@ func _draw() -> void:
 	draw_string(Juego.fuente, Vector2(17, 23), str(Juego.oro), HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color8(247, 236, 210))
 	draw_string(Juego.fuente, Vector2(50, 23), Idioma.t("PISO %d/%d") % [Juego.piso, Juego.PISOS_TOTALES], HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color8(168, 154, 142))
 	_dibujar_objetos()
+	_dibujar_logro()
 	_dibujar_transformaciones()
+	if Juego.diario:
+		draw_rect(Rect2(2, 28, 76, 11), Color(0.08, 0.06, 0.12, 0.8))
+		draw_string(Juego.fuente, Vector2(6, 37), Idioma.t("RETO DIARIO"), HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color8(108, 207, 148))
 	if Juego.extremo:
 		draw_rect(Rect2(2, 28, 58, 11), Color(0.08, 0.06, 0.12, 0.8))
 		draw_string(Juego.fuente, Vector2(6, 37), Idioma.t("EXTREMO"), HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color8(214, 61, 79))

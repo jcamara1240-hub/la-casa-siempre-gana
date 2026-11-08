@@ -8,6 +8,7 @@ const ARTICULO_REBARAJAR := "_rebarajar"
 const PREFIJO_OBJETO := "obj:"
 const PRECIO_REBARAJAR := 6
 const VIDA_JEFE_EXTREMO := 3.0
+const PROB_ELITE := 0.08
 const TINTE_PISO := [Color.WHITE, Color(0.8, 0.9, 1.1), Color(0.8, 1.05, 0.85), Color(1.1, 0.9, 0.75), Color(1.15, 0.75, 0.8)]
 # tipo, coste en el presupuesto, piso mínimo, salas limpiadas mínimas, peso
 const CATALOGO := [
@@ -19,6 +20,11 @@ const CATALOGO := [
 	["joker", 4, 2, 0, 12.0],
 	["cubilete", 5, 2, 2, 10.0],
 	["portero", 6, 3, 0, 10.0],
+	["ficha_oro", 2, 1, 3, 3.0],
+	["camara", 3, 1, 3, 9.0],
+	["ratero", 2, 1, 2, 10.0],
+	["dado_bomba", 3, 2, 0, 12.0],
+	["reina", 5, 3, 0, 8.0],
 ]
 const PRECIO_CORAZON := 10
 const PRECIO_RANURA := 25
@@ -39,11 +45,15 @@ var _seleccion: Seleccion
 var _coleccion: Coleccion
 var _panel: PanelEvento
 var _tactiles: ControlesTactiles
+var _logros: PantallaLogros
+var _reto: PantallaReto
+var _marcador: Marcador
 var _prob_carta := 0.7
 var _cambiando_sala := false
 var _carta_pendiente := ""
 var _hint_tienda := ""
 var _articulo_mostrado := ""
+var _puntos_pendientes := -1
 var _sacudida := 0.0
 
 @onready var _mundo: Node2D = $Mundo
@@ -88,7 +98,7 @@ func _ready() -> void:
 	_selector.saltada.connect(_cerrar_selector)
 	_barra.sustitucion_elegida.connect(_al_sustituir)
 	_barra.sustitucion_cancelada.connect(_cerrar_selector)
-	_pantalla.aceptada.connect(_ir_al_menu)
+	_pantalla.aceptada.connect(_al_cerrar_final)
 	_menu.jugar.connect(empezar_partida)
 	_menu.continuar.connect(_reanudar)
 	_menu.ir_a_portada.connect(_ir_al_menu)
@@ -107,7 +117,11 @@ func _crear_pantallas_extra() -> void:
 	_tactiles = ControlesTactiles.new()
 	_tactiles.principal = self
 	get_tree().quit_on_go_back = false
-	for pantalla in [_tactiles, _panel, _seleccion, _coleccion]:
+	_logros = PantallaLogros.new()
+	_reto = PantallaReto.new()
+	_marcador = Marcador.new()
+	add_child(_marcador)
+	for pantalla in [_tactiles, _panel, _seleccion, _coleccion, _logros, _reto]:
 		$UI.add_child(pantalla)
 	$UI.move_child(_tactiles, _menu.get_index())
 	_menu.jugar.connect(_seleccion.abrir)
@@ -116,6 +130,14 @@ func _crear_pantallas_extra() -> void:
 	_seleccion.atras.connect(_menu.abrir_principal)
 	_coleccion.atras.connect(_menu.abrir_principal)
 	_panel.cerrado.connect(_al_cerrar_evento)
+	_reto.conectar(_marcador)
+	_menu.ver_logros.connect(_logros.abrir)
+	_menu.ver_reto.connect(func(): _reto.abrir())
+	_menu.reanudar.connect(continuar_partida)
+	_logros.atras.connect(_menu.abrir_principal)
+	_reto.atras.connect(_menu.abrir_principal)
+	_reto.jugar_reto.connect(empezar_reto)
+	Juego.logro_obtenido.connect(_hud.avisar_logro)
 	Juego.transformacion_obtenida.connect(_al_transformarse)
 
 
@@ -133,6 +155,16 @@ func _ir_al_menu() -> void:
 	Sonido.musica("menu")
 
 
+func _al_cerrar_final() -> void:
+	if not Juego.diario:
+		_ir_al_menu()
+		return
+	var puntos := _puntos_pendientes
+	_ir_al_menu()
+	_menu.cerrar()
+	_reto.abrir(puntos)
+
+
 func _reanudar() -> void:
 	get_tree().paused = false
 
@@ -143,8 +175,51 @@ func _notification(what: int) -> void:
 		quizas_pausar()
 
 
+func empezar_reto() -> void:
+	# La semilla sale de la fecha: todo el mundo juega la misma mazmorra ese día.
+	Juego.nueva_partida(hash(Juego.fecha_hoy()), "tahur", 1, false, true)
+	Juego.revisar_logros()
+	_arrancar()
+
+
 func empezar_partida(personaje := "", mesa := -1, extremo := false) -> void:
 	Juego.nueva_partida(0, personaje, mesa, extremo)
+	_arrancar()
+
+
+func continuar_partida() -> void:
+	var datos := Guardado.cargar()
+	if datos.is_empty():
+		_ir_al_menu()
+		return
+	Juego.restaurar(datos.juego)
+	salas = datos.salas
+	_salas_limpiadas = datos.salas_limpiadas
+	_prob_carta = datos.prob_carta
+	_hud.salas = salas
+	_pintar_piso()
+	jugador.aplicar_personaje()
+	if not Juego.transformaciones.is_empty():
+		_al_tenir(Juego.transformaciones[-1])
+	Sonido.musica("piso")
+	get_tree().paused = false
+	entrar_sala(datos.pos, Vector2i.ZERO)
+
+
+func _guardar_punto() -> void:
+	Guardado.guardar({"juego": Juego.volcar(), "salas": salas, "salas_limpiadas": _salas_limpiadas,
+		"prob_carta": _prob_carta, "pos": actual.pos})
+
+
+func _pintar_piso() -> void:
+	_sala.modulate = TINTE_PISO[clampi(Juego.piso - 1, 0, TINTE_PISO.size() - 1)]
+
+
+func _al_tenir(id: String) -> void:
+	jugador.teñir(Color.html(ObjetosDB.TRANSFORMACIONES[id].color).lerp(Color.WHITE, 0.45))
+
+
+func _arrancar() -> void:
 	jugador.aplicar_personaje()
 	Sonido.musica("piso")
 	_prob_carta = 0.7
@@ -154,11 +229,13 @@ func empezar_partida(personaje := "", mesa := -1, extremo := false) -> void:
 
 func _generar_piso() -> void:
 	_salas_limpiadas = 0
+	if Juego.diario:
+		Juego.azar.seed = hash("%s-%d" % [Juego.fecha_hoy(), Juego.piso])
 	salas = GeneradorMazmorra.generar(Juego.azar, mini(12 + Juego.piso, 15))
 	_quitar_tienda_si_extremo()
 	_repartir_eventos()
 	_hud.salas = salas
-	_sala.modulate = TINTE_PISO[clampi(Juego.piso - 1, 0, TINTE_PISO.size() - 1)]
+	_pintar_piso()
 	entrar_sala(GeneradorMazmorra.INICIO, Vector2i.ZERO)
 	mostrar_cartel(Idioma.t("PISO %d") % Juego.piso, Idioma.t("AL FONDO TE ESPERA %s") % Idioma.t(Jefe.NOMBRES[Juego.jefe_del_piso()]))
 
@@ -175,7 +252,7 @@ func _quitar_tienda_si_extremo() -> void:
 
 func _repartir_eventos() -> void:
 	# Con un solo corazón no tienen sentido ni la barra ni vender vida.
-	var tipos: Array = ["trileros", "doble_nada"] if Juego.extremo else PanelEvento.TIPOS.duplicate()
+	var tipos: Array = ["trileros", "doble_nada", "mendigo", "caja_fuerte"] if Juego.extremo else PanelEvento.TIPOS.duplicate()
 	for c in salas:
 		if salas[c].tipo == TIPO.EVENTO:
 			salas[c]["evento"] = tipos.pop_at(Juego.azar.randi() % tipos.size())
@@ -227,6 +304,7 @@ func entrar_sala(c: Vector2i, venimos: Vector2i) -> void:
 			_crear_tienda()
 		TIPO.EVENTO:
 			_crear_evento()
+	_guardar_punto()
 
 
 func _colocar_jugador(venimos: Vector2i) -> void:
@@ -314,7 +392,9 @@ func _soltar_oleada(grupo: Array) -> void:
 		if _horda.enemigos.size() >= MAX_ENEMIGOS:
 			break
 		var p := _punto_lejos_del_jugador(azar)
-		_horda.crear(tipo, p, mult)
+		var e := _horda.crear(tipo, p, mult)
+		if Juego.piso >= 2 and azar.randf() < PROB_ELITE:
+			e.hacer_elite()
 
 
 func _punto_lejos_del_jugador(azar: RandomNumberGenerator) -> Vector2:
@@ -359,6 +439,8 @@ func _terminar_combate() -> void:
 	if _sin_golpes:
 		Juego.racha += 1
 		Juego.estado_cambiado.emit()
+	Juego.revisar_logros()
+	Progreso.guardar()
 	if Juego.stat("monedas_sala") > 0.0:
 		Juego.ganar_oro(int(Juego.stat("monedas_sala")))
 	if actual.tipo == TIPO.JEFE:
@@ -373,7 +455,10 @@ func _terminar_combate() -> void:
 		_prob_carta += 0.25
 
 
-func _al_morir_enemigo(posicion: Vector2, oro_prob: float, tipo: String) -> void:
+func _al_morir_enemigo(posicion: Vector2, oro_prob: float, tipo: String, monedas: int) -> void:
+	Progreso.sumar("enemigos", 1)
+	for _i in monedas:
+		_soltar_moneda(posicion)
 	if Juego.azar.randf() < oro_prob:
 		_soltar_moneda(posicion)
 	if tipo == "jefe":
@@ -381,6 +466,8 @@ func _al_morir_enemigo(posicion: Vector2, oro_prob: float, tipo: String) -> void
 		Juego.curar(2)
 		Sonido.tocar("jefe_muere")
 		Juego.novedades += Progreso.al_vencer_jefe(Juego.jefe_del_piso(), Juego.azar)
+		if _sin_golpes:
+			Juego.marcar_logro("sin_tocar")
 		for i in 16:
 			_soltar_moneda(posicion)
 	_efecto_muerte(posicion, tipo == "jefe")
@@ -492,7 +579,7 @@ func _crear_salida_jefe(recien_ganado := false) -> void:
 
 func _crear_evento() -> void:
 	var r := _crear_recogible(Recogible.Clase.EVENTO, "res://assets/personajes/npc.png", Sala.CENTRO)
-	r.hframes = 4
+	r.hframes = 6
 	r.frame = PanelEvento.TIPOS.find(actual.evento)
 	r.scale = Vector2(2, 2)
 
@@ -739,13 +826,14 @@ func _al_transformarse(id: String) -> void:
 	var datos: Dictionary = ObjetosDB.TRANSFORMACIONES[id]
 	mostrar_cartel(Idioma.t(datos.nombre).to_upper(), Idioma.t(datos.desc))
 	Sonido.tocar("transformacion")
-	jugador.teñir(Color.html(datos.color).lerp(Color.WHITE, 0.45))
+	_al_tenir(id)
 
 
 func recogido(r: Recogible) -> void:
 	match r.clase:
 		Recogible.Clase.MONEDA:
 			Juego.ganar_oro(1 + int(Juego.stat("moneda_extra")))
+			Progreso.sumar("monedas", 1 + int(Juego.stat("moneda_extra")))
 			Sonido.tocar("moneda", randf_range(0.95, 1.2), -6.0)
 			r.queue_free()
 		Recogible.Clase.CARTA:
@@ -829,7 +917,7 @@ func _perder() -> void:
 
 
 func _ganar() -> void:
-	Juego.novedades += Progreso.al_ganar(Juego.mesa, Juego.extremo)
+	Juego.novedades += Progreso.al_ganar(Juego.mesa, Juego.extremo, Juego.personaje)
 	_acabar(true)
 
 
@@ -842,5 +930,12 @@ func _acabar(gano: bool) -> void:
 	_ataques.limpiar()
 	get_tree().paused = true
 	Sonido.musica("")
-	Progreso.al_terminar_partida()
+	Guardado.borrar()
+	Juego.novedades += Progreso.al_terminar_partida()
+	Juego.revisar_logros(gano)
+	_puntos_pendientes = -1
+	if Juego.diario:
+		var puntos := Juego.puntos_reto(gano)
+		if Progreso.registrar_reto(Juego.fecha_hoy(), puntos):
+			_puntos_pendientes = puntos
 	_pantalla.mostrar_final(gano)

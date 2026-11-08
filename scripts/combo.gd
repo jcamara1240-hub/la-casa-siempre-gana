@@ -43,7 +43,7 @@ static func resolver(fila: Array, ctx := {}) -> Dictionary:
 		if not sin_copia:
 			match carta.tipo:
 				CartasDB.Tipo.MODIFICADOR:
-					_aplicar_modificador(carta, pendiente, aura, ctx, pasos.size())
+					_aplicar_modificador(carta, pendiente, aura, ctx, pasos.size(), efectivas.size())
 					paso.texto = carta.nombre
 
 				CartasDB.Tipo.ATAQUE:
@@ -96,7 +96,7 @@ static func _contar_multiplicadores(fila: Array) -> int:
 	return cuantos
 
 
-static func _aplicar_modificador(carta: Dictionary, p: Dictionary, aura: Dictionary, ctx: Dictionary, indice: int) -> void:
+static func _aplicar_modificador(carta: Dictionary, p: Dictionary, aura: Dictionary, ctx: Dictionary, indice: int, a_la_izquierda: int) -> void:
 	match String(carta.mod):
 		"aura":
 			aura.dano += float(carta.valor)
@@ -108,6 +108,14 @@ static func _aplicar_modificador(carta: Dictionary, p: Dictionary, aura: Diction
 			p.dano += floorf(float(ctx.get("monedas", 0)) / float(carta.valor))
 		"comodin":
 			return
+		"corte":
+			p.n += int(carta.valor)
+			p.pct -= 0.3
+		"sobre":
+			p.dano += float(a_la_izquierda)
+		"mano":
+			p.dano += float(carta.valor)
+			p.quema += 1
 		_:
 			p[carta.mod] += carta.valor
 	p.ranuras.append(indice)
@@ -124,7 +132,7 @@ static func _crear_ataque(id: String, carta: Dictionary, p: Dictionary, aura: Di
 		"rebote": rebote,
 		"quema": int(carta.get("quema", 0)) + p.quema,
 		"frio": p.frio,
-		"crit": p.crit,
+		"crit": p.crit + float(carta.get("crit", 0.0)),
 		"oro": p.oro,
 		"azar": carta.get("azar", false),
 		"vuelve": carta.get("vuelve", false),
@@ -135,9 +143,9 @@ static func _crear_ataque(id: String, carta: Dictionary, p: Dictionary, aura: Di
 	match id:
 		"rayo":
 			a.n += p.rebote + p.perfora / 2
-		"explosion", "molotov", "lluvia", "jackpot":
+		"explosion", "molotov", "lluvia", "jackpot", "bola8":
 			a.radio += 7.0 * (p.perfora + p.rebote)
-		"cuchilla":
+		"cuchilla", "ruleta_gira":
 			a.duracion += 0.2 * (p.perfora + p.rebote)
 	return a
 
@@ -160,6 +168,20 @@ static func _factor(carta: Dictionary, n_ataques: int, izquierda: Array, ranura:
 			return 3.0 if azar.randf() < 0.5 else 1.0
 		"all_in":
 			return valor if ranura == fila.size() - 1 and not fila.has("") else 1.0
+		"doble_pareja":
+			return valor if _repeticiones(izquierda).values().filter(func(v): return v >= 2).size() >= 2 else 1.0
+		"carta_alta":
+			return valor if n_ataques == 1 else 1.0
+		"siete":
+			return valor if izquierda.size() == 7 else 1.0
+		"tres_ataques":
+			return valor if n_ataques == 3 else 1.0
+		"bancarrota":
+			return valor if int(ctx.get("monedas", 1)) == 0 else 1.0
+		"mesa_llena":
+			return 1.0 + valor * fila.filter(func(c): return c != "").size()
+		"rojo_negro":
+			return valor if ranura % 2 == 0 else 1.0
 		"racha":
 			return 1.0 + valor * int(ctx.get("racha", 0))
 		"hucha":

@@ -36,20 +36,21 @@ func _clic(menu, i: int) -> void:
 
 func _correr() -> void:
 	var juego: Node = root.get_node("Juego")
+	DirAccess.remove_absolute("user://partida.sav")
 	var m = load("res://scenes/main.tscn").instantiate()
 	root.add_child(m)
 	await physics_frame
 	_ok(not m._pantalla.visible, "la pantalla final empieza oculta")
 	var menu = m._menu
 	_ok(menu.visible and paused, "el juego arranca en el menú y en pausa")
-	_ok(menu._items == ["jugar", "coleccion", "opciones", "salir"], "Jugar, Colección, Opciones y Salir")
+	_ok(menu._items == ["jugar", "reto", "coleccion", "logros", "opciones", "salir"], "los seis botones del menú")
 
-	await _clic(menu, 1)
+	await _clic(menu, 2)
 	_ok(m._coleccion.visible and not menu.visible, "se abre la colección")
 	await _tecla(KEY_ESCAPE)
 	_ok(menu.visible and not m._coleccion.visible, "Esc sale de la colección")
 
-	await _clic(menu, 2)
+	await _clic(menu, 4)
 	_ok(menu._items[0] == "idioma", "clic en Opciones")
 	var antes: String = Idioma.actual
 	await _tecla(KEY_ENTER)
@@ -59,7 +60,7 @@ func _correr() -> void:
 	var cfg := ConfigFile.new()
 	_ok(cfg.load("user://ajustes.cfg") == OK and cfg.get_value("ajustes", "idioma") == antes, "el idioma queda guardado")
 	await _tecla(KEY_ESCAPE)
-	_ok(menu._items[0] == "jugar", "Esc vuelve al menú principal")
+	_ok(menu.visible and "jugar" in menu._items, "Esc vuelve al menú principal")
 
 	await _tecla(KEY_ENTER)
 	_ok(m._seleccion.visible, "Jugar lleva a elegir personaje")
@@ -84,7 +85,7 @@ func _correr() -> void:
 
 	await _tecla(KEY_ESCAPE)
 	await _clic(menu, 2)
-	_ok(menu.visible and menu._items[0] == "jugar" and paused, "desde la pausa al menú principal")
+	_ok(menu.visible and menu._items[0] == "reanudar" and paused, "desde la pausa al menú principal, con Continuar partida")
 	await _tecla(KEY_ENTER)
 	await _tecla(KEY_ENTER)
 	await physics_frame

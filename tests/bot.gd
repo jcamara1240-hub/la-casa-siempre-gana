@@ -58,7 +58,7 @@ func _jugar(invencible: bool) -> Dictionary:
 	await _captura("portada")
 	m._pantalla.visible = false
 	m._menu.cerrar()
-	var ids: Array = ["tahur", "borracho", "crupier", "heredera"]
+	var ids: Array = ["tahur", "borracho", "crupier", "heredera", "mago", "guarda"]
 	m.empezar_partida(ids[_partida % ids.size()], int(_args.get("mesa", "0")))
 	_partida += 1
 	m.jugador.invulnerable = invencible

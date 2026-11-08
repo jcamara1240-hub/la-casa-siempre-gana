@@ -13,11 +13,13 @@ Solo te mueves. Tu personaje ataca por su cuenta, y lo que hace depende de una f
 ## Qué hay dentro
 
 - 5 pisos generados al azar. Al entrar en una sala se cierran las puertas hasta que no quede nadie.
-- 5 jefes: el Pez Rojo siempre abre la partida, y luego salen la Tragaperras, la Ruleta, la Mosca Crupier y el Rey del 21 en orden distinto. Cada uno funciona con las reglas de su juego: la Mosca reparte manos de baccarat y el Rey se queda aturdido si se pasa de 21.
-- 45 cartas (Pareja, Full, Comodín, All In, Mano del Muerto...) y 16 objetos pasivos.
-- 5 transformaciones si juntas ciertos objetos.
-- 4 personajes con su propio mazo y 5 niveles de dificultad.
-- Salas de evento: trileros, doble o nada, un prestamista y una barra con un chupito que mejor no probar.
+- 8 jefes: el Pez Rojo siempre abre la partida, y luego salen cuatro más entre la Tragaperras, la Ruleta, la Mosca Crupier, el Rey del 21, los Dados Locos, el Revólver y la Bingo. Cada uno funciona con las reglas de su juego: la Mosca reparte manos de baccarat y el Rey se queda aturdido si se pasa de 21.
+- 60 cartas (Pareja, Full, Comodín, All In, Mano del Muerto...) y 28 objetos pasivos.
+- 7 transformaciones si juntas ciertos objetos.
+- 6 personajes con su propio mazo y 5 niveles de dificultad.
+- Salas de evento: trileros, doble o nada, un prestamista, una caja fuerte, un mendigo y una barra con un chupito que mejor no probar.
+- Reto diario: la misma mazmorra para todo el mundo cada día.
+- 27 logros y partida guardada.
 - Lo que desbloqueas se queda guardado entre partidas.
 - Modo extremo: un golpe y a casa, sin tienda y con jefes que tienen el triple de vida.
 - Se puede jugar en el móvil, con un joystick que aparece donde pones el dedo.

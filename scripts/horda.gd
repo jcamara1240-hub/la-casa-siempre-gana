@@ -3,7 +3,7 @@ extends Node2D
 ## Mueve a todos los enemigos y responde a "¿quién hay cerca de este punto?".
 ## Para eso reparte a los enemigos en una rejilla, que se rehace en cada fotograma.
 
-signal enemigo_muerto(posicion: Vector2, oro_prob: float, tipo: String)
+signal enemigo_muerto(posicion: Vector2, oro_prob: float, tipo: String, monedas: int)
 signal danio_hecho(posicion: Vector2, cantidad: float, color: Color)
 
 const CELDA := 32.0
@@ -171,7 +171,7 @@ func _retirar_muertos() -> void:
 			enemigos.remove_at(i)
 			Juego.enemigos_eliminados += 1
 			Sonido.tocar("muerte", randf_range(0.85, 1.2), -4.0)
-			enemigo_muerto.emit(e.position, e.oro_prob, e.tipo)
+			enemigo_muerto.emit(e.position, e.oro_prob, e.tipo, e.monedas_al_morir)
 			if e.tipo == "ficha_grande":
 				nacen.append(e.position)
 			if e == jefe:

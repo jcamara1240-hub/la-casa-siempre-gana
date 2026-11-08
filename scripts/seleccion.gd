@@ -10,7 +10,7 @@ const COLOR_ORO := Color8(247, 198, 74)
 const COLOR_GRIS := Color8(168, 154, 142)
 const COLOR_FONDO := Color8(20, 16, 30)
 const COLOR_ROJO_CLARO := Color8(214, 61, 79)
-const ANCHO := 142.0
+const ANCHO := 100.0
 const CAJA_EXTREMO := Rect2(220, 282, 200, 16)
 const CAJA_EMPEZAR := Rect2(240, 302, 160, 20)
 const CAJA_VOLVER := Rect2(240, 327, 160, 18)
@@ -46,7 +46,7 @@ func _process(delta: float) -> void:
 
 
 func _caja(i: int) -> Rect2:
-	return Rect2(14.0 + i * (ANCHO + 10.0), 40.0, ANCHO, 186.0)
+	return Rect2(7.0 + i * (ANCHO + 5.0), 40.0, ANCHO, 186.0)
 
 
 func _empezar() -> void:
@@ -155,19 +155,19 @@ func _dibujar_personaje(i: int) -> void:
 	draw_rect(caja, COLOR_ORO if i == _indice else Color8(74, 52, 102), false, 1.0)
 	var columna := int(_t * 2.5) % 2 if i != _indice else 2 + int(_t * 8.0) % 4
 	var tinte := Color.WHITE if libre else Color(0.08, 0.06, 0.12)
-	draw_texture_rect_region(_texturas[id], Rect2(caja.position.x + 39, caja.position.y + 10, 64, 64),
+	draw_texture_rect_region(_texturas[id], Rect2(caja.position.x + 26, caja.position.y + 10, 48, 48),
 			Rect2(columna * 16, 0, 16, 16), tinte)
 	var x := caja.position.x + 4
 	var ancho := caja.size.x - 8
 	if libre:
-		_centrado(Juego.fuente, 8, PersonajesDB.nombre(id).to_upper(), x, ancho, caja.position.y + 88, COLOR_ORO)
-		draw_multiline_string(Juego.fuente, Vector2(x, caja.position.y + 102), PersonajesDB.descripcion(id),
-				HORIZONTAL_ALIGNMENT_CENTER, ancho, 8, 3, COLOR_CREMA)
-		_centrado(Juego.fuente, 8, Idioma.t("VIDA %d   MONEDAS %d") % [int(datos.vida), int(datos.oro)], x, ancho, caja.position.y + 146, COLOR_GRIS)
+		_centrado(Juego.fuente, 8, PersonajesDB.nombre(id).to_upper(), x, ancho, caja.position.y + 72, COLOR_ORO)
+		draw_multiline_string(Juego.fuente, Vector2(x, caja.position.y + 86), PersonajesDB.descripcion(id),
+				HORIZONTAL_ALIGNMENT_CENTER, ancho, 8, 5, COLOR_CREMA)
+		_centrado(Juego.fuente, 8, Idioma.t("VIDA %d  ORO %d") % [int(datos.vida), int(datos.oro)], x, ancho, caja.position.y + 144, COLOR_GRIS)
 		var nombres: Array = datos.cartas.map(func(c): return CartasDB.nombre(c))
-		draw_multiline_string(Juego.fuente, Vector2(x, caja.position.y + 160), ", ".join(nombres),
-				HORIZONTAL_ALIGNMENT_CENTER, ancho, 8, 2, COLOR_GRIS)
+		draw_multiline_string(Juego.fuente, Vector2(x, caja.position.y + 158), ", ".join(nombres),
+				HORIZONTAL_ALIGNMENT_CENTER, ancho, 8, 3, COLOR_GRIS)
 	else:
-		_centrado(Juego.fuente, 8, Idioma.t("BLOQUEADO"), x, ancho, caja.position.y + 88, COLOR_GRIS)
-		draw_multiline_string(Juego.fuente, Vector2(x, caja.position.y + 104), Idioma.t(datos.requisito),
-				HORIZONTAL_ALIGNMENT_CENTER, ancho, 8, 3, COLOR_CREMA)
+		_centrado(Juego.fuente, 8, Idioma.t("BLOQUEADO"), x, ancho, caja.position.y + 72, COLOR_GRIS)
+		draw_multiline_string(Juego.fuente, Vector2(x, caja.position.y + 88), Idioma.t(datos.requisito),
+				HORIZONTAL_ALIGNMENT_CENTER, ancho, 8, 5, COLOR_CREMA)

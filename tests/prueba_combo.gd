@@ -35,7 +35,7 @@ func _cartas_validas() -> void:
 func _traducciones() -> void:
 	var fuente: Font = load("res://assets/fuente/pixel.fnt")
 	var textos: Array = []
-	for db in [CartasDB.CARTAS, ObjetosDB.OBJETOS, PersonajesDB.PERSONAJES, ObjetosDB.TRANSFORMACIONES]:
+	for db in [CartasDB.CARTAS, ObjetosDB.OBJETOS, PersonajesDB.PERSONAJES, ObjetosDB.TRANSFORMACIONES, LogrosDB.LOGROS]:
 		for id in db:
 			textos.append(db[id].nombre)
 			textos.append(db[id].desc)
@@ -59,7 +59,7 @@ func _traducciones() -> void:
 			if not Idioma.EN.has(r.get_string(1)):
 				_fallos += 1
 				print("MAL  %s sin traducir: %s" % [ruta, r.get_string(1)])
-	for clave in ["FILA LLENA. TOCA LA CARTA QUE QUIERAS CAMBIAR O TOCA AQUÍ PARA CANCELAR.", "DESLIZA EL DEDO POR LA SALA PARA ANDAR. TU PERSONAJE ATACA SOLO."]:
+	for clave in ["CLASIFICACIÓN MUNDIAL AÚN NO ACTIVADA", "CARGANDO...", "ENVIANDO...", "SIN CONEXIÓN CON LA CLASIFICACIÓN", "NADIE HA JUGADO HOY. SÉ EL PRIMERO.", "ENVIAR PUNTOS", "JUGAR RETO", "PUNTOS", "FILA LLENA. TOCA LA CARTA QUE QUIERAS CAMBIAR O TOCA AQUÍ PARA CANCELAR.", "DESLIZA EL DEDO POR LA SALA PARA ANDAR. TU PERSONAJE ATACA SOLO."]:
 		if not Idioma.EN.has(clave):
 			_fallos += 1
 			print("MAL  sin traducir: ", clave)
@@ -119,6 +119,16 @@ func _reglas_del_combo() -> void:
 	_igual(Combo.resolver(["resto", "bala"], {"monedas": 16}).total, 7, "todo al resto")
 	_igual(Combo.resolver(["bala", "cara_cruz"]).total, 10, "cara o cruz: previsión media")
 	_igual(Combo.resolver(["bala"], {"dano_global": 2.0}).total, 7, "el Mafioso suma daño a todo")
+	_igual(Combo.resolver(["cortar", "bala"]).total, 10.5, "cortar: 3 balas al 70%")
+	_igual(Combo.resolver(["bala", "sobre", "bala"]).total, 11, "sobre bajo cuerda cuenta lo de su izquierda")
+	_igual(Combo.resolver(["bala", "bala", "abanico", "abanico", "doble_pareja"]).total, 112, "doble pareja")
+	_igual(Combo.resolver(["bala", "carta_alta"]).total, 15, "carta alta con un ataque")
+	_igual(Combo.resolver(["bala", "bala", "carta_alta"]).total, 10, "carta alta con dos ataques")
+	_igual(Combo.resolver(["bala", "bala", "bala", "bala", "bala", "bala", "bala", "siete"]).total, 245, "siete de la suerte")
+	_igual(Combo.resolver(["bala", "bancarrota"], {"monedas": 0}).total, 15, "bancarrota")
+	_igual(Combo.resolver(["bala", "mesa_llena"]).total, 7.5, "mesa llena")
+	_igual(Combo.resolver(["bala", "", "rojo_negro"]).total, 10, "rojo o negro en ranura impar")
+	_igual(Combo.resolver(["bala", "rojo_negro"]).total, 5, "rojo o negro en ranura par")
 
 
 func _mazmorras() -> void:

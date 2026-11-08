@@ -6,6 +6,9 @@ signal jugar
 signal continuar
 signal ir_a_portada
 signal ver_coleccion
+signal ver_logros
+signal ver_reto
+signal reanudar
 
 enum Vista { PRINCIPAL, OPCIONES, PAUSA }
 
@@ -57,7 +60,11 @@ func _ir_a(vista: Vista) -> void:
 	match vista:
 		Vista.PRINCIPAL:
 			# En el navegador un juego no puede cerrar la pestaña: el botón no haría nada.
-			_items = ["jugar", "coleccion", "opciones"] if web else ["jugar", "coleccion", "opciones", "salir"]
+			_items = ["jugar", "reto", "coleccion", "logros", "opciones"]
+			if Guardado.hay_partida():
+				_items.push_front("reanudar")
+			if not web:
+				_items.append("salir")
 		Vista.PAUSA:
 			_items = ["continuar", "opciones", "portada"]
 		Vista.OPCIONES:
@@ -90,7 +97,7 @@ func _process(delta: float) -> void:
 
 
 func _inicio_botones() -> float:
-	return 148.0 if _vista == Vista.PRINCIPAL else 104.0
+	return 122.0 if _vista == Vista.PRINCIPAL else 104.0
 
 
 func _caja(i: int) -> Rect2:
@@ -160,6 +167,15 @@ func _activar(id: String, sentido: int) -> void:
 		"coleccion":
 			cerrar()
 			ver_coleccion.emit()
+		"logros":
+			cerrar()
+			ver_logros.emit()
+		"reto":
+			cerrar()
+			ver_reto.emit()
+		"reanudar":
+			cerrar()
+			reanudar.emit()
 		"musica":
 			Juego.cambiar_volumenes(_siguiente_volumen(Juego.volumen_musica, sentido), Juego.volumen_efectos)
 		"efectos":
@@ -205,6 +221,9 @@ func _texto(id: String) -> String:
 	match id:
 		"jugar": return Idioma.t("JUGAR")
 		"coleccion": return Idioma.t("COLECCIÓN")
+		"logros": return Idioma.t("LOGROS")
+		"reto": return Idioma.t("RETO DIARIO")
+		"reanudar": return Idioma.t("CONTINUAR PARTIDA")
 		"musica": return Idioma.t("MÚSICA: %d%%") % roundi(Juego.volumen_musica * 100.0)
 		"efectos": return Idioma.t("EFECTOS: %d%%") % roundi(Juego.volumen_efectos * 100.0)
 		"opciones": return Idioma.t("OPCIONES")
@@ -250,7 +269,7 @@ func _dibujar_fondo() -> void:
 func _dibujar_titulo() -> void:
 	var titulo := Idioma.t("LA CASA SIEMPRE GANA")
 	var ancho := Juego.fuente_grande.get_string_size(titulo, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x * 2.0
-	var origen := Vector2(320.0 - ancho * 0.5, 104)
+	var origen := Vector2(320.0 - ancho * 0.5, 92)
 	for capa in [[Vector2(2, 2), Color8(143, 35, 64)], [Vector2.ZERO, COLOR_ORO]]:
 		draw_set_transform(origen + capa[0], 0.0, Vector2(2, 2))
 		draw_string(Juego.fuente_grande, Vector2.ZERO, titulo, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, capa[1])
@@ -273,5 +292,5 @@ func _dibujar_instrucciones() -> void:
 		"EL ORDEN IMPORTA: PONLAS BIEN ENTRE SALA Y SALA.",
 	]
 	for i in lineas.size():
-		draw_string(Juego.fuente, Vector2(0, 300 + i * 12), Idioma.t(lineas[i]), HORIZONTAL_ALIGNMENT_CENTER, 640, 8,
+		draw_string(Juego.fuente, Vector2(0, 308 + i * 12), Idioma.t(lineas[i]), HORIZONTAL_ALIGNMENT_CENTER, 640, 8,
 				Color8(168, 154, 142))

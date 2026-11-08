@@ -33,11 +33,15 @@ func lanzar(a: Dictionary) -> void:
 	var hacia: Vector2 = (objetivo[0].position - origen).normalized()
 	match String(a.id):
 		"rayo": Sonido.tocar("rayo")
-		"explosion", "molotov", "lluvia", "jackpot": Sonido.tocar("explosion", randf_range(0.9, 1.15), -3.0)
+		"explosion", "molotov", "lluvia", "jackpot", "bola8": Sonido.tocar("explosion", randf_range(0.9, 1.15), -3.0)
 		_: Sonido.tocar("carta", randf_range(0.95, 1.2))
 	match String(a.id):
-		"bala", "dados", "bola", "as_picas":
+		"bala", "dados", "bola", "as_picas", "dardo":
 			_abanico(a, origen, hacia, 0.16, 1.1)
+		"billete":
+			_abanico(a, origen, hacia, 0.07, 0.9)
+		"taco":
+			_abanico(a, origen, hacia, 0.1, 0.4)
 		"reparto":
 			_abanico(a, origen, hacia, 0.05, 0.9)
 		"abanico":
@@ -49,10 +53,10 @@ func lanzar(a: Dictionary) -> void:
 				_bala(a, origen, Vector2.RIGHT.rotated(TAU * i / a.n + hacia.angle()), 0.7)
 		"rayo":
 			_rayo(a, origen)
-		"explosion", "molotov", "lluvia", "jackpot":
+		"explosion", "molotov", "lluvia", "jackpot", "bola8":
 			for e in horda.mas_cercanos(origen, a.n):
 				_explotar(a, e.position)
-		"cuchilla":
+		"cuchilla", "ruleta_gira":
 			for i in a.n:
 				_cuchilla(a, TAU * i / a.n)
 
@@ -92,10 +96,18 @@ func golpear(e: Enemigo, a: Dictionary, retroceso: Vector2) -> void:
 	if a.oro > 0:
 		e.oro_prob = 1.0
 	horda.danar(e, dano, retroceso, color)
-	if a.quema > 0:
-		e.aplicar_quemadura(max(1.0, a.dano * 0.4) * a.quema)
+	var quema: float = a.quema + Juego.stat("quema_global")
+	if quema > 0.0:
+		e.aplicar_quemadura(max(1.0, a.dano * 0.4) * quema)
 	if a.frio > 0:
 		e.aplicar_frio()
+
+
+## Un aviso en el suelo que, pasado un momento, explota: lo usa el Bingo.
+func zona_peligro(centro: Vector2, radio: float, retardo: float) -> void:
+	var z := ZonaPeligro.new()
+	z.iniciar(centro, radio, retardo, self)
+	add_child(z)
 
 
 func _rayo(a: Dictionary, origen: Vector2) -> void:

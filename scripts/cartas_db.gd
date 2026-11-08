@@ -39,6 +39,17 @@ const CARTAS := {
 	"jackpot": {"nombre": "Jackpot", "tipo": Tipo.ATAQUE, "rareza": 2, "dano": 20.0, "n": 1, "radio": 70.0,
 		"desc": "Tres sietes. Una explosión enorme."},
 
+	"billete": {"nombre": "Fajo Volador", "tipo": Tipo.ATAQUE, "rareza": 0, "dano": 2.0, "n": 5,
+		"desc": "Cinco billetes en línea casi recta."},
+	"taco": {"nombre": "Taco de Billar", "tipo": Tipo.ATAQUE, "rareza": 0, "dano": 6.0, "n": 1, "perfora": 2,
+		"desc": "Golpe corto que atraviesa 2 enemigos."},
+	"bola8": {"nombre": "Bola Ocho", "tipo": Tipo.ATAQUE, "rareza": 1, "dano": 6.0, "n": 2, "radio": 22.0,
+		"desc": "Dos pequeñas explosiones sobre los más cercanos."},
+	"dardo": {"nombre": "Dardo de Diana", "tipo": Tipo.ATAQUE, "rareza": 1, "dano": 9.0, "n": 1, "crit": 0.5,
+		"desc": "Un dardo con un 50% de hacer daño doble."},
+	"ruleta_gira": {"nombre": "Ruleta Giratoria", "tipo": Tipo.ATAQUE, "rareza": 1, "dano": 3.0, "n": 2,
+		"desc": "Dos fichas orbitan a tu alrededor durante el ciclo."},
+
 	# ---- Modificadores: los gasta el siguiente ataque de su derecha.
 	"ciega_peq": {"nombre": "Ciega Pequeña", "tipo": Tipo.MODIFICADOR, "rareza": 0, "mod": "dano", "valor": 2.0,
 		"desc": "El siguiente ataque hace +2 de daño."},
@@ -71,6 +82,13 @@ const CARTAS := {
 	"alfombra": {"nombre": "Alfombra Roja", "tipo": Tipo.MODIFICADOR, "rareza": 2, "mod": "aura_perfora", "valor": 1,
 		"desc": "TODOS los ataques a su derecha atraviesan 1 enemigo más."},
 
+	"cortar": {"nombre": "Cortar la Baraja", "tipo": Tipo.MODIFICADOR, "rareza": 1, "mod": "corte", "valor": 2,
+		"desc": "El siguiente ataque lanza +2 proyectiles, pero hace un 30% menos."},
+	"sobre": {"nombre": "Sobre Bajo Cuerda", "tipo": Tipo.MODIFICADOR, "rareza": 1, "mod": "sobre", "valor": 1,
+		"desc": "El siguiente ataque hace +1 de daño por cada carta a su izquierda."},
+	"mano": {"nombre": "Mano Caliente", "tipo": Tipo.MODIFICADOR, "rareza": 0, "mod": "mano", "valor": 2,
+		"desc": "El siguiente ataque hace +2 de daño y quema."},
+
 	# ---- Multiplicadores: solo miran lo que tienen a su izquierda.
 	"propina": {"nombre": "Propina", "tipo": Tipo.MULTIPLICADOR, "rareza": 0, "mult": "fijo", "valor": 1.5,
 		"desc": "x1.5 a todo lo que tiene a la izquierda."},
@@ -102,6 +120,20 @@ const CARTAS := {
 		"desc": "x3 si te queda un corazón o menos."},
 	"solitario": {"nombre": "Solitario", "tipo": Tipo.MULTIPLICADOR, "rareza": 1, "mult": "solitario", "valor": 3.0,
 		"desc": "x3 si es el único multiplicador de la fila."},
+	"doble_pareja": {"nombre": "Doble Pareja", "tipo": Tipo.MULTIPLICADOR, "rareza": 1, "mult": "doble_pareja", "valor": 4.0,
+		"desc": "x4 si a su izquierda hay dos parejas distintas."},
+	"carta_alta": {"nombre": "Carta Alta", "tipo": Tipo.MULTIPLICADOR, "rareza": 0, "mult": "carta_alta", "valor": 3.0,
+		"desc": "x3 si a su izquierda hay exactamente un ataque."},
+	"siete": {"nombre": "Siete de la Suerte", "tipo": Tipo.MULTIPLICADOR, "rareza": 2, "mult": "siete", "valor": 7.0,
+		"desc": "x7 si tiene exactamente siete cartas a su izquierda."},
+	"tres_ataques": {"nombre": "A la Tercera", "tipo": Tipo.MULTIPLICADOR, "rareza": 1, "mult": "tres_ataques", "valor": 3.0,
+		"desc": "x3 si a su izquierda hay exactamente tres ataques."},
+	"bancarrota": {"nombre": "Bancarrota", "tipo": Tipo.MULTIPLICADOR, "rareza": 1, "mult": "bancarrota", "valor": 3.0,
+		"desc": "x3 si no te queda ni una moneda."},
+	"mesa_llena": {"nombre": "Mesa Llena", "tipo": Tipo.MULTIPLICADOR, "rareza": 1, "mult": "mesa_llena", "valor": 0.25,
+		"desc": "x1 más x0.25 por cada carta de la fila."},
+	"rojo_negro": {"nombre": "Rojo o Negro", "tipo": Tipo.MULTIPLICADOR, "rareza": 0, "mult": "rojo_negro", "valor": 2.0,
+		"desc": "x2 si está en una ranura impar: la 1, la 3, la 5..."},
 	"casa": {"nombre": "La Casa Gana", "tipo": Tipo.MULTIPLICADOR, "rareza": 2, "mult": "casa", "valor": 2.5,
 		"desc": "x2.5, pero te cuesta 1 moneda en cada ciclo."},
 }
