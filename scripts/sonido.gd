@@ -20,6 +20,7 @@ var _siguiente_voz := 0
 var _ultimo := {}
 var _reproductor_musica: AudioStreamPlayer
 var _musica_actual := ""
+var _db_efectos := 0.0
 
 
 static func tocar(nombre: String, tono := 1.0, ajuste_db := 0.0) -> void:
@@ -33,25 +34,19 @@ static func musica(nombre: String) -> void:
 
 
 static func aplicar_volumenes(musica_lineal: float, efectos_lineal: float) -> void:
-	_poner_bus("Musica", musica_lineal)
-	_poner_bus("Efectos", efectos_lineal)
+	if _yo != null:
+		_yo._db_efectos = _a_db(efectos_lineal)
+		_yo._reproductor_musica.volume_db = _a_db(musica_lineal)
 
 
-static func _poner_bus(nombre: String, lineal: float) -> void:
-	var i := AudioServer.get_bus_index(nombre)
-	if i == -1:
-		AudioServer.add_bus()
-		i = AudioServer.bus_count - 1
-		AudioServer.set_bus_name(i, nombre)
-		AudioServer.set_bus_send(i, "Master")
-	AudioServer.set_bus_mute(i, lineal <= 0.001)
-	AudioServer.set_bus_volume_db(i, linear_to_db(maxf(lineal, 0.001)))
+## Sin buses propios a propósito: en la versión web, los creados por código dejan mudo el audio.
+static func _a_db(lineal: float) -> float:
+	return linear_to_db(lineal) if lineal > 0.001 else -80.0
 
 
 func _ready() -> void:
 	_yo = self
 	process_mode = Node.PROCESS_MODE_ALWAYS
-	Sonido.aplicar_volumenes(Juego.volumen_musica, Juego.volumen_efectos)
 	for nombre in EFECTOS:
 		_efectos[nombre] = load("res://assets/sonido/%s.wav" % nombre)
 	for nombre in MUSICAS:
@@ -62,12 +57,11 @@ func _ready() -> void:
 		_musicas[nombre] = pista
 	for _i in VOCES:
 		var voz := AudioStreamPlayer.new()
-		voz.bus = "Efectos"
 		add_child(voz)
 		_voces.append(voz)
 	_reproductor_musica = AudioStreamPlayer.new()
-	_reproductor_musica.bus = "Musica"
 	add_child(_reproductor_musica)
+	Sonido.aplicar_volumenes(Juego.volumen_musica, Juego.volumen_efectos)
 
 
 func _tocar(nombre: String, tono: float, ajuste_db: float) -> void:
@@ -79,7 +73,7 @@ func _tocar(nombre: String, tono: float, ajuste_db: float) -> void:
 	_siguiente_voz = (_siguiente_voz + 1) % VOCES
 	voz.stream = _efectos[nombre]
 	voz.pitch_scale = tono
-	voz.volume_db = ajuste_db
+	voz.volume_db = ajuste_db + _db_efectos
 	voz.play()
 
 

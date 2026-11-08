@@ -195,7 +195,7 @@ func _correr() -> void:
 	await process_frame
 	await process_frame
 	# Solo efectos: la música se mezcla aparte, continua, al montar el vídeo.
-	AudioServer.set_bus_mute(AudioServer.get_bus_index("Musica"), true)
+	J.cambiar_volumenes(0.0, 0.8)
 	Progreso.personajes = ["tahur", "borracho", "crupier", "heredera"]
 	Progreso.mesa_max = 4
 	_crear_capas()
