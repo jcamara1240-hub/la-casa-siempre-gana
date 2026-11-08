@@ -2,6 +2,8 @@
 
 ![Partida en marcha](media/demo.gif)
 
+**[Juega gratis en el navegador](https://hellboy1240.itch.io/la-casa-siempre-gana)**
+
 Un roguelike en un casino subterráneo. Es la mezcla de tres juegos que me encantan: las mazmorras de The Binding of Isaac, las hordas de Vampire Survivors y las cartas de Balatro.
 
 Solo te mueves. Tu personaje ataca por su cuenta, y lo que hace depende de una fila de cartas que se ejecutan de izquierda a derecha en cada ciclo. Un modificador lo gasta el siguiente ataque y un multiplicador solo cuenta lo que tiene a su izquierda, así que la misma mano puede hacer 31 de daño o 93 según cómo la ordenes.
@@ -30,7 +32,7 @@ WASD o flechas para moverte, ratón para arrastrar cartas cuando la sala está l
 
 ## Cómo abrirlo
 
-Hace falta [Godot 4.7](https://godotengine.org/download) (la versión normal, no la .NET). Importas `project.godot` y le das a F5.
+Para jugar basta con [la página de itch.io](https://hellboy1240.itch.io/la-casa-siempre-gana), donde también hay versión para Windows. Para tocar el código hace falta [Godot 4.7](https://godotengine.org/download) (la versión normal, no la .NET). Importas `project.godot` y le das a F5.
 
 ## Cómo está hecho
 
