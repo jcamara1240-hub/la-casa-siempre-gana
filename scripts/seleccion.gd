@@ -1,0 +1,156 @@
+class_name Seleccion
+extends Control
+## Elegir personaje y mesa antes de empezar.
+
+signal elegido(personaje: String, mesa: int)
+signal atras
+
+const COLOR_CREMA := Color8(247, 236, 210)
+const COLOR_ORO := Color8(247, 198, 74)
+const COLOR_GRIS := Color8(168, 154, 142)
+const COLOR_FONDO := Color8(20, 16, 30)
+const ANCHO := 142.0
+const CAJA_EMPEZAR := Rect2(240, 300, 160, 20)
+const CAJA_VOLVER := Rect2(240, 326, 160, 18)
+const FLECHA_IZQ := Rect2(190, 240, 24, 18)
+const FLECHA_DER := Rect2(426, 240, 24, 18)
+
+var _ids: Array = []
+var _texturas := {}
+var _indice := 0
+var _mesa := 0
+var _t := 0.0
+
+
+func _ready() -> void:
+	process_mode = Node.PROCESS_MODE_ALWAYS
+	size = Vector2(640, 360)
+	visible = false
+	_ids = PersonajesDB.PERSONAJES.keys()
+	for id in _ids:
+		_texturas[id] = PersonajesDB.textura(id)
+
+
+func abrir() -> void:
+	_mesa = mini(_mesa, Progreso.mesa_max)
+	visible = true
+
+
+func _process(delta: float) -> void:
+	if visible:
+		_t += delta
+		queue_redraw()
+
+
+func _caja(i: int) -> Rect2:
+	return Rect2(14.0 + i * (ANCHO + 10.0), 40.0, ANCHO, 186.0)
+
+
+func _empezar() -> void:
+	var id: String = _ids[_indice]
+	if not Progreso.personaje_libre(id):
+		Sonido.tocar("perder")
+		return
+	Sonido.tocar("clic")
+	visible = false
+	elegido.emit(id, _mesa)
+
+
+func _volver() -> void:
+	Sonido.tocar("clic")
+	visible = false
+	atras.emit()
+
+
+func _cambiar_mesa(sentido: int) -> void:
+	_mesa = wrapi(_mesa + sentido, 0, Progreso.mesa_max + 1)
+	Sonido.tocar("mover")
+
+
+func _gui_input(evento: InputEvent) -> void:
+	if not (evento is InputEventMouseButton) or not evento.pressed or evento.button_index != MOUSE_BUTTON_LEFT:
+		return
+	var p: Vector2 = evento.position
+	for i in _ids.size():
+		if _caja(i).has_point(p):
+			_indice = i
+			Sonido.tocar("mover")
+	if FLECHA_IZQ.has_point(p):
+		_cambiar_mesa(-1)
+	elif FLECHA_DER.has_point(p):
+		_cambiar_mesa(1)
+	elif CAJA_EMPEZAR.has_point(p):
+		_empezar()
+	elif CAJA_VOLVER.has_point(p):
+		_volver()
+
+
+func _unhandled_input(evento: InputEvent) -> void:
+	if not visible or not (evento is InputEventKey) or not evento.pressed or evento.echo:
+		return
+	match evento.keycode:
+		KEY_LEFT, KEY_A:
+			_indice = wrapi(_indice - 1, 0, _ids.size())
+			Sonido.tocar("mover")
+		KEY_RIGHT, KEY_D:
+			_indice = wrapi(_indice + 1, 0, _ids.size())
+			Sonido.tocar("mover")
+		KEY_UP, KEY_W:
+			_cambiar_mesa(1)
+		KEY_DOWN, KEY_S:
+			_cambiar_mesa(-1)
+		KEY_ENTER, KEY_KP_ENTER, KEY_SPACE:
+			_empezar()
+		KEY_ESCAPE:
+			_volver()
+		_:
+			return
+	get_viewport().set_input_as_handled()
+
+
+func _centrado(fuente: Font, tam: int, texto: String, x: float, ancho: float, y: float, color: Color) -> void:
+	draw_string(fuente, Vector2(x, y), texto, HORIZONTAL_ALIGNMENT_CENTER, ancho, tam, color)
+
+
+func _draw() -> void:
+	draw_rect(Rect2(0, 0, 640, 360), COLOR_FONDO)
+	_centrado(Juego.fuente_grande, 16, Idioma.t("ELIGE A TU JUGADOR"), 0, 640, 30, COLOR_ORO)
+	for i in _ids.size():
+		_dibujar_personaje(i)
+	var mesa: Dictionary = PersonajesDB.MESAS[_mesa]
+	_centrado(Juego.fuente_grande, 16, Idioma.t(mesa.nombre).to_upper(), 214, 212, 254, COLOR_ORO)
+	_centrado(Juego.fuente_grande, 16, "<", FLECHA_IZQ.position.x, FLECHA_IZQ.size.x, 254, COLOR_CREMA)
+	_centrado(Juego.fuente_grande, 16, ">", FLECHA_DER.position.x, FLECHA_DER.size.x, 254, COLOR_CREMA)
+	_centrado(Juego.fuente, 8, Idioma.t(mesa.desc), 0, 640, 276, COLOR_GRIS)
+	var libre := Progreso.personaje_libre(_ids[_indice])
+	draw_rect(CAJA_EMPEZAR, Color8(122, 90, 160) if libre else Color8(42, 31, 61))
+	_centrado(Juego.fuente, 8, Idioma.t("EMPEZAR"), CAJA_EMPEZAR.position.x, CAJA_EMPEZAR.size.x, 313, COLOR_CREMA if libre else COLOR_GRIS)
+	draw_rect(CAJA_VOLVER, Color8(42, 31, 61))
+	_centrado(Juego.fuente, 8, Idioma.t("VOLVER"), CAJA_VOLVER.position.x, CAJA_VOLVER.size.x, 338, COLOR_CREMA)
+
+
+func _dibujar_personaje(i: int) -> void:
+	var caja := _caja(i)
+	var id: String = _ids[i]
+	var datos: Dictionary = PersonajesDB.PERSONAJES[id]
+	var libre := Progreso.personaje_libre(id)
+	draw_rect(caja, Color8(42, 31, 61))
+	draw_rect(caja, COLOR_ORO if i == _indice else Color8(74, 52, 102), false, 1.0)
+	var columna := int(_t * 2.5) % 2 if i != _indice else 2 + int(_t * 8.0) % 4
+	var tinte := Color.WHITE if libre else Color(0.08, 0.06, 0.12)
+	draw_texture_rect_region(_texturas[id], Rect2(caja.position.x + 39, caja.position.y + 10, 64, 64),
+			Rect2(columna * 16, 0, 16, 16), tinte)
+	var x := caja.position.x + 4
+	var ancho := caja.size.x - 8
+	if libre:
+		_centrado(Juego.fuente, 8, PersonajesDB.nombre(id).to_upper(), x, ancho, caja.position.y + 88, COLOR_ORO)
+		draw_multiline_string(Juego.fuente, Vector2(x, caja.position.y + 102), PersonajesDB.descripcion(id),
+				HORIZONTAL_ALIGNMENT_CENTER, ancho, 8, 3, COLOR_CREMA)
+		_centrado(Juego.fuente, 8, Idioma.t("VIDA %d   MONEDAS %d") % [int(datos.vida), int(datos.oro)], x, ancho, caja.position.y + 146, COLOR_GRIS)
+		var nombres: Array = datos.cartas.map(func(c): return CartasDB.nombre(c))
+		draw_multiline_string(Juego.fuente, Vector2(x, caja.position.y + 160), ", ".join(nombres),
+				HORIZONTAL_ALIGNMENT_CENTER, ancho, 8, 2, COLOR_GRIS)
+	else:
+		_centrado(Juego.fuente, 8, Idioma.t("BLOQUEADO"), x, ancho, caja.position.y + 88, COLOR_GRIS)
+		draw_multiline_string(Juego.fuente, Vector2(x, caja.position.y + 104), Idioma.t(datos.requisito),
+				HORIZONTAL_ALIGNMENT_CENTER, ancho, 8, 3, COLOR_CREMA)

@@ -1,0 +1,119 @@
+class_name CartasDB
+extends RefCounted
+## Todas las cartas. Añadir una nueva es añadir una entrada aquí y su dibujo.
+
+enum Tipo { ATAQUE, MODIFICADOR, MULTIPLICADOR }
+
+const PESO_RAREZA := [60.0, 30.0, 10.0]
+const PRECIO_RAREZA := [12, 22, 38]
+const NOMBRE_RAREZA := ["COMÚN", "RARA", "LEGENDARIA"]
+
+const CARTAS := {
+	# ---- Ataques: lo que de verdad hace daño.
+	"bala": {"nombre": "Calderilla", "tipo": Tipo.ATAQUE, "rareza": 0, "dano": 5.0, "n": 1,
+		"desc": "Lanza una moneda al enemigo más cercano."},
+	"abanico": {"nombre": "Abanico de Naipes", "tipo": Tipo.ATAQUE, "rareza": 0, "dano": 3.0, "n": 3,
+		"desc": "Tres naipes en abanico, de corto alcance."},
+	"reparto": {"nombre": "Reparto Rápido", "tipo": Tipo.ATAQUE, "rareza": 0, "dano": 3.0, "n": 3,
+		"desc": "Tres cartas seguidas en línea recta."},
+	"bola": {"nombre": "Bola de Ruleta", "tipo": Tipo.ATAQUE, "rareza": 0, "dano": 4.0, "n": 1, "rebote": 4,
+		"desc": "Va saltando de enemigo en enemigo, hasta 4 veces."},
+	"dados": {"nombre": "Tirada de Dados", "tipo": Tipo.ATAQUE, "rareza": 0, "dano": 4.0, "n": 2, "azar": true,
+		"desc": "Dos dados. Cada uno hace entre 1 y 7 de daño."},
+	"molotov": {"nombre": "Cóctel Molotov", "tipo": Tipo.ATAQUE, "rareza": 0, "dano": 5.0, "n": 1, "quema": 1, "radio": 26.0,
+		"desc": "La barra invita: explota y deja a todos ardiendo."},
+	"rayo": {"nombre": "Neón", "tipo": Tipo.ATAQUE, "rareza": 0, "dano": 3.0, "n": 3,
+		"desc": "Una descarga del cartel luminoso que salta entre 3 enemigos."},
+	"cuchilla": {"nombre": "Navaja del Tahúr", "tipo": Tipo.ATAQUE, "rareza": 1, "dano": 4.0, "n": 1,
+		"desc": "Una navaja orbita a tu alrededor durante el ciclo."},
+	"explosion": {"nombre": "Bote Gordo", "tipo": Tipo.ATAQUE, "rareza": 1, "dano": 8.0, "n": 1,
+		"desc": "Revienta el grupo más cercano. Daña en área."},
+	"nova": {"nombre": "Ronda para Todos", "tipo": Tipo.ATAQUE, "rareza": 1, "dano": 2.0, "n": 8,
+		"desc": "Ocho monedas en todas direcciones."},
+	"boomerang": {"nombre": "Baraja de Vuelta", "tipo": Tipo.ATAQUE, "rareza": 1, "dano": 4.0, "n": 1, "perfora": 99, "vuelve": true,
+		"desc": "Sale, lo atraviesa todo y regresa a tu mano."},
+	"lluvia": {"nombre": "Lluvia de Fichas", "tipo": Tipo.ATAQUE, "rareza": 1, "dano": 4.0, "n": 4, "radio": 16.0,
+		"desc": "Cuatro fichas caen sobre los enemigos más cercanos."},
+	"as_picas": {"nombre": "As de Picas", "tipo": Tipo.ATAQUE, "rareza": 2, "dano": 16.0, "n": 1, "perfora": 4,
+		"desc": "Un solo naipe, muy fuerte, que atraviesa 4 enemigos."},
+	"jackpot": {"nombre": "Jackpot", "tipo": Tipo.ATAQUE, "rareza": 2, "dano": 20.0, "n": 1, "radio": 70.0,
+		"desc": "Tres sietes. Una explosión enorme."},
+
+	# ---- Modificadores: los gasta el siguiente ataque de su derecha.
+	"ciega_peq": {"nombre": "Ciega Pequeña", "tipo": Tipo.MODIFICADOR, "rareza": 0, "mod": "dano", "valor": 2.0,
+		"desc": "El siguiente ataque hace +2 de daño."},
+	"afilar": {"nombre": "Apuesta Alta", "tipo": Tipo.MODIFICADOR, "rareza": 0, "mod": "dano", "valor": 3.0,
+		"desc": "El siguiente ataque hace +3 de daño."},
+	"ciega_grande": {"nombre": "Ciega Grande", "tipo": Tipo.MODIFICADOR, "rareza": 1, "mod": "dano", "valor": 5.0,
+		"desc": "El siguiente ataque hace +5 de daño."},
+	"subir": {"nombre": "Subir la Apuesta", "tipo": Tipo.MODIFICADOR, "rareza": 1, "mod": "pct", "valor": 0.5,
+		"desc": "El siguiente ataque hace un 50% más de daño."},
+	"doble": {"nombre": "Doblar", "tipo": Tipo.MODIFICADOR, "rareza": 1, "mod": "n", "valor": 1,
+		"desc": "El siguiente ataque lanza +1 proyectil."},
+	"perforar": {"nombre": "Farol", "tipo": Tipo.MODIFICADOR, "rareza": 0, "mod": "perfora", "valor": 2,
+		"desc": "El siguiente ataque atraviesa 2 enemigos más (o gana alcance)."},
+	"quemar": {"nombre": "Mesa Caliente", "tipo": Tipo.MODIFICADOR, "rareza": 0, "mod": "quema", "valor": 1,
+		"desc": "El siguiente ataque deja a los enemigos ardiendo."},
+	"rebote": {"nombre": "Carambola", "tipo": Tipo.MODIFICADOR, "rareza": 1, "mod": "rebote", "valor": 2,
+		"desc": "El siguiente ataque rebota 2 veces hacia otro enemigo."},
+	"hielo": {"nombre": "Sangre Fría", "tipo": Tipo.MODIFICADOR, "rareza": 0, "mod": "frio", "valor": 1,
+		"desc": "El siguiente ataque ralentiza a los enemigos."},
+	"marcada": {"nombre": "Carta Marcada", "tipo": Tipo.MODIFICADOR, "rareza": 1, "mod": "crit", "valor": 0.25,
+		"desc": "El siguiente ataque tiene un 25% de hacer daño doble."},
+	"ficha_oro": {"nombre": "Ficha de Oro", "tipo": Tipo.MODIFICADOR, "rareza": 1, "mod": "oro", "valor": 1,
+		"desc": "Lo que mate el siguiente ataque suelta siempre una moneda."},
+	"resto": {"nombre": "Todo al Resto", "tipo": Tipo.MODIFICADOR, "rareza": 2, "mod": "resto", "valor": 8,
+		"desc": "El siguiente ataque hace +1 de daño por cada 8 monedas que tengas."},
+	"comodin": {"nombre": "Comodín", "tipo": Tipo.MODIFICADOR, "rareza": 2, "mod": "comodin", "valor": 0,
+		"desc": "Se convierte en una copia de la carta de su izquierda."},
+	"tapete": {"nombre": "Tapete Verde", "tipo": Tipo.MODIFICADOR, "rareza": 2, "mod": "aura", "valor": 2.0,
+		"desc": "TODOS los ataques a su derecha hacen +2 de daño."},
+	"alfombra": {"nombre": "Alfombra Roja", "tipo": Tipo.MODIFICADOR, "rareza": 2, "mod": "aura_perfora", "valor": 1,
+		"desc": "TODOS los ataques a su derecha atraviesan 1 enemigo más."},
+
+	# ---- Multiplicadores: solo miran lo que tienen a su izquierda.
+	"propina": {"nombre": "Propina", "tipo": Tipo.MULTIPLICADOR, "rareza": 0, "mult": "fijo", "valor": 1.5,
+		"desc": "x1.5 a todo lo que tiene a la izquierda."},
+	"eco": {"nombre": "Reapuesta", "tipo": Tipo.MULTIPLICADOR, "rareza": 1, "mult": "eco",
+		"desc": "Repite el ataque anterior a la mitad de daño."},
+	"doble_nada": {"nombre": "Doble o Nada", "tipo": Tipo.MULTIPLICADOR, "rareza": 2, "mult": "fijo", "valor": 2.0,
+		"desc": "x2 a todo lo que tiene a la izquierda."},
+	"pareja": {"nombre": "Pareja", "tipo": Tipo.MULTIPLICADOR, "rareza": 0, "mult": "iguales", "cuantas": 2, "valor": 2.0,
+		"desc": "x2 si a su izquierda hay dos cartas iguales."},
+	"trio": {"nombre": "Trío", "tipo": Tipo.MULTIPLICADOR, "rareza": 1, "mult": "iguales", "cuantas": 3, "valor": 3.0,
+		"desc": "x3 si a su izquierda hay tres cartas iguales."},
+	"poker": {"nombre": "Póker", "tipo": Tipo.MULTIPLICADOR, "rareza": 2, "mult": "iguales", "cuantas": 4, "valor": 6.0,
+		"desc": "x6 si a su izquierda hay cuatro cartas iguales."},
+	"full": {"nombre": "Full", "tipo": Tipo.MULTIPLICADOR, "rareza": 2, "mult": "full", "valor": 5.0,
+		"desc": "x5 si a su izquierda hay un trío y una pareja distintos."},
+	"color": {"nombre": "Color", "tipo": Tipo.MULTIPLICADOR, "rareza": 1, "mult": "color", "valor": 3.0,
+		"desc": "x3 si a su izquierda hay 3 cartas o más y todas son del mismo tipo."},
+	"escalera": {"nombre": "Escalera", "tipo": Tipo.MULTIPLICADOR, "rareza": 1, "mult": "escalera", "valor": 0.5,
+		"desc": "x1 más x0.5 por cada ataque a su izquierda."},
+	"cara_cruz": {"nombre": "Cara o Cruz", "tipo": Tipo.MULTIPLICADOR, "rareza": 1, "mult": "cara_cruz",
+		"desc": "Cada ciclo tira una moneda: x3 o x1."},
+	"all_in": {"nombre": "All In", "tipo": Tipo.MULTIPLICADOR, "rareza": 1, "mult": "all_in", "valor": 3.0,
+		"desc": "x3 si está en la última ranura y la fila está llena."},
+	"racha": {"nombre": "Racha Caliente", "tipo": Tipo.MULTIPLICADOR, "rareza": 1, "mult": "racha", "valor": 0.25,
+		"desc": "+x0.25 por cada sala seguida limpiada sin recibir daño."},
+	"hucha": {"nombre": "Hucha", "tipo": Tipo.MULTIPLICADOR, "rareza": 2, "mult": "hucha", "valor": 0.25,
+		"desc": "+x0.25 por cada 10 monedas que tengas."},
+	"mano_muerta": {"nombre": "Mano del Muerto", "tipo": Tipo.MULTIPLICADOR, "rareza": 1, "mult": "mano_muerta", "valor": 3.0,
+		"desc": "x3 si te queda un corazón o menos."},
+	"solitario": {"nombre": "Solitario", "tipo": Tipo.MULTIPLICADOR, "rareza": 1, "mult": "solitario", "valor": 3.0,
+		"desc": "x3 si es el único multiplicador de la fila."},
+	"casa": {"nombre": "La Casa Gana", "tipo": Tipo.MULTIPLICADOR, "rareza": 2, "mult": "casa", "valor": 2.5,
+		"desc": "x2.5, pero te cuesta 1 moneda en cada ciclo."},
+}
+
+
+static func nombre(id: String) -> String:
+	return Idioma.t(CARTAS[id].nombre)
+
+
+static func descripcion(id: String) -> String:
+	return Idioma.t(CARTAS[id].desc)
+
+
+static func textura(id: String) -> Texture2D:
+	return load("res://assets/cartas/%s.png" % id)

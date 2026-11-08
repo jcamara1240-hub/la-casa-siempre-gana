@@ -1,0 +1,151 @@
+class_name Idioma
+extends RefCounted
+## Traducciones. El texto en español hace de clave: si falta una, se ve en español
+## y tests/prueba_combo.gd avisa.
+
+const IDIOMAS := ["es", "en"]
+const NOMBRES := {"es": "ESPAÑOL", "en": "ENGLISH"}
+
+static var actual := "es"
+
+const EN := {
+	# Cartas: ataques
+	"Calderilla": "Pocket Change", "Lanza una moneda al enemigo más cercano.": "Throws a coin at the nearest enemy.",
+	"Abanico de Naipes": "Card Fan", "Tres naipes en abanico, de corto alcance.": "Three cards in a short-range fan.",
+	"Reparto Rápido": "Quick Deal", "Tres cartas seguidas en línea recta.": "Three cards dealt in a straight line.",
+	"Bola de Ruleta": "Roulette Ball", "Va saltando de enemigo en enemigo, hasta 4 veces.": "Bounces from enemy to enemy, up to 4 times.",
+	"Tirada de Dados": "Dice Roll", "Dos dados. Cada uno hace entre 1 y 7 de daño.": "Two dice. Each one deals 1 to 7 damage.",
+	"Cóctel Molotov": "Molotov Cocktail", "La barra invita: explota y deja a todos ardiendo.": "On the house: it explodes and sets everyone on fire.",
+	"Neón": "Neon", "Una descarga del cartel luminoso que salta entre 3 enemigos.": "A jolt from the neon sign that jumps between 3 enemies.",
+	"Navaja del Tahúr": "Cardsharp's Knife", "Una navaja orbita a tu alrededor durante el ciclo.": "A knife orbits around you during the cycle.",
+	"Bote Gordo": "Big Pot", "Revienta el grupo más cercano. Daña en área.": "Blows up the nearest group. Area damage.",
+	"Ronda para Todos": "Round for Everyone", "Ocho monedas en todas direcciones.": "Eight coins in every direction.",
+	"Baraja de Vuelta": "Returning Deck", "Sale, lo atraviesa todo y regresa a tu mano.": "Flies out, cuts through everything and comes back.",
+	"Lluvia de Fichas": "Chip Rain", "Cuatro fichas caen sobre los enemigos más cercanos.": "Four chips fall on the nearest enemies.",
+	"As de Picas": "Ace of Spades", "Un solo naipe, muy fuerte, que atraviesa 4 enemigos.": "A single, very strong card that pierces 4 enemies.",
+	"Jackpot": "Jackpot", "Tres sietes. Una explosión enorme.": "Three sevens. A huge explosion.",
+	# Cartas: modificadores
+	"Ciega Pequeña": "Small Blind", "El siguiente ataque hace +2 de daño.": "The next attack deals +2 damage.",
+	"Apuesta Alta": "High Stakes", "El siguiente ataque hace +3 de daño.": "The next attack deals +3 damage.",
+	"Ciega Grande": "Big Blind", "El siguiente ataque hace +5 de daño.": "The next attack deals +5 damage.",
+	"Subir la Apuesta": "Raise", "El siguiente ataque hace un 50% más de daño.": "The next attack deals 50% more damage.",
+	"Doblar": "Double Down", "El siguiente ataque lanza +1 proyectil.": "The next attack fires +1 projectile.",
+	"Farol": "Bluff", "El siguiente ataque atraviesa 2 enemigos más (o gana alcance).": "The next attack pierces 2 more enemies (or gains reach).",
+	"Mesa Caliente": "Hot Table", "El siguiente ataque deja a los enemigos ardiendo.": "The next attack sets enemies on fire.",
+	"Carambola": "Trick Shot", "El siguiente ataque rebota 2 veces hacia otro enemigo.": "The next attack bounces twice to another enemy.",
+	"Sangre Fría": "Cold Blood", "El siguiente ataque ralentiza a los enemigos.": "The next attack slows enemies.",
+	"Carta Marcada": "Marked Card", "El siguiente ataque tiene un 25% de hacer daño doble.": "The next attack has a 25% chance of double damage.",
+	"Ficha de Oro": "Gold Chip", "Lo que mate el siguiente ataque suelta siempre una moneda.": "Whatever the next attack kills always drops a coin.",
+	"Todo al Resto": "Go for Broke", "El siguiente ataque hace +1 de daño por cada 8 monedas que tengas.": "The next attack deals +1 damage for every 8 coins you hold.",
+	"Comodín": "Wild Card", "Se convierte en una copia de la carta de su izquierda.": "Becomes a copy of the card to its left.",
+	"Tapete Verde": "Green Felt", "TODOS los ataques a su derecha hacen +2 de daño.": "ALL attacks to its right deal +2 damage.",
+	"Alfombra Roja": "Red Carpet", "TODOS los ataques a su derecha atraviesan 1 enemigo más.": "ALL attacks to its right pierce 1 more enemy.",
+	# Cartas: multiplicadores
+	"Propina": "Tip", "x1.5 a todo lo que tiene a la izquierda.": "x1.5 to everything on its left.",
+	"Reapuesta": "Rebet", "Repite el ataque anterior a la mitad de daño.": "Repeats the previous attack at half damage.",
+	"Doble o Nada": "Double or Nothing", "x2 a todo lo que tiene a la izquierda.": "x2 to everything on its left.",
+	"Pareja": "Pair", "x2 si a su izquierda hay dos cartas iguales.": "x2 if there are two matching cards on its left.",
+	"Trío": "Three of a Kind", "x3 si a su izquierda hay tres cartas iguales.": "x3 if there are three matching cards on its left.",
+	"Póker": "Four of a Kind", "x6 si a su izquierda hay cuatro cartas iguales.": "x6 if there are four matching cards on its left.",
+	"Full": "Full House", "x5 si a su izquierda hay un trío y una pareja distintos.": "x5 if there is a three of a kind and a different pair on its left.",
+	"Color": "Flush", "x3 si a su izquierda hay 3 cartas o más y todas son del mismo tipo.": "x3 if there are 3 or more cards on its left, all of the same type.",
+	"Escalera": "Straight", "x1 más x0.5 por cada ataque a su izquierda.": "x1 plus x0.5 for each attack on its left.",
+	"Cara o Cruz": "Heads or Tails", "Cada ciclo tira una moneda: x3 o x1.": "Flips a coin every cycle: x3 or x1.",
+	"All In": "All In", "x3 si está en la última ranura y la fila está llena.": "x3 if it is in the last slot and the row is full.",
+	"Racha Caliente": "Hot Streak", "+x0.25 por cada sala seguida limpiada sin recibir daño.": "+x0.25 for each room in a row cleared without taking damage.",
+	"Hucha": "Piggy Bank", "+x0.25 por cada 10 monedas que tengas.": "+x0.25 for every 10 coins you hold.",
+	"Mano del Muerto": "Dead Man's Hand", "x3 si te queda un corazón o menos.": "x3 if you have one heart or less.",
+	"Solitario": "Solitaire", "x3 si es el único multiplicador de la fila.": "x3 if it is the only multiplier in the row.",
+	"La Casa Gana": "The House Wins", "x2.5, pero te cuesta 1 moneda en cada ciclo.": "x2.5, but costs you 1 coin every cycle.",
+	"COMÚN": "COMMON", "RARA": "RARE", "LEGENDARIA": "LEGENDARY",
+	# Objetos
+	"Trébol de Cuatro Hojas": "Four-Leaf Clover", "Salen cartas mejores y +10% de golpe doble.": "Better cards appear and +10% double hit chance.",
+	"Herradura": "Horseshoe", "+1 corazón y te cura del todo.": "+1 heart and heals you fully.",
+	"Dado Cargado": "Loaded Die", "+15% de golpe doble.": "+15% double hit chance.",
+	"Zapatos de Charol": "Patent Leather Shoes", "Te mueves un 20% más rápido.": "You move 20% faster.",
+	"Traje de Etiqueta": "Tuxedo", "Tras un golpe eres invulnerable más tiempo.": "You stay invulnerable longer after a hit.",
+	"Gafas de Sol": "Sunglasses", "Las balas enemigas van un 25% más lentas.": "Enemy bullets are 25% slower.",
+	"Puro Habano": "Havana Cigar", "El humo quema a los enemigos que se te acercan.": "The smoke burns enemies that get close.",
+	"Whisky Doble": "Double Whisky", "Los ciclos de cartas son un 15% más rápidos.": "Card cycles are 15% faster.",
+	"Reloj de Oro": "Gold Watch", "Los ciclos un 10% más rápidos y +5 monedas.": "Cycles 10% faster and +5 coins.",
+	"Tarjeta VIP": "VIP Card", "Todo cuesta un 30% menos en la tienda.": "Everything costs 30% less in the shop.",
+	"Saco de Monedas": "Bag of Coins", "Cada sala limpiada te da 3 monedas.": "Each cleared room gives you 3 coins.",
+	"Imán": "Magnet", "Atraes las monedas desde mucho más lejos.": "You attract coins from much farther away.",
+	"Cartera de Piel": "Leather Wallet", "Al bajar de piso cobras un 25% de intereses.": "You earn 25% interest when you go down a floor.",
+	"Ficha VIP": "VIP Chip", "+1 ranura para cartas.": "+1 card slot.",
+	"Baraja Doble": "Double Deck", "20% de que un ciclo se ejecute dos veces.": "20% chance for a cycle to run twice.",
+	"Seguro de la Banca": "House Insurance", "Ignoras el primer golpe de cada sala.": "You ignore the first hit in each room.",
+	# Jefes
+	"EL PEZ ROJO": "THE RED FISH", "LA TRAGAPERRAS": "THE SLOT MACHINE", "LA RULETA": "THE ROULETTE",
+	"LA MOSCA CRUPIER": "THE CROUPIER FLY", "EL REY DEL 21": "THE KING OF 21",
+	"NO VA MÁS": "NO MORE BETS", "0 VERDE": "0 GREEN", "%d NEGRO": "%d BLACK", "%d ROJO": "%d RED",
+	"PUNTO %d  BANCA %d": "PLAYER %d  BANKER %d", "%d SE PASA": "%d BUST", "BLACKJACK": "BLACKJACK", "SE PLANTA %d": "STANDS ON %d",
+	# Barra y marcador
+	"DAÑO POR CICLO": "DAMAGE PER CYCLE", "   SIN EFECTO AQUÍ": "   NO EFFECT HERE",
+	"FILA LLENA. HAZ CLIC EN LA CARTA QUE QUIERAS CAMBIAR. CLIC DERECHO: CANCELAR.": "ROW FULL. CLICK THE CARD YOU WANT TO REPLACE. RIGHT CLICK: CANCEL.",
+	"LAS CARTAS SE COLOCAN CUANDO LA SALA ESTÉ LIMPIA.": "CARDS CAN BE MOVED ONCE THE ROOM IS CLEAR.",
+	"ARRASTRA LAS CARTAS PARA CAMBIAR EL ORDEN. SE EJECUTAN DE IZQUIERDA A DERECHA.": "DRAG THE CARDS TO CHANGE THE ORDER. THEY RUN FROM LEFT TO RIGHT.",
+	"PISO %d/%d": "FLOOR %d/%d", "SALTAR": "SKIP", "PULSA ENTER": "PRESS ENTER",
+	# Partida
+	"PISO %d": "FLOOR %d", "AL FONDO TE ESPERA %s": "%s AWAITS YOU BELOW",
+	"E: COMPRAR": "E: BUY", "YA TIENES LA VIDA LLENA": "YOUR HEALTH IS ALREADY FULL", "NO CABEN MÁS RANURAS": "NO ROOM FOR MORE SLOTS",
+	"NO TE LLEGA": "NOT ENOUGH COINS", "NECESITAS AL MENOS UNA CARTA DE ATAQUE": "YOU NEED AT LEAST ONE ATTACK CARD",
+	"Corazón": "Heart", "Recuperas un corazón.": "Restores one heart.",
+	"Ranura Extra": "Extra Slot", "Una ranura más en la fila de cartas.": "One more slot in the card row.",
+	"Volver a Barajar": "Reshuffle", "Cambia las cartas de la tienda. Cada vez cuesta más.": "Replaces the shop's cards. Costs more every time.",
+	"ELIGE UNA CARTA": "CHOOSE A CARD", "¡TESORO!": "TREASURE!",
+	"LA CASA GANA": "THE HOUSE WINS", "HAS CAÍDO EN EL PISO %d DE %d.": "YOU FELL ON FLOOR %d OF %d.",
+	"HAS DESBANCADO A LA CASA": "YOU BROKE THE BANK", "POR ESTA VEZ, LA CASA HA PERDIDO.": "JUST THIS ONCE, THE HOUSE LOST.",
+	"ENEMIGOS ELIMINADOS: %d": "ENEMIES DEFEATED: %d", "MONEDAS EN EL BOLSILLO: %d": "COINS IN YOUR POCKET: %d", "OBJETOS: %d": "ITEMS: %d",
+	# Menú
+	"LA CASA SIEMPRE GANA": "THE HOUSE ALWAYS WINS", "JUGAR": "PLAY", "OPCIONES": "OPTIONS", "SALIR": "QUIT",
+	"CONTINUAR": "CONTINUE", "MENÚ PRINCIPAL": "MAIN MENU", "PAUSA": "PAUSED", "VOLVER": "BACK",
+	"IDIOMA: %s": "LANGUAGE: %s", "PANTALLA COMPLETA: %s": "FULLSCREEN: %s", "SACUDIDA DE PANTALLA: %s": "SCREEN SHAKE: %s",
+	"NÚMEROS DE DAÑO: %s": "DAMAGE NUMBERS: %s", "SÍ": "ON", "NO": "OFF",
+	"MUÉVETE CON WASD O LAS FLECHAS. TU PERSONAJE ATACA SOLO.": "MOVE WITH WASD OR THE ARROW KEYS. YOUR CHARACTER ATTACKS BY ITSELF.",
+	"CADA CICLO, TUS CARTAS SE EJECUTAN DE IZQUIERDA A DERECHA.": "EVERY CYCLE, YOUR CARDS RUN FROM LEFT TO RIGHT.",
+	"EL ORDEN IMPORTA: PONLAS BIEN ENTRE SALA Y SALA.": "ORDER MATTERS: ARRANGE THEM BETWEEN ROOMS.",
+	# Personajes y mesas
+	"El Tahúr": "The Cardsharp", "Sus cartas están marcadas: +10% de golpe doble.": "Marked cards: +10% double hit chance.",
+	"El Borracho": "The Drunk", "Ciclos un 30% más rápidos, pero anda haciendo eses.": "Cycles 30% faster, but staggers around.",
+	"La Crupier": "The Dealer", "La tienda le cuesta un 25% menos.": "The shop costs her 25% less.",
+	"La Heredera": "The Heiress", "Si le golpean paga 8 monedas en vez de vida.": "When hit she pays 8 coins instead of health.",
+	"Vence al Pez Rojo.": "Beat the Red Fish.", "Vence a 3 jefes distintos.": "Beat 3 different bosses.", "Gana una partida.": "Win a run.",
+	"Mesa Blanca": "White Table", "Las reglas de siempre.": "The usual rules.",
+	"Mesa Roja": "Red Table", "Enemigos con un 25% más de vida.": "Enemies have 25% more health.",
+	"Mesa Verde": "Green Table", "Lo anterior y más enemigos en cada sala.": "All of the above and more enemies per room.",
+	"Mesa Negra": "Black Table", "Lo anterior y la tienda un 30% más cara.": "All of the above and the shop costs 30% more.",
+	"Mesa de Oro": "Gold Table", "Lo anterior, jefes más duros y un corazón menos.": "All of the above, tougher bosses and one less heart.",
+	"ELIGE A TU JUGADOR": "CHOOSE YOUR PLAYER", "EMPEZAR": "START", "BLOQUEADO": "LOCKED", "VIDA %d   MONEDAS %d": "HEALTH %d   COINS %d",
+	# Colección y progreso
+	"COLECCIÓN": "COLLECTION", "CARTAS %d/%d   OBJETOS %d/%d   JEFES %d/%d   VICTORIAS %d": "CARDS %d/%d   ITEMS %d/%d   BOSSES %d/%d   WINS %d",
+	"VENCE A LOS JEFES PARA DESCUBRIRLO.": "BEAT BOSSES TO DISCOVER IT.", "DESBLOQUEADO: %s": "UNLOCKED: %s",
+	"MÚSICA: %d%%": "MUSIC: %d%%", "EFECTOS: %d%%": "SOUND EFFECTS: %d%%",
+	# Transformaciones
+	"El Mafioso": "The Mobster", "Todos tus ataques hacen +2 de daño.": "All your attacks deal +2 damage.",
+	"El Suertudo": "The Lucky One", "Tus golpes dobles hacen daño triple.": "Your double hits deal triple damage.",
+	"El Magnate": "The Tycoon", "Cada moneda que recoges vale doble.": "Every coin you pick up counts double.",
+	"El Fullero": "The Cheater", "+30% de que un ciclo se ejecute dos veces.": "+30% chance for a cycle to run twice.",
+	"El Noctámbulo": "The Night Owl", "+15% de velocidad y más invulnerabilidad.": "+15% speed and longer invulnerability.",
+	"REÚNE %d DE:": "COLLECT %d OF:",
+	# Eventos
+	"LA CASA SIEMPRE GANA.": "THE HOUSE ALWAYS WINS.", "MARCHARSE": "LEAVE", "LOS TRILEROS": "THE SHELL GAME", "DOBLE O NADA": "DOUBLE OR NOTHING", "EL PRESTAMISTA": "THE LOAN SHARK", "LA BARRA": "THE BAR",
+	"SIGUE LA MONEDA. SI ACIERTAS, COBRAS DOS VECES Y MEDIA.": "FOLLOW THE COIN. GUESS RIGHT AND GET 2.5 TIMES YOUR BET.",
+	"PON TUS MONEDAS Y VE DOBLANDO. SI FALLAS, LO PIERDES TODO.": "PUT IN YOUR COINS AND KEEP DOUBLING. MISS AND YOU LOSE IT ALL.",
+	"APOSTAR %d": "BET %d", "MIRA BIEN...": "WATCH CLOSELY...", "MEZCLANDO...": "SHUFFLING...", "¡BIEN VISTO! COBRAS %d.": "WELL SPOTTED! YOU GET %d.",
+	"OTRA RONDA": "ANOTHER ROUND", "EN JUEGO: %d": "AT STAKE: %d", "DOBLAR": "DOUBLE", "COBRAR %d": "CASH OUT %d",
+	"LA MONEDA ESTÁ EN EL AIRE...": "THE COIN IS IN THE AIR...", "¡CARA! EN JUEGO: %d": "HEADS! AT STAKE: %d", "CRUZ. LO HAS PERDIDO TODO.": "TAILS. YOU LOST IT ALL.",
+	"TE LLEVAS %d MONEDAS.": "YOU TAKE %d COINS.", "YO SIEMPRE TENGO DINERO. OTRA COSA ES LO QUE ME DES A CAMBIO.": "I ALWAYS HAVE MONEY. WHAT YOU GIVE ME IN RETURN IS ANOTHER MATTER.",
+	"VENDER UN CORAZÓN: +30 MONEDAS": "SELL A HEART: +30 COINS", "PRÉSTAMO: +40 AHORA, DEBES 60 AL BAJAR DE PISO": "LOAN: +40 NOW, OWE 60 ON THE NEXT FLOOR",
+	"UN PLACER HACER NEGOCIOS.": "A PLEASURE DOING BUSINESS.", "SI NO PAGAS, TE COBRO UN CORAZÓN.": "IF YOU DON'T PAY, I TAKE A HEART.",
+	"¿QUÉ TE PONGO?": "WHAT'LL IT BE?", "COPA DE LA CASA (8): CURA UN CORAZÓN": "HOUSE DRINK (8): HEALS ONE HEART", "CHUPITO MISTERIOSO (5)": "MYSTERY SHOT (5)",
+	"SIENTA BIEN: RECUPERAS UN CORAZÓN.": "FEELS GOOD: YOU RECOVER ONE HEART.", "ENCUENTRAS 15 MONEDAS EN EL FONDO DEL VASO.": "YOU FIND 15 COINS AT THE BOTTOM OF THE GLASS.",
+	"APARECE UNA CARTA BAJO EL POSAVASOS: %s.": "A CARD APPEARS UNDER THE COASTER: %s.", "NO DEBISTE BEBER ESO: PIERDES MEDIO CORAZÓN.": "YOU SHOULDN'T HAVE DRUNK THAT: YOU LOSE HALF A HEART.",
+	"¿DÓNDE ESTÁ? HAZ CLIC EN UNA COPA.": "WHERE IS IT? CLICK A CUP.", "DEUDA %d": "DEBT %d", "PAGAS TU DEUDA": "YOU PAY YOUR DEBT", "EL PRESTAMISTA TE COBRA UN CORAZÓN": "THE LOAN SHARK TAKES A HEART",
+}
+
+
+static func t(texto: String) -> String:
+	if actual == "en":
+		return EN.get(texto, texto)
+	return texto
