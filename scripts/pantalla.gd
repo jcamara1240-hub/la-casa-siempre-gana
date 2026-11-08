@@ -4,6 +4,7 @@ extends Control
 ## Si pierdes, solo el marcador. Enter salta la animación y, ya terminada, sale.
 
 signal aceptada
+signal seguir_infinito
 
 const COLOR_CREMA := Color8(247, 236, 210)
 const COLOR_ORO := Color8(247, 198, 74)
@@ -17,8 +18,11 @@ const SEG_POR_DESBLOQUEO := 0.2
 const POR_FILA := 16
 const ANCHO_CASILLA := 36.0
 const MAX_NOVEDADES := 32
+const CAJA_SEGUIR := Rect2(120, 334, 190, 18)
+const CAJA_MENU := Rect2(330, 334, 190, 18)
 
 var _gano := false
+var _opcion := 0
 var _t := 0.0
 var _inicio_datos := 0.4
 var _inicio_novedades := 0.0
@@ -46,6 +50,7 @@ func _ready() -> void:
 
 func mostrar_final(gano: bool) -> void:
 	_gano = gano
+	_opcion = 0
 	_t = 0.0
 	_sonados.clear()
 	_monedas.clear()
@@ -72,8 +77,30 @@ func _preparar_datos() -> void:
 		{"texto": "PUNTOS", "valor": Juego.puntos_reto(_gano)} if Juego.diario else {"texto": "OBJETOS", "valor": Juego.objetos.size()},
 		{"texto": "TIEMPO", "fijo": "%d:%02d" % [minutos, segundos]},
 		{"texto": "PERSONAJE", "fijo": PersonajesDB.nombre(Juego.personaje).to_upper()},
-		{"texto": "MESA", "fijo": Idioma.t("EXTREMO") if Juego.extremo else Idioma.t(PersonajesDB.MESAS[Juego.mesa].nombre).to_upper()},
+		{"texto": "MESA", "fijo": _nombre_mesa()},
 	]
+	if Juego.infinito:
+		_datos.append({"texto": "RÉCORD INFINITO", "valor": Progreso.mejor_infinito})
+
+
+func _nombre_mesa() -> String:
+	if Juego.imposible:
+		return Idioma.t("IMPOSIBLE")
+	return Idioma.t("EXTREMO") if Juego.extremo else Idioma.t(PersonajesDB.MESAS[Juego.mesa].nombre).to_upper()
+
+
+## Tras ganar se puede seguir bajando, salvo en el reto diario: su marca ya está hecha.
+func _hay_oferta() -> bool:
+	return _gano and not Juego.diario and animacion_terminada()
+
+
+func _elegir(opcion: int) -> void:
+	Sonido.tocar("clic")
+	visible = false
+	if opcion == 0:
+		seguir_infinito.emit()
+	else:
+		aceptada.emit()
 
 
 ## Se cargan aquí y no al pintar: una textura cargada durante _draw sale en blanco.
@@ -149,11 +176,29 @@ func _mover_monedas(delta: float) -> void:
 
 func _gui_input(evento: InputEvent) -> void:
 	if evento is InputEventMouseButton and evento.pressed and evento.button_index == MOUSE_BUTTON_LEFT:
-		_avanzar()
+		if not _hay_oferta():
+			_avanzar()
+		elif CAJA_SEGUIR.has_point(evento.position):
+			_elegir(0)
+		elif CAJA_MENU.has_point(evento.position):
+			_elegir(1)
 
 
 func _unhandled_input(evento: InputEvent) -> void:
 	if not visible or not (evento is InputEventKey) or not evento.pressed or evento.echo:
+		return
+	if _hay_oferta():
+		match evento.keycode:
+			KEY_LEFT, KEY_RIGHT, KEY_A, KEY_D:
+				_opcion = 1 - _opcion
+				Sonido.tocar("clic")
+			KEY_ENTER, KEY_KP_ENTER, KEY_SPACE:
+				_elegir(_opcion)
+			KEY_ESCAPE:
+				_elegir(1)
+			_:
+				return
+		get_viewport().set_input_as_handled()
 		return
 	if evento.keycode not in [KEY_ENTER, KEY_KP_ENTER, KEY_SPACE, KEY_ESCAPE]:
 		return
@@ -190,8 +235,20 @@ func _draw() -> void:
 		_dibujar_jugador()
 	if _t >= _inicio_novedades and not _novedades.is_empty():
 		_dibujar_novedades()
-	if animacion_terminada() and fmod(_t, 1.0) < 0.65:
+	if _hay_oferta():
+		_dibujar_oferta()
+	elif animacion_terminada() and fmod(_t, 1.0) < 0.65:
 		draw_string(Juego.fuente, Vector2(0, 352), Idioma.t("TOCA PARA CONTINUAR") if Juego.tactil else Idioma.t("PULSA ENTER"), HORIZONTAL_ALIGNMENT_CENTER, 640, 8, Color8(108, 207, 148))
+
+
+func _dibujar_oferta() -> void:
+	var cajas := [CAJA_SEGUIR, CAJA_MENU]
+	var textos := [Idioma.t("SEGUIR: MODO INFINITO"), Idioma.t("SALIR AL MENÚ")]
+	for i in 2:
+		var elegida := i == _opcion
+		draw_rect(cajas[i], Color8(143, 35, 64) if elegida and i == 0 else Color8(74, 52, 102) if elegida else Color8(42, 31, 61))
+		draw_rect(cajas[i], COLOR_ORO if elegida else COLOR_GRIS, false, 1.0)
+		draw_string(Juego.fuente, cajas[i].position + Vector2(0, 13), textos[i], HORIZONTAL_ALIGNMENT_CENTER, cajas[i].size.x, 8, COLOR_CREMA)
 
 
 func _dibujar_monedas() -> void:
@@ -233,7 +290,7 @@ func _dibujar_titulo() -> void:
 	if _gano:
 		frase = Idioma.t("POR ESTA VEZ, LA CASA HA PERDIDO.")
 	else:
-		frase = Idioma.t("HAS CAÍDO EN EL PISO %d DE %d.") % [Juego.piso, Juego.PISOS_TOTALES]
+		frase = (Idioma.t("HAS LLEGADO AL PISO %d EN EL MODO INFINITO.") % Juego.piso) if Juego.infinito else (Idioma.t("HAS CAÍDO EN EL PISO %d DE %d.") % [Juego.piso, Juego.PISOS_TOTALES])
 	draw_string(Juego.fuente, Vector2(0, 100), frase, HORIZONTAL_ALIGNMENT_CENTER, 640, 8, COLOR_CREMA)
 
 

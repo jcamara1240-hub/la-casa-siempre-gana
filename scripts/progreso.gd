@@ -9,6 +9,7 @@ const OBJETOS_INICIALES := ["herradura", "zapatos", "gafas", "whisky", "tarjeta"
 static var partidas := 0
 static var victorias := 0
 static var victorias_extremo := 0
+static var mejor_infinito := 0
 static var mesa_max := 0
 static var jefes_vencidos: Array = []
 static var cartas_extra: Array = []
@@ -29,6 +30,7 @@ static func cargar() -> void:
 	partidas = cfg.get_value("progreso", "partidas", 0)
 	victorias = cfg.get_value("progreso", "victorias", 0)
 	victorias_extremo = cfg.get_value("progreso", "victorias_extremo", 0)
+	mejor_infinito = cfg.get_value("progreso", "mejor_infinito", 0)
 	mesa_max = cfg.get_value("progreso", "mesa_max", 0)
 	jefes_vencidos = cfg.get_value("progreso", "jefes_vencidos", [])
 	cartas_extra = cfg.get_value("progreso", "cartas_extra", [])
@@ -47,6 +49,7 @@ static func guardar() -> void:
 	cfg.set_value("progreso", "partidas", partidas)
 	cfg.set_value("progreso", "victorias", victorias)
 	cfg.set_value("progreso", "victorias_extremo", victorias_extremo)
+	cfg.set_value("progreso", "mejor_infinito", mejor_infinito)
 	cfg.set_value("progreso", "mesa_max", mesa_max)
 	cfg.set_value("progreso", "jefes_vencidos", jefes_vencidos)
 	cfg.set_value("progreso", "cartas_extra", cartas_extra)
@@ -121,6 +124,11 @@ static func al_ganar(mesa: int, extremo := false, personaje := "tahur") -> Array
 		nuevo.append({"tipo": "mesa", "id": str(mesa_max)})
 	guardar()
 	return nuevo
+
+
+static func registrar_infinito(piso: int) -> void:
+	mejor_infinito = maxi(mejor_infinito, piso)
+	guardar()
 
 
 static func al_terminar_partida() -> Array:

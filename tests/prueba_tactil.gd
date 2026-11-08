@@ -72,6 +72,7 @@ func _correr() -> void:
 	await _esperar(4)
 	var r = m._recogibles.get_child(3)
 	J.oro = 200
+	J.vida = 1  # por si el artículo es un corazón: con la vida llena no se vende
 	m.jugador.position = r.position
 	await _esperar(4)
 	_ok(m.articulo_a_mano() != null, "cerca de un artículo aparece Comprar")

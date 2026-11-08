@@ -30,6 +30,12 @@ static func crear(id: String) -> Jefe:
 	return JefePez.new()
 
 
+const DANO_MAX_SEGUNDO := 0.10  # parte de su vida que puede perder por segundo
+
+var _dano_segundo := 0.0
+var _reloj_dano := 1.0
+
+
 func preparar(multiplicador: float) -> void:
 	tipo = "jefe"
 	radio = 21.0
@@ -58,6 +64,10 @@ func _comportamiento(_delta: float, _horda: Horda) -> void:
 
 
 func actualizar(delta: float, horda: Horda) -> void:
+	_reloj_dano -= delta
+	if _reloj_dano <= 0.0:
+		_reloj_dano = 1.0
+		_dano_segundo = 0.0
 	_t += delta
 	if _nacer > 0.0:
 		_nacer -= delta
@@ -75,6 +85,13 @@ func enfadado() -> bool:
 
 
 func aplicar_golpe(dano: float, _retroceso: Vector2) -> void:
+	# Por muy bestia que sea el combo, desde el piso 2 no se les revienta de un golpe.
+	if Juego.piso >= 2:
+		# En el modo infinito ese tope baja: cada jefe aguanta más que el anterior.
+		var tope := maxf(DANO_MAX_SEGUNDO * pow(0.93, Juego.pisos_extra()), 0.03)
+		var disponible := maxf(vida_max * tope - _dano_segundo, 0.0)
+		dano = minf(dano, disponible)
+		_dano_segundo += dano
 	super.aplicar_golpe(dano, Vector2.ZERO)
 
 

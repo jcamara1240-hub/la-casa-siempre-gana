@@ -146,6 +146,9 @@ func _draw() -> void:
 	if Progreso.victorias_extremo > 0:
 		draw_string(Juego.fuente, Vector2(0, 256), Idioma.t("EXTREMO SUPERADO: %d") % Progreso.victorias_extremo,
 				HORIZONTAL_ALIGNMENT_RIGHT, 596, 8, Color8(214, 61, 79))
+	if Progreso.mejor_infinito > 0:
+		draw_string(Juego.fuente, Vector2(0, 244), Idioma.t("RÉCORD INFINITO: PISO %d") % Progreso.mejor_infinito,
+				HORIZONTAL_ALIGNMENT_RIGHT, 596, 8, Color8(247, 198, 74))
 	draw_string(Juego.fuente, Vector2(44, 256), _titulo_info, HORIZONTAL_ALIGNMENT_LEFT, -1, 8, COLOR_ORO)
 	draw_multiline_string(Juego.fuente, Vector2(44, 270), _texto_info, HORIZONTAL_ALIGNMENT_LEFT, 552, 8, 3, COLOR_CREMA)
 	draw_rect(CAJA_VOLVER, Color8(42, 31, 61))

@@ -45,7 +45,8 @@ func recibir_golpe(cantidad := 1) -> void:
 	if coste > 0 and not Juego.extremo and Juego.gastar_oro(coste):
 		Sonido.tocar("perder")
 		return
-	Juego.herir(cantidad)
+	# En el modo infinito, cada cuatro pisos extra los golpes quitan un corazón más.
+	Juego.herir(cantidad + Juego.pisos_extra() / 4)
 	Sonido.tocar("dano")
 	golpeado.emit()
 

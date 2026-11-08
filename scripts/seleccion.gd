@@ -2,7 +2,7 @@ class_name Seleccion
 extends Control
 ## Elegir personaje y mesa antes de empezar.
 
-signal elegido(personaje: String, mesa: int, extremo: bool)
+signal elegido(personaje: String, mesa: int, extremo: bool, imposible: bool)
 signal atras
 
 const COLOR_CREMA := Color8(247, 236, 210)
@@ -21,7 +21,7 @@ var _ids: Array = []
 var _texturas := {}
 var _indice := 0
 var _mesa := 0
-var _extremo := false
+var _modo := 0  # 0: normal, 1: extremo, 2: imposible
 var _t := 0.0
 
 
@@ -56,7 +56,7 @@ func _empezar() -> void:
 		return
 	Sonido.tocar("clic")
 	visible = false
-	elegido.emit(id, _mesa, _extremo)
+	elegido.emit(id, _mesa, _modo == 1, _modo == 2)
 
 
 func _volver() -> void:
@@ -66,8 +66,8 @@ func _volver() -> void:
 
 
 func _cambiar_extremo() -> void:
-	_extremo = not _extremo
-	Sonido.tocar("mult" if _extremo else "clic")
+	_modo = (_modo + 1) % 3
+	Sonido.tocar("mult" if _modo > 0 else "clic")
 
 
 func _cambiar_mesa(sentido: int) -> void:
@@ -133,12 +133,12 @@ func _draw() -> void:
 	_centrado(Juego.fuente_grande, 16, Idioma.t(mesa.nombre).to_upper(), 214, 212, 254, COLOR_ORO)
 	_centrado(Juego.fuente_grande, 16, "<", FLECHA_IZQ.position.x, FLECHA_IZQ.size.x, 254, COLOR_CREMA)
 	_centrado(Juego.fuente_grande, 16, ">", FLECHA_DER.position.x, FLECHA_DER.size.x, 254, COLOR_CREMA)
-	var explicacion: String = Idioma.t("UN GOLPE Y A CASA. SIN TIENDA. JEFES CON EL TRIPLE DE VIDA.") if _extremo else Idioma.t(mesa.desc)
-	_centrado(Juego.fuente, 8, explicacion, 0, 640, 275, COLOR_ROJO_CLARO if _extremo else COLOR_GRIS)
-	draw_rect(CAJA_EXTREMO, Color8(143, 35, 64) if _extremo else Color8(42, 31, 61))
+	var explicacion: String = Idioma.t("COMO EL EXTREMO, PERO CON DOS RANURAS Y SIN SALAS DE TESORO.") if _modo == 2 else Idioma.t("UN GOLPE Y A CASA. SIN TIENDA. JEFES CON EL TRIPLE DE VIDA.") if _modo == 1 else Idioma.t(mesa.desc)
+	_centrado(Juego.fuente, 8, explicacion, 0, 640, 275, COLOR_ROJO_CLARO if _modo > 0 else COLOR_GRIS)
+	draw_rect(CAJA_EXTREMO, Color8(143, 35, 64) if _modo > 0 else Color8(42, 31, 61))
 	draw_rect(CAJA_EXTREMO, COLOR_ROJO_CLARO, false, 1.0)
-	var estado := Idioma.t("SÍ") if _extremo else Idioma.t("NO")
-	_centrado(Juego.fuente, 8, Idioma.t("MODO EXTREMO: %s") % estado, CAJA_EXTREMO.position.x, CAJA_EXTREMO.size.x, 293, COLOR_CREMA)
+	var estado := Idioma.t(["NORMAL", "EXTREMO", "IMPOSIBLE"][_modo])
+	_centrado(Juego.fuente, 8, Idioma.t("MODO: %s") % estado, CAJA_EXTREMO.position.x, CAJA_EXTREMO.size.x, 293, COLOR_CREMA)
 	var libre := Progreso.personaje_libre(_ids[_indice])
 	draw_rect(CAJA_EMPEZAR, Color8(122, 90, 160) if libre else Color8(42, 31, 61))
 	_centrado(Juego.fuente, 8, Idioma.t("EMPEZAR"), CAJA_EMPEZAR.position.x, CAJA_EMPEZAR.size.x, 315, COLOR_CREMA if libre else COLOR_GRIS)

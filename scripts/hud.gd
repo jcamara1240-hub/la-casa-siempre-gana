@@ -96,7 +96,7 @@ func _draw() -> void:
 		draw_texture_rect_region(_corazon, Rect2(6 + i * 11, 4, 9, 7), Rect2(columna * 9, 0, 9, 7))
 	draw_texture_rect_region(_moneda, Rect2(6, 15, 8, 8), Rect2(0, 0, 8, 8))
 	draw_string(Juego.fuente, Vector2(17, 23), str(Juego.oro), HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color8(247, 236, 210))
-	draw_string(Juego.fuente, Vector2(50, 23), Idioma.t("PISO %d/%d") % [Juego.piso, Juego.PISOS_TOTALES], HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color8(168, 154, 142))
+	draw_string(Juego.fuente, Vector2(50, 23), (Idioma.t("PISO %d INF") % Juego.piso) if Juego.infinito else (Idioma.t("PISO %d/%d") % [Juego.piso, Juego.PISOS_TOTALES]), HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color8(168, 154, 142))
 	_dibujar_objetos()
 	_dibujar_logro()
 	_dibujar_transformaciones()
@@ -104,8 +104,8 @@ func _draw() -> void:
 		draw_rect(Rect2(2, 28, 76, 11), Color(0.08, 0.06, 0.12, 0.8))
 		draw_string(Juego.fuente, Vector2(6, 37), Idioma.t("RETO DIARIO"), HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color8(108, 207, 148))
 	if Juego.extremo:
-		draw_rect(Rect2(2, 28, 58, 11), Color(0.08, 0.06, 0.12, 0.8))
-		draw_string(Juego.fuente, Vector2(6, 37), Idioma.t("EXTREMO"), HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color8(214, 61, 79))
+		draw_rect(Rect2(2, 28, 72 if Juego.imposible else 58, 11), Color(0.08, 0.06, 0.12, 0.8))
+		draw_string(Juego.fuente, Vector2(6, 37), Idioma.t("IMPOSIBLE") if Juego.imposible else Idioma.t("EXTREMO"), HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color8(214, 61, 79))
 	if Juego.deuda > 0:
 		draw_rect(Rect2(2, 28, 70, 11), Color(0.08, 0.06, 0.12, 0.8))
 		draw_string(Juego.fuente, Vector2(6, 37), Idioma.t("DEUDA %d") % Juego.deuda, HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color8(214, 61, 79))

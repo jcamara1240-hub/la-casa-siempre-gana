@@ -10,6 +10,7 @@ const PRECIO_REBARAJAR := 6
 const VIDA_JEFE_EXTREMO := 3.0
 const VIDA_JEFE_NORMAL := 1.4
 const PROB_ELITE := 0.08
+const PRESUPUESTO_MAX := 180
 const TINTE_PISO := [Color.WHITE, Color(0.8, 0.9, 1.1), Color(0.8, 1.05, 0.85), Color(1.1, 0.9, 0.75), Color(1.15, 0.75, 0.8)]
 # tipo, coste en el presupuesto, piso mínimo, salas limpiadas mínimas, peso
 const CATALOGO := [
@@ -98,6 +99,7 @@ func _ready() -> void:
 	_barra.sustitucion_elegida.connect(_al_sustituir)
 	_barra.sustitucion_cancelada.connect(_cerrar_selector)
 	_pantalla.aceptada.connect(_al_cerrar_final)
+	_pantalla.seguir_infinito.connect(_seguir_infinito)
 	_menu.jugar.connect(empezar_partida)
 	_menu.continuar.connect(_reanudar)
 	_menu.ir_a_portada.connect(_ir_al_menu)
@@ -159,6 +161,15 @@ func _al_cerrar_final() -> void:
 		_reto.abrir()
 
 
+## Tras ganar se sigue bajando con todo lo que llevabas.
+func _seguir_infinito() -> void:
+	Juego.empezar_infinito()
+	get_tree().paused = false
+	Sonido.musica("piso")
+	_bajar_piso()
+	_aviso.text = Idioma.t("MODO INFINITO: CADA PISO ES PEOR QUE EL ANTERIOR.")
+
+
 func _reanudar() -> void:
 	get_tree().paused = false
 
@@ -176,8 +187,8 @@ func empezar_reto() -> void:
 	_arrancar()
 
 
-func empezar_partida(personaje := "", mesa := -1, extremo := false) -> void:
-	Juego.nueva_partida(0, personaje, mesa, extremo)
+func empezar_partida(personaje := "", mesa := -1, extremo := false, imposible := false) -> void:
+	Juego.nueva_partida(0, personaje, mesa, extremo, false, imposible)
 	_arrancar()
 
 
@@ -235,11 +246,12 @@ func _generar_piso() -> void:
 
 
 ## En modo extremo la tienda se convierte en una sala de combate más.
+## En el imposible, también el tesoro.
 func _quitar_tienda_si_extremo() -> void:
 	if not Juego.extremo:
 		return
 	for c in salas:
-		if salas[c].tipo == TIPO.TIENDA:
+		if salas[c].tipo == TIPO.TIENDA or (Juego.imposible and salas[c].tipo == TIPO.TESORO):
 			salas[c].tipo = TIPO.NORMAL
 			salas[c].limpia = false
 
@@ -335,7 +347,7 @@ func _empezar_combate() -> void:
 
 
 func _planificar_oleadas() -> Array:
-	var presupuesto := 11 + _salas_limpiadas * 3 + (Juego.piso - 1) * 10
+	var presupuesto := mini(11 + _salas_limpiadas * 3 + (Juego.piso - 1) * 10 + Juego.pisos_extra() * 6, PRESUPUESTO_MAX)
 	if Juego.mesa >= 2:
 		presupuesto = int(presupuesto * 1.3)
 	var numero_oleadas := 2 + mini(_salas_limpiadas / 3, 2)
@@ -382,12 +394,14 @@ func _soltar_oleada(grupo: Array) -> void:
 	var mult := 1.3 + (Juego.piso - 1) * 0.8 + _salas_limpiadas * 0.08
 	if Juego.mesa >= 1:
 		mult *= 1.25
+	mult *= pow(1.22, Juego.pisos_extra())
+	var prob_elite := minf(PROB_ELITE + Juego.pisos_extra() * 0.03, 0.4)
 	for tipo in grupo:
 		if _horda.enemigos.size() >= MAX_ENEMIGOS:
 			break
 		var p := _punto_lejos_del_jugador(azar)
 		var e := _horda.crear(tipo, p, mult)
-		if Juego.piso >= 2 and azar.randf() < PROB_ELITE:
+		if Juego.piso >= 2 and azar.randf() < prob_elite:
 			e.hacer_elite()
 
 
@@ -410,6 +424,7 @@ func _empezar_jefe() -> void:
 	jefe.position = Vector2(320, 110)
 	var vida_jefe := (1.0 + (Juego.piso - 1) * 0.9) * (1.4 if Juego.mesa >= 4 else 1.0)
 	vida_jefe *= VIDA_JEFE_EXTREMO if Juego.extremo else VIDA_JEFE_NORMAL
+	vida_jefe *= Juego.refuerzo_jefe()
 	jefe.preparar(vida_jefe)
 	mostrar_cartel(Idioma.t(jefe.nombre), "")
 	Sonido.tocar("jefe_aparece")
@@ -855,7 +870,7 @@ func recogido(r: Recogible) -> void:
 
 
 func _bajar_piso() -> void:
-	if Juego.piso >= Juego.PISOS_TOTALES:
+	if Juego.piso >= Juego.PISOS_TOTALES and not Juego.infinito:
 		_ganar()
 		return
 	Juego.piso += 1
@@ -924,7 +939,10 @@ func _acabar(gano: bool) -> void:
 	get_tree().paused = true
 	Sonido.musica("")
 	Guardado.borrar()
-	Juego.novedades += Progreso.al_terminar_partida()
+	if Juego.infinito:
+		Progreso.registrar_infinito(Juego.piso)
+	else:
+		Juego.novedades += Progreso.al_terminar_partida()
 	Juego.revisar_logros(gano)
 	if Juego.diario:
 		Progreso.registrar_reto(Juego.fecha_hoy(), Juego.puntos_reto(gano))

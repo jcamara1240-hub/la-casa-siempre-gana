@@ -22,6 +22,8 @@ Solo te mueves. Tu personaje ataca por su cuenta, y lo que hace depende de una f
 - 27 logros y partida guardada.
 - Lo que desbloqueas se queda guardado entre partidas.
 - Modo extremo: un golpe y a casa, sin tienda y con jefes que tienen el triple de vida.
+- Modo imposible: como el extremo, pero con solo dos ranuras de cartas y sin salas de tesoro.
+- Modo infinito: al ganar puedes seguir bajando con lo que llevas, y cada piso es peor que el anterior.
 - Se puede jugar en el móvil, con un joystick que aparece donde pones el dedo.
 - En español e inglés.
 

@@ -9,10 +9,13 @@ signal logro_obtenido(id: String)
 const VIDA_INICIAL := 8
 const RANURAS_INICIALES := 5
 const RANURAS_MAX := 8
+const RANURAS_IMPOSIBLE := 2
 const PISOS_TOTALES := 5
 const RUTA_AJUSTES := "user://ajustes.cfg"
 const JEFES_CASINO := ["tragaperras", "ruleta", "baccarat", "blackjack", "dados", "revolver", "bingo", "trilero", "cajero", "coctelero", "poker"]
 
+# Multiplicador extra de vida de los jefes en cada piso.
+const REFUERZO_JEFE := [1.0, 1.5, 2.2, 3.0, 4.0]
 const OBJETOS_PROHIBIDOS_EXTREMO := ["herradura", "seguro"]
 
 const STATS_BASE := {
@@ -33,6 +36,8 @@ var mesa := 0
 var deuda := 0
 var extremo := false
 var diario := false
+var imposible := false
+var infinito := false
 var transformaciones: Array = []
 var novedades: Array = []  # lo desbloqueado en esta partida
 var tiempo_partida := 0.0
@@ -123,8 +128,11 @@ func _aplicar_pantalla() -> void:
 			DisplayServer.WINDOW_MODE_FULLSCREEN if pantalla_completa else DisplayServer.WINDOW_MODE_WINDOWED)
 
 
-func nueva_partida(semilla := 0, id_personaje := "", id_mesa := -1, modo_extremo := false, reto_diario := false) -> void:
-	extremo = modo_extremo
+func nueva_partida(semilla := 0, id_personaje := "", id_mesa := -1, modo_extremo := false, reto_diario := false, modo_imposible := false) -> void:
+	# El imposible es un extremo con aún menos sitio para las cartas.
+	extremo = modo_extremo or modo_imposible
+	imposible = modo_imposible
+	infinito = false
 	diario = reto_diario
 	if id_personaje != "":
 		personaje = id_personaje
@@ -149,7 +157,8 @@ func nueva_partida(semilla := 0, id_personaje := "", id_mesa := -1, modo_extremo
 	oro_total = 0
 	enemigos_eliminados = 0
 	cartas = datos.cartas.duplicate()
-	while cartas.size() < int(datos.get("ranuras", RANURAS_INICIALES)):
+	var ranuras_iniciales := RANURAS_IMPOSIBLE if imposible else int(datos.get("ranuras", RANURAS_INICIALES))
+	while cartas.size() < ranuras_iniciales:
 		cartas.append("")
 	objetos = []
 	stats = STATS_BASE.duplicate()
@@ -177,7 +186,7 @@ func puntos_reto(gano: bool) -> int:
 
 # ---------------------------------------------------------------- guardado
 const CAMPOS_PARTIDA := ["vida", "vida_max", "oro", "piso", "enemigos_eliminados", "racha", "personaje", "mesa", "extremo",
-	"diario", "deuda", "orden_jefes", "cartas", "objetos", "stats", "transformaciones", "novedades", "tiempo_partida",
+	"diario", "imposible", "infinito", "deuda", "orden_jefes", "cartas", "objetos", "stats", "transformaciones", "novedades", "tiempo_partida",
 	"mejor_combo", "oro_total"]
 
 
@@ -234,6 +243,9 @@ func revisar_logros(gano := false) -> void:
 
 
 func jefe_del_piso() -> String:
+	# En el modo infinito la lista crece: cada cinco pisos vuelve el Dueño.
+	while infinito and orden_jefes.size() < piso:
+		orden_jefes.append("dueno" if orden_jefes.size() % PISOS_TOTALES == PISOS_TOTALES - 1 else _jefe_infinito())
 	return orden_jefes[clampi(piso - 1, 0, orden_jefes.size() - 1)]
 
 
@@ -299,6 +311,30 @@ func pedir_prestamo() -> void:
 	ganar_oro(40)
 
 
+func _jefe_infinito() -> String:
+	var candidatos: Array = JEFES_CASINO.filter(func(id): return id != orden_jefes[-1])
+	return candidatos[azar.randi() % candidatos.size()]
+
+
+## Pisos jugados más allá del final normal. Todo el modo infinito escala con esto.
+func pisos_extra() -> int:
+	return maxi(piso - PISOS_TOTALES, 0) if infinito else 0
+
+
+func empezar_infinito() -> void:
+	infinito = true
+	novedades = []
+
+
+## Multiplicador de la vida de los jefes según el piso: al final vas muy fuerte.
+func refuerzo_jefe() -> float:
+	# Con solo dos ranuras no llegas a esos daños, así que el imposible no lo lleva.
+	if imposible:
+		return 1.0
+	var base: float = REFUERZO_JEFE[clampi(piso - 1, 0, REFUERZO_JEFE.size() - 1)]
+	return base * pow(1.35, pisos_extra())
+
+
 ## Al bajar de piso se paga lo que se debe. Devuelve el texto del cartel, o "".
 func cobrar_deuda() -> String:
 	if deuda == 0:
@@ -321,6 +357,8 @@ func robar_objeto(excluir := []) -> String:
 	var libres: Array = []
 	for id in ObjetosDB.OBJETOS:
 		if extremo and OBJETOS_PROHIBIDOS_EXTREMO.has(id):
+			continue
+		if imposible and id == "ficha_vip":
 			continue
 		if not objetos.has(id) and not excluir.has(id) and Progreso.objeto_libre(id):
 			libres.append(id)
@@ -377,7 +415,7 @@ func fila_con_movimiento(origen: int, destino: int) -> Array:
 
 
 func anadir_ranura() -> void:
-	if cartas.size() < RANURAS_MAX:
+	if cartas.size() < (RANURAS_IMPOSIBLE if imposible else RANURAS_MAX):
 		cartas.append("")
 		cartas_cambiadas.emit()
 
