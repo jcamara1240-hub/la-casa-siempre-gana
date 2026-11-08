@@ -19,6 +19,8 @@ Solo te mueves. Tu personaje ataca por su cuenta, y lo que hace depende de una f
 - 4 personajes con su propio mazo y 5 niveles de dificultad.
 - Salas de evento: trileros, doble o nada, un prestamista y una barra con un chupito que mejor no probar.
 - Lo que desbloqueas se queda guardado entre partidas.
+- Modo extremo: un golpe y a casa, sin tienda y con jefes que tienen el triple de vida.
+- Se puede jugar en el móvil, con un joystick que aparece donde pones el dedo.
 - En español e inglés.
 
 | | |
@@ -28,7 +30,7 @@ Solo te mueves. Tu personaje ataca por su cuenta, y lo que hace depende de una f
 
 ## Controles
 
-WASD o flechas para moverte, ratón para arrastrar cartas cuando la sala está limpia, E para comprar y Esc para pausar.
+WASD o flechas para moverte, ratón para arrastrar cartas cuando la sala está limpia, E para comprar y Esc para pausar. En el móvil, desliza el dedo por la sala para andar; las cartas se arrastran igual.
 
 ## Cómo abrirlo
 

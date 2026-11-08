@@ -57,6 +57,8 @@ func _gui_input(evento: InputEvent) -> void:
 		_mirar(evento.position)
 		queue_redraw()
 	elif evento is InputEventMouseButton and evento.pressed and evento.button_index == MOUSE_BUTTON_LEFT:
+		_mirar(evento.position)  # con el dedo no hay "pasar por encima"
+		queue_redraw()
 		if CAJA_VOLVER.has_point(evento.position):
 			_volver()
 
@@ -117,6 +119,9 @@ func _draw() -> void:
 		var nombre: String = Idioma.t(ObjetosDB.TRANSFORMACIONES[ids[i]].nombre) if conocida else "???"
 		draw_string(Juego.fuente, caja.position + Vector2(0, 12), nombre, HORIZONTAL_ALIGNMENT_CENTER, caja.size.x, 8,
 				COLOR_ORO if conocida else COLOR_GRIS)
+	if Progreso.victorias_extremo > 0:
+		draw_string(Juego.fuente, Vector2(0, 256), Idioma.t("EXTREMO SUPERADO: %d") % Progreso.victorias_extremo,
+				HORIZONTAL_ALIGNMENT_RIGHT, 596, 8, Color8(214, 61, 79))
 	draw_string(Juego.fuente, Vector2(44, 256), _titulo_info, HORIZONTAL_ALIGNMENT_LEFT, -1, 8, COLOR_ORO)
 	draw_multiline_string(Juego.fuente, Vector2(44, 270), _texto_info, HORIZONTAL_ALIGNMENT_LEFT, 552, 8, 3, COLOR_CREMA)
 	draw_rect(CAJA_VOLVER, Color8(42, 31, 61))

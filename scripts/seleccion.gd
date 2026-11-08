@@ -2,16 +2,18 @@ class_name Seleccion
 extends Control
 ## Elegir personaje y mesa antes de empezar.
 
-signal elegido(personaje: String, mesa: int)
+signal elegido(personaje: String, mesa: int, extremo: bool)
 signal atras
 
 const COLOR_CREMA := Color8(247, 236, 210)
 const COLOR_ORO := Color8(247, 198, 74)
 const COLOR_GRIS := Color8(168, 154, 142)
 const COLOR_FONDO := Color8(20, 16, 30)
+const COLOR_ROJO_CLARO := Color8(214, 61, 79)
 const ANCHO := 142.0
-const CAJA_EMPEZAR := Rect2(240, 300, 160, 20)
-const CAJA_VOLVER := Rect2(240, 326, 160, 18)
+const CAJA_EXTREMO := Rect2(220, 282, 200, 16)
+const CAJA_EMPEZAR := Rect2(240, 302, 160, 20)
+const CAJA_VOLVER := Rect2(240, 327, 160, 18)
 const FLECHA_IZQ := Rect2(190, 240, 24, 18)
 const FLECHA_DER := Rect2(426, 240, 24, 18)
 
@@ -19,6 +21,7 @@ var _ids: Array = []
 var _texturas := {}
 var _indice := 0
 var _mesa := 0
+var _extremo := false
 var _t := 0.0
 
 
@@ -53,13 +56,18 @@ func _empezar() -> void:
 		return
 	Sonido.tocar("clic")
 	visible = false
-	elegido.emit(id, _mesa)
+	elegido.emit(id, _mesa, _extremo)
 
 
 func _volver() -> void:
 	Sonido.tocar("clic")
 	visible = false
 	atras.emit()
+
+
+func _cambiar_extremo() -> void:
+	_extremo = not _extremo
+	Sonido.tocar("mult" if _extremo else "clic")
 
 
 func _cambiar_mesa(sentido: int) -> void:
@@ -79,6 +87,8 @@ func _gui_input(evento: InputEvent) -> void:
 		_cambiar_mesa(-1)
 	elif FLECHA_DER.has_point(p):
 		_cambiar_mesa(1)
+	elif CAJA_EXTREMO.has_point(p):
+		_cambiar_extremo()
 	elif CAJA_EMPEZAR.has_point(p):
 		_empezar()
 	elif CAJA_VOLVER.has_point(p):
@@ -103,6 +113,8 @@ func _unhandled_input(evento: InputEvent) -> void:
 			_empezar()
 		KEY_ESCAPE:
 			_volver()
+		KEY_X:
+			_cambiar_extremo()
 		_:
 			return
 	get_viewport().set_input_as_handled()
@@ -121,12 +133,17 @@ func _draw() -> void:
 	_centrado(Juego.fuente_grande, 16, Idioma.t(mesa.nombre).to_upper(), 214, 212, 254, COLOR_ORO)
 	_centrado(Juego.fuente_grande, 16, "<", FLECHA_IZQ.position.x, FLECHA_IZQ.size.x, 254, COLOR_CREMA)
 	_centrado(Juego.fuente_grande, 16, ">", FLECHA_DER.position.x, FLECHA_DER.size.x, 254, COLOR_CREMA)
-	_centrado(Juego.fuente, 8, Idioma.t(mesa.desc), 0, 640, 276, COLOR_GRIS)
+	var explicacion: String = Idioma.t("UN GOLPE Y A CASA. SIN TIENDA. JEFES CON EL TRIPLE DE VIDA.") if _extremo else Idioma.t(mesa.desc)
+	_centrado(Juego.fuente, 8, explicacion, 0, 640, 275, COLOR_ROJO_CLARO if _extremo else COLOR_GRIS)
+	draw_rect(CAJA_EXTREMO, Color8(143, 35, 64) if _extremo else Color8(42, 31, 61))
+	draw_rect(CAJA_EXTREMO, COLOR_ROJO_CLARO, false, 1.0)
+	var estado := Idioma.t("SÍ") if _extremo else Idioma.t("NO")
+	_centrado(Juego.fuente, 8, Idioma.t("MODO EXTREMO: %s") % estado, CAJA_EXTREMO.position.x, CAJA_EXTREMO.size.x, 293, COLOR_CREMA)
 	var libre := Progreso.personaje_libre(_ids[_indice])
 	draw_rect(CAJA_EMPEZAR, Color8(122, 90, 160) if libre else Color8(42, 31, 61))
-	_centrado(Juego.fuente, 8, Idioma.t("EMPEZAR"), CAJA_EMPEZAR.position.x, CAJA_EMPEZAR.size.x, 313, COLOR_CREMA if libre else COLOR_GRIS)
+	_centrado(Juego.fuente, 8, Idioma.t("EMPEZAR"), CAJA_EMPEZAR.position.x, CAJA_EMPEZAR.size.x, 315, COLOR_CREMA if libre else COLOR_GRIS)
 	draw_rect(CAJA_VOLVER, Color8(42, 31, 61))
-	_centrado(Juego.fuente, 8, Idioma.t("VOLVER"), CAJA_VOLVER.position.x, CAJA_VOLVER.size.x, 338, COLOR_CREMA)
+	_centrado(Juego.fuente, 8, Idioma.t("VOLVER"), CAJA_VOLVER.position.x, CAJA_VOLVER.size.x, 339, COLOR_CREMA)
 
 
 func _dibujar_personaje(i: int) -> void:

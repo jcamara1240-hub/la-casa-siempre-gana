@@ -92,7 +92,7 @@ func _correr() -> void:
 	m.abrir_selector(["full", "comodin", "mano_muerta"], Idioma.t("¡TESORO!"))
 	await _salva("selector_en")
 	m._cerrar_selector()
-	m._quizas_pausar()
+	m.quizas_pausar()
 	await _salva("pausa_en")
 	m._menu.cerrar()
 	paused = false

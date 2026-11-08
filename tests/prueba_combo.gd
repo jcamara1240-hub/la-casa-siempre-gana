@@ -59,6 +59,10 @@ func _traducciones() -> void:
 			if not Idioma.EN.has(r.get_string(1)):
 				_fallos += 1
 				print("MAL  %s sin traducir: %s" % [ruta, r.get_string(1)])
+	for clave in ["FILA LLENA. TOCA LA CARTA QUE QUIERAS CAMBIAR O TOCA AQUÍ PARA CANCELAR.", "DESLIZA EL DEDO POR LA SALA PARA ANDAR. TU PERSONAJE ATACA SOLO."]:
+		if not Idioma.EN.has(clave):
+			_fallos += 1
+			print("MAL  sin traducir: ", clave)
 	var todos: Array = Idioma.EN.keys() + Idioma.EN.values()
 	for texto in todos:
 		for i in texto.length():

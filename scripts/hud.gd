@@ -74,6 +74,9 @@ func _draw() -> void:
 	draw_string(Juego.fuente, Vector2(50, 23), Idioma.t("PISO %d/%d") % [Juego.piso, Juego.PISOS_TOTALES], HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color8(168, 154, 142))
 	_dibujar_objetos()
 	_dibujar_transformaciones()
+	if Juego.extremo:
+		draw_rect(Rect2(2, 28, 58, 11), Color(0.08, 0.06, 0.12, 0.8))
+		draw_string(Juego.fuente, Vector2(6, 37), Idioma.t("EXTREMO"), HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color8(214, 61, 79))
 	if Juego.deuda > 0:
 		draw_rect(Rect2(2, 28, 70, 11), Color(0.08, 0.06, 0.12, 0.8))
 		draw_string(Juego.fuente, Vector2(6, 37), Idioma.t("DEUDA %d") % Juego.deuda, HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color8(214, 61, 79))

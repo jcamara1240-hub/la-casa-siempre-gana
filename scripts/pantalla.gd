@@ -35,7 +35,6 @@ var _tex_cerrada: Texture2D
 func _ready() -> void:
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	size = Vector2(640, 360)
-	mouse_filter = Control.MOUSE_FILTER_IGNORE
 	visible = false
 	_tex_rodillos = load("res://assets/personajes/rodillos.png")
 	_tex_moneda = load("res://assets/objetos/moneda.png")
@@ -70,7 +69,7 @@ func _preparar_datos() -> void:
 		{"texto": "OBJETOS", "valor": Juego.objetos.size()},
 		{"texto": "TIEMPO", "fijo": "%d:%02d" % [minutos, segundos]},
 		{"texto": "PERSONAJE", "fijo": PersonajesDB.nombre(Juego.personaje).to_upper()},
-		{"texto": "MESA", "fijo": Idioma.t(PersonajesDB.MESAS[Juego.mesa].nombre).to_upper()},
+		{"texto": "MESA", "fijo": Idioma.t("EXTREMO") if Juego.extremo else Idioma.t(PersonajesDB.MESAS[Juego.mesa].nombre).to_upper()},
 	]
 
 
@@ -142,12 +141,21 @@ func _mover_monedas(delta: float) -> void:
 			m.pos = Vector2(randf_range(0.0, 640.0), -10.0)
 
 
+func _gui_input(evento: InputEvent) -> void:
+	if evento is InputEventMouseButton and evento.pressed and evento.button_index == MOUSE_BUTTON_LEFT:
+		_avanzar()
+
+
 func _unhandled_input(evento: InputEvent) -> void:
 	if not visible or not (evento is InputEventKey) or not evento.pressed or evento.echo:
 		return
 	if evento.keycode not in [KEY_ENTER, KEY_KP_ENTER, KEY_SPACE, KEY_ESCAPE]:
 		return
 	get_viewport().set_input_as_handled()
+	_avanzar()
+
+
+func _avanzar() -> void:
 	if animacion_terminada():
 		visible = false
 		aceptada.emit()
@@ -177,7 +185,7 @@ func _draw() -> void:
 	if _t >= _inicio_novedades and not _novedades.is_empty():
 		_dibujar_novedades()
 	if animacion_terminada() and fmod(_t, 1.0) < 0.65:
-		draw_string(Juego.fuente, Vector2(0, 352), Idioma.t("PULSA ENTER"), HORIZONTAL_ALIGNMENT_CENTER, 640, 8, Color8(108, 207, 148))
+		draw_string(Juego.fuente, Vector2(0, 352), Idioma.t("TOCA PARA CONTINUAR") if Juego.tactil else Idioma.t("PULSA ENTER"), HORIZONTAL_ALIGNMENT_CENTER, 640, 8, Color8(108, 207, 148))
 
 
 func _dibujar_monedas() -> void:

@@ -7,6 +7,7 @@ const ARTICULO_RANURA := "_ranura"
 const ARTICULO_REBARAJAR := "_rebarajar"
 const PREFIJO_OBJETO := "obj:"
 const PRECIO_REBARAJAR := 6
+const VIDA_JEFE_EXTREMO := 3.0
 const TINTE_PISO := [Color.WHITE, Color(0.8, 0.9, 1.1), Color(0.8, 1.05, 0.85), Color(1.1, 0.9, 0.75), Color(1.15, 0.75, 0.8)]
 # tipo, coste en el presupuesto, piso mínimo, salas limpiadas mínimas, peso
 const CATALOGO := [
@@ -37,6 +38,7 @@ var _sonido: Sonido
 var _seleccion: Seleccion
 var _coleccion: Coleccion
 var _panel: PanelEvento
+var _tactiles: ControlesTactiles
 var _prob_carta := 0.7
 var _cambiando_sala := false
 var _carta_pendiente := ""
@@ -102,8 +104,12 @@ func _crear_pantallas_extra() -> void:
 	_seleccion = Seleccion.new()
 	_coleccion = Coleccion.new()
 	_panel = PanelEvento.new()
-	for pantalla in [_panel, _seleccion, _coleccion]:
+	_tactiles = ControlesTactiles.new()
+	_tactiles.principal = self
+	get_tree().quit_on_go_back = false
+	for pantalla in [_tactiles, _panel, _seleccion, _coleccion]:
 		$UI.add_child(pantalla)
+	$UI.move_child(_tactiles, _menu.get_index())
 	_menu.jugar.connect(_seleccion.abrir)
 	_menu.ver_coleccion.connect(_coleccion.abrir)
 	_seleccion.elegido.connect(empezar_partida)
@@ -131,8 +137,14 @@ func _reanudar() -> void:
 	get_tree().paused = false
 
 
-func empezar_partida(personaje := "", mesa := -1) -> void:
-	Juego.nueva_partida(0, personaje, mesa)
+## El botón "atrás" de Android hace de Esc.
+func _notification(what: int) -> void:
+	if what == NOTIFICATION_WM_GO_BACK_REQUEST:
+		quizas_pausar()
+
+
+func empezar_partida(personaje := "", mesa := -1, extremo := false) -> void:
+	Juego.nueva_partida(0, personaje, mesa, extremo)
 	jugador.aplicar_personaje()
 	Sonido.musica("piso")
 	_prob_carta = 0.7
@@ -143,6 +155,7 @@ func empezar_partida(personaje := "", mesa := -1) -> void:
 func _generar_piso() -> void:
 	_salas_limpiadas = 0
 	salas = GeneradorMazmorra.generar(Juego.azar, mini(12 + Juego.piso, 15))
+	_quitar_tienda_si_extremo()
 	_repartir_eventos()
 	_hud.salas = salas
 	_sala.modulate = TINTE_PISO[clampi(Juego.piso - 1, 0, TINTE_PISO.size() - 1)]
@@ -150,8 +163,19 @@ func _generar_piso() -> void:
 	mostrar_cartel(Idioma.t("PISO %d") % Juego.piso, Idioma.t("AL FONDO TE ESPERA %s") % Idioma.t(Jefe.NOMBRES[Juego.jefe_del_piso()]))
 
 
+## En modo extremo la tienda se convierte en una sala de combate más.
+func _quitar_tienda_si_extremo() -> void:
+	if not Juego.extremo:
+		return
+	for c in salas:
+		if salas[c].tipo == TIPO.TIENDA:
+			salas[c].tipo = TIPO.NORMAL
+			salas[c].limpia = false
+
+
 func _repartir_eventos() -> void:
-	var tipos: Array = PanelEvento.TIPOS.duplicate()
+	# Con un solo corazón no tienen sentido ni la barra ni vender vida.
+	var tipos: Array = ["trileros", "doble_nada"] if Juego.extremo else PanelEvento.TIPOS.duplicate()
 	for c in salas:
 		if salas[c].tipo == TIPO.EVENTO:
 			salas[c]["evento"] = tipos.pop_at(Juego.azar.randi() % tipos.size())
@@ -310,7 +334,10 @@ func _empezar_jefe() -> void:
 	_oleadas = []
 	var jefe := Jefe.crear(Juego.jefe_del_piso())
 	jefe.position = Vector2(320, 110)
-	jefe.preparar((1.0 + (Juego.piso - 1) * 0.9) * (1.4 if Juego.mesa >= 4 else 1.0))
+	var vida_jefe := (1.0 + (Juego.piso - 1) * 0.9) * (1.4 if Juego.mesa >= 4 else 1.0)
+	if Juego.extremo:
+		vida_jefe *= VIDA_JEFE_EXTREMO
+	jefe.preparar(vida_jefe)
 	mostrar_cartel(Idioma.t(jefe.nombre), "")
 	Sonido.tocar("jefe_aparece")
 	Sonido.musica("jefe")
@@ -593,7 +620,7 @@ func _actualizar_hint_tienda() -> void:
 	var id: String = articulo.datos.id
 	if id != _articulo_mostrado:
 		_articulo_mostrado = id
-		_aviso.text = Idioma.t("E: COMPRAR")
+		_aviso.text = "" if Juego.tactil else Idioma.t("E: COMPRAR")
 		_barra.info_externa = _info_articulo(id)
 
 
@@ -631,7 +658,7 @@ func _info_articulo(id: String) -> Dictionary:
 
 func _unhandled_input(evento: InputEvent) -> void:
 	if evento is InputEventKey and evento.pressed and not evento.echo and evento.keycode == KEY_ESCAPE:
-		_quizas_pausar()
+		quizas_pausar()
 		return
 	if get_tree().paused:
 		return
@@ -641,8 +668,14 @@ func _unhandled_input(evento: InputEvent) -> void:
 			comprar(articulo)
 
 
+func articulo_a_mano() -> Recogible:
+	if actual.get("tipo") != TIPO.TIENDA:
+		return null
+	return _articulo_cerca()
+
+
 ## Esc no hace nada mientras eliges carta o estás en una pantalla de fin de partida.
-func _quizas_pausar() -> void:
+func quizas_pausar() -> void:
 	if get_tree().paused:
 		return
 	get_tree().paused = true
@@ -796,7 +829,7 @@ func _perder() -> void:
 
 
 func _ganar() -> void:
-	Juego.novedades += Progreso.al_ganar(Juego.mesa)
+	Juego.novedades += Progreso.al_ganar(Juego.mesa, Juego.extremo)
 	_acabar(true)
 
 

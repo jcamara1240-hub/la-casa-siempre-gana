@@ -137,6 +137,9 @@ func _gui_input(evento: InputEvent) -> void:
 		queue_redraw()
 	elif evento is InputEventMouseButton and evento.button_index == MOUSE_BUTTON_LEFT:
 		if evento.pressed:
+			if modo_sustituir and Juego.tactil and evento.position.x >= 412.0:
+				sustitucion_cancelada.emit()
+				return
 			_pulsar(_ranura_en(evento.position))
 		else:
 			_soltar()
@@ -146,6 +149,7 @@ func _gui_input(evento: InputEvent) -> void:
 
 
 func _pulsar(r: int) -> void:
+	_sobre = r  # con el dedo no hay "pasar por encima": tocar una carta la describe
 	if r == -1:
 		return
 	if modo_sustituir:
@@ -221,7 +225,8 @@ func _dibujar_info() -> void:
 	var x := 412.0
 	var ancho := 222.0
 	if modo_sustituir:
-		_parrafo(Idioma.t("FILA LLENA. HAZ CLIC EN LA CARTA QUE QUIERAS CAMBIAR. CLIC DERECHO: CANCELAR."), x, ancho, COLOR_ORO)
+		var aviso_fila := "FILA LLENA. TOCA LA CARTA QUE QUIERAS CAMBIAR O TOCA AQUÍ PARA CANCELAR." if Juego.tactil else "FILA LLENA. HAZ CLIC EN LA CARTA QUE QUIERAS CAMBIAR. CLIC DERECHO: CANCELAR."
+		_parrafo(Idioma.t(aviso_fila), x, ancho, COLOR_ORO)
 		return
 	if not info_externa.is_empty():
 		draw_string(fuente, Vector2(x, 15), info_externa.nombre, HORIZONTAL_ALIGNMENT_LEFT, -1, 8, COLOR_ORO)

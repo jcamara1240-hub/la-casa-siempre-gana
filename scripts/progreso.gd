@@ -8,6 +8,7 @@ const OBJETOS_INICIALES := ["herradura", "zapatos", "gafas", "whisky", "tarjeta"
 
 static var partidas := 0
 static var victorias := 0
+static var victorias_extremo := 0
 static var mesa_max := 0
 static var jefes_vencidos: Array = []
 static var cartas_extra: Array = []
@@ -22,6 +23,7 @@ static func cargar() -> void:
 		return
 	partidas = cfg.get_value("progreso", "partidas", 0)
 	victorias = cfg.get_value("progreso", "victorias", 0)
+	victorias_extremo = cfg.get_value("progreso", "victorias_extremo", 0)
 	mesa_max = cfg.get_value("progreso", "mesa_max", 0)
 	jefes_vencidos = cfg.get_value("progreso", "jefes_vencidos", [])
 	cartas_extra = cfg.get_value("progreso", "cartas_extra", [])
@@ -34,6 +36,7 @@ static func guardar() -> void:
 	var cfg := ConfigFile.new()
 	cfg.set_value("progreso", "partidas", partidas)
 	cfg.set_value("progreso", "victorias", victorias)
+	cfg.set_value("progreso", "victorias_extremo", victorias_extremo)
 	cfg.set_value("progreso", "mesa_max", mesa_max)
 	cfg.set_value("progreso", "jefes_vencidos", jefes_vencidos)
 	cfg.set_value("progreso", "cartas_extra", cartas_extra)
@@ -88,9 +91,11 @@ static func al_vencer_jefe(jefe: String, azar: RandomNumberGenerator) -> Array:
 	return nuevo
 
 
-static func al_ganar(mesa: int) -> Array:
+static func al_ganar(mesa: int, extremo := false) -> Array:
 	var nuevo: Array = []
 	victorias += 1
+	if extremo:
+		victorias_extremo += 1
 	_abrir_personaje("heredera", nuevo)
 	if mesa >= mesa_max and mesa_max < PersonajesDB.MESAS.size() - 1:
 		mesa_max = mesa + 1

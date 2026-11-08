@@ -37,7 +37,7 @@ func recibir_golpe(cantidad := 1) -> void:
 		seguro_listo = false
 		return
 	var coste := int(Juego.stat("golpe_monedas"))
-	if coste > 0 and Juego.gastar_oro(coste):
+	if coste > 0 and not Juego.extremo and Juego.gastar_oro(coste):
 		Sonido.tocar("perder")
 		return
 	Juego.herir(cantidad)
@@ -59,6 +59,8 @@ func _leer_direccion() -> Vector2:
 	var y := _eje(KEY_W, KEY_UP, KEY_S, KEY_DOWN)
 	# normalized() evita que en diagonal se corra más que en línea recta.
 	var direccion := Vector2(x, y).normalized()
+	if Juego.direccion_tactil != Vector2.ZERO:
+		direccion = Juego.direccion_tactil
 	if Juego.stat("tambaleo") > 0.0 and direccion != Vector2.ZERO:
 		direccion = direccion.rotated(sin(_anim_t * 3.2) * 0.55)
 	return direccion

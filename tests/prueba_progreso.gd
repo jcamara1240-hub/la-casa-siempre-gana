@@ -115,5 +115,38 @@ func _correr() -> void:
 				m._cerrar_selector()
 	_ok(true, "los cuatro eventos terminan siempre")
 
+	comprobar_extremo(m)
+	await process_frame
 	print("FALLOS: ", _fallos)
 	quit(1 if _fallos > 0 else 0)
+
+
+func comprobar_extremo(m) -> void:
+	m.empezar_partida("heredera", 0, true)
+	_ok(J.extremo and J.vida == 2 and J.vida_max == 2, "extremo: un solo corazón, también con la Heredera")
+	var tiendas := 0
+	var tipos_evento := {}
+	for c in m.salas:
+		if m.salas[c].tipo == GeneradorMazmorra.Tipo.TIENDA:
+			tiendas += 1
+		if m.salas[c].tipo == GeneradorMazmorra.Tipo.EVENTO:
+			tipos_evento[m.salas[c].evento] = true
+	_ok(tiendas == 0, "extremo: no hay tienda")
+	_ok(not tipos_evento.has("barra") and not tipos_evento.has("prestamista"), "extremo: sin barra ni prestamista")
+	for _i in 200:
+		var o: String = J.robar_objeto()
+		if o == "herradura" or o == "seguro":
+			_ok(false, "extremo: salió un objeto prohibido")
+			break
+	var c_jefe := Vector2i.ZERO
+	for c in m.salas:
+		if m.salas[c].tipo == GeneradorMazmorra.Tipo.JEFE:
+			c_jefe = c
+	m.entrar_sala(c_jefe, Vector2i.ZERO)
+	_ok(is_equal_approx(m._horda.jefe.vida, 600.0), "extremo: el Pez Rojo tiene el triple de vida (%s)" % m._horda.jefe.vida)
+	J.oro = 50
+	m.jugador.recibir_golpe(1)
+	_ok(J.vida == 0 and m._pantalla.visible and J.oro == 50, "extremo: un golpe y se acaba, sin pagar con monedas")
+	m._ir_al_menu()
+	m.empezar_partida("heredera", 0, false)
+	_ok(not J.extremo and J.vida_max == 4, "fuera del extremo todo sigue igual")

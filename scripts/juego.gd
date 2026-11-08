@@ -12,6 +12,8 @@ const PISOS_TOTALES := 5
 const RUTA_AJUSTES := "user://ajustes.cfg"
 const JEFES_CASINO := ["tragaperras", "ruleta", "baccarat", "blackjack"]
 
+const OBJETOS_PROHIBIDOS_EXTREMO := ["herradura", "seguro"]
+
 const STATS_BASE := {
 	"crit": 0.0, "suerte": 0.0, "velocidad": 0.0, "invulnerable": 0.0, "bala_lenta": 0.0, "puro": 0.0,
 	"ciclo": 0.0, "descuento": 0.0, "monedas_sala": 0.0, "iman": 0.0, "intereses": 0.0,
@@ -28,6 +30,7 @@ var racha := 0
 var personaje := "tahur"
 var mesa := 0
 var deuda := 0
+var extremo := false
 var transformaciones: Array = []
 var novedades: Array = []  # lo desbloqueado en esta partida
 var tiempo_partida := 0.0
@@ -48,6 +51,10 @@ var sacudida := true
 var numeros_dano := true
 var volumen_musica := 0.6
 var volumen_efectos := 0.8
+
+# Pantallas táctiles
+var tactil := OS.has_feature("mobile") or OS.has_feature("web_android") or OS.has_feature("web_ios")
+var direccion_tactil := Vector2.ZERO
 
 
 func _ready() -> void:
@@ -114,7 +121,8 @@ func _aplicar_pantalla() -> void:
 			DisplayServer.WINDOW_MODE_FULLSCREEN if pantalla_completa else DisplayServer.WINDOW_MODE_WINDOWED)
 
 
-func nueva_partida(semilla := 0, id_personaje := "", id_mesa := -1) -> void:
+func nueva_partida(semilla := 0, id_personaje := "", id_mesa := -1, modo_extremo := false) -> void:
+	extremo = modo_extremo
 	if id_personaje != "":
 		personaje = id_personaje
 	if id_mesa >= 0:
@@ -124,7 +132,8 @@ func nueva_partida(semilla := 0, id_personaje := "", id_mesa := -1) -> void:
 	else:
 		azar.seed = semilla
 	var datos: Dictionary = PersonajesDB.PERSONAJES[personaje]
-	vida_max = int(datos.vida) - (2 if mesa >= 4 else 0)
+	# En modo extremo hay un solo corazón, y un golpe se lo lleva entero.
+	vida_max = 2 if extremo else int(datos.vida) - (2 if mesa >= 4 else 0)
 	vida = vida_max
 	oro = int(datos.oro)
 	piso = 1
@@ -240,6 +249,8 @@ func cobrar_deuda() -> String:
 func robar_objeto(excluir := []) -> String:
 	var libres: Array = []
 	for id in ObjetosDB.OBJETOS:
+		if extremo and OBJETOS_PROHIBIDOS_EXTREMO.has(id):
+			continue
 		if not objetos.has(id) and not excluir.has(id) and Progreso.objeto_libre(id):
 			libres.append(id)
 	if libres.is_empty():
@@ -320,7 +331,7 @@ func curar(cantidad: int) -> void:
 
 
 func herir(cantidad: int) -> void:
-	vida = maxi(vida - cantidad, 0)
+	vida = 0 if extremo else maxi(vida - cantidad, 0)
 	racha = 0
 	estado_cambiado.emit()
 
