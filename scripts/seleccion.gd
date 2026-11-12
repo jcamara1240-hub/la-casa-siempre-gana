@@ -174,3 +174,13 @@ func _dibujar_personaje(i: int) -> void:
 		_centrado(Juego.fuente, 8, Idioma.t("BLOQUEADO"), x, ancho, caja.position.y + 72, COLOR_GRIS)
 		draw_multiline_string(Juego.fuente, Vector2(x, caja.position.y + 88), Idioma.t(datos.requisito),
 				HORIZONTAL_ALIGNMENT_CENTER, ancho, 8, 5, COLOR_CREMA)
+		_dibujar_requisito(id, x, ancho, caja.position.y + 150)
+
+
+## Cuánto te falta para abrir un personaje: una barra y el recuento ("734/1000").
+func _dibujar_requisito(id: String, x: float, ancho: float, y: float) -> void:
+	var p := Progreso.progreso_personaje(id)
+	var barra := Rect2(x + 6, y, ancho - 12, 5)
+	draw_rect(barra, Color8(20, 16, 30))
+	draw_rect(Rect2(barra.position, Vector2(barra.size.x * clampf(float(p.x) / maxi(p.y, 1), 0.0, 1.0), barra.size.y)), COLOR_ORO)
+	_centrado(Juego.fuente, 8, "%d/%d" % [p.x, p.y], x, ancho, y + 16, COLOR_GRIS)

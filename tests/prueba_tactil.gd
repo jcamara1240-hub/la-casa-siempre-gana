@@ -90,9 +90,10 @@ func _correr() -> void:
 	clic.position = Vector2(320, 200)
 	m._pantalla._gui_input(clic)
 	_ok(m._pantalla.animacion_terminada(), "tocar la pantalla final salta la animación")
+	clic.position = m._pantalla._caja_opcion(m._pantalla.opciones().find("menu")).get_center()
 	m._pantalla._gui_input(clic)
 	await process_frame
-	_ok(not m._pantalla.visible and m._menu.visible, "otro toque vuelve al menú")
+	_ok(not m._pantalla.visible and m._menu.visible, "tocar SALIR AL MENÚ vuelve al menú")
 
 	print("FALLOS: ", _fallos)
 	quit(1 if _fallos > 0 else 0)

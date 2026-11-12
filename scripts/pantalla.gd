@@ -5,6 +5,7 @@ extends Control
 
 signal aceptada
 signal seguir_infinito
+signal otra_mano  # repetir con el mismo personaje, mesa y modo, sin pasar por el menú
 
 const COLOR_CREMA := Color8(247, 236, 210)
 const COLOR_ORO := Color8(247, 198, 74)
@@ -18,8 +19,8 @@ const SEG_POR_DESBLOQUEO := 0.2
 const POR_FILA := 16
 const ANCHO_CASILLA := 36.0
 const MAX_NOVEDADES := 32
-const CAJA_SEGUIR := Rect2(120, 334, 190, 18)
-const CAJA_MENU := Rect2(330, 334, 190, 18)
+const Y_BOTONES := 334.0
+const COLOR_DUENO := Color8(232, 160, 190)  # la voz del Dueño, en otro color
 
 var _gano := false
 var _opcion := 0
@@ -36,6 +37,9 @@ var _tex_moneda: Texture2D
 var _tex_jugador: Texture2D
 var _tex_cerrada: Texture2D
 var _tex_trofeo: Texture2D
+var _tex_dueno: Texture2D
+var _frase := ""  # id de FrasesDB: lo que dice el Dueño
+var _objetivo: Dictionary = {}  # Progreso.siguiente_objetivo(), al terminar
 
 
 func _ready() -> void:
@@ -46,6 +50,7 @@ func _ready() -> void:
 	_tex_moneda = load("res://assets/objetos/moneda.png")
 	_tex_cerrada = load("res://assets/cartas/_hueco.png")
 	_tex_trofeo = load("res://assets/objetos/trofeo.png")
+	_tex_dueno = load("res://assets/personajes/dueno_retrato.png")
 
 
 func mostrar_final(gano: bool) -> void:
@@ -57,6 +62,8 @@ func mostrar_final(gano: bool) -> void:
 	_tex_jugador = PersonajesDB.textura(Juego.personaje)
 	_preparar_datos()
 	_preparar_novedades()
+	_preparar_frase(gano)
+	_objetivo = Progreso.siguiente_objetivo()
 	_inicio_datos = FIN_RODILLOS + 0.9 if gano else 0.5
 	_inicio_novedades = _inicio_datos + _datos.size() * SEG_POR_DATO + 0.3
 	_fin = _inicio_novedades + _novedades.size() * SEG_POR_DESBLOQUEO
@@ -92,18 +99,47 @@ func _nombre_mesa() -> String:
 	return Idioma.t("EXTREMO") if Juego.extremo else Idioma.t(PersonajesDB.MESAS[Juego.mesa].nombre).to_upper()
 
 
-## Tras ganar se puede seguir bajando, salvo en el reto diario: su marca ya está hecha.
+## El Dueño elige qué decir: las frases que aún no has oído van primero.
+func _preparar_frase(gano: bool) -> void:
+	var vistas: Array = Progreso.vistos.get("frases", [])
+	var azar := RandomNumberGenerator.new()
+	azar.randomize()
+	_frase = FrasesDB.elegir(FrasesDB.contexto_actual(gano), vistas, azar)
+	if _frase != "" and Progreso.ver("frases", _frase):
+		Progreso.guardar()
+
+
+func frase() -> String:
+	return _frase
+
+
+## Los botones del final. Al ganar: seguir en el infinito, otra mano o salir; al perder:
+## otra mano o salir. En el reto diario, nada: solo cuenta un intento.
+func opciones() -> Array:
+	if Juego.diario:
+		return []
+	return ["infinito", "otra", "menu"] if _gano else ["otra", "menu"]
+
+
 func _hay_oferta() -> bool:
-	return _gano and not Juego.diario and animacion_terminada()
+	return not opciones().is_empty() and animacion_terminada()
+
+
+func _caja_opcion(i: int) -> Rect2:
+	var n := opciones().size()
+	var ancho := 180.0 if n >= 3 else 190.0
+	var hueco := 12.0 if n >= 3 else 20.0
+	var x0 := 320.0 - (n * ancho + (n - 1) * hueco) * 0.5
+	return Rect2(x0 + i * (ancho + hueco), Y_BOTONES, ancho, 18)
 
 
 func _elegir(opcion: int) -> void:
 	Sonido.tocar("clic")
 	visible = false
-	if opcion == 0:
-		seguir_infinito.emit()
-	else:
-		aceptada.emit()
+	match String(opciones()[opcion]):
+		"infinito": seguir_infinito.emit()
+		"otra": otra_mano.emit()
+		_: aceptada.emit()
 
 
 ## Se cargan aquí y no al pintar: una textura cargada durante _draw sale en blanco.
@@ -181,10 +217,10 @@ func _gui_input(evento: InputEvent) -> void:
 	if evento is InputEventMouseButton and evento.pressed and evento.button_index == MOUSE_BUTTON_LEFT:
 		if not _hay_oferta():
 			_avanzar()
-		elif CAJA_SEGUIR.has_point(evento.position):
-			_elegir(0)
-		elif CAJA_MENU.has_point(evento.position):
-			_elegir(1)
+			return
+		for i in opciones().size():
+			if _caja_opcion(i).has_point(evento.position):
+				_elegir(i)
 
 
 func _unhandled_input(evento: InputEvent) -> void:
@@ -198,13 +234,16 @@ func _unhandled_input(evento: InputEvent) -> void:
 		return
 	if _hay_oferta():
 		match tecla:
-			KEY_LEFT, KEY_RIGHT, KEY_A, KEY_D:
-				_opcion = 1 - _opcion
+			KEY_LEFT, KEY_A:
+				_opcion = wrapi(_opcion - 1, 0, opciones().size())
+				Sonido.tocar("clic")
+			KEY_RIGHT, KEY_D:
+				_opcion = wrapi(_opcion + 1, 0, opciones().size())
 				Sonido.tocar("clic")
 			KEY_ENTER, KEY_KP_ENTER, KEY_SPACE:
 				_elegir(_opcion)
 			KEY_ESCAPE:
-				_elegir(1)
+				_elegir(opciones().find("menu"))
 			_:
 				return
 		get_viewport().set_input_as_handled()
@@ -244,6 +283,8 @@ func _draw() -> void:
 		_dibujar_jugador()
 	if _t >= _inicio_novedades and not _novedades.is_empty():
 		_dibujar_novedades()
+	if animacion_terminada():
+		_dibujar_objetivo()
 	if _hay_oferta():
 		_dibujar_oferta()
 	elif animacion_terminada() and fmod(_t, 1.0) < 0.65:
@@ -251,13 +292,49 @@ func _draw() -> void:
 
 
 func _dibujar_oferta() -> void:
-	var cajas := [CAJA_SEGUIR, CAJA_MENU]
-	var textos := [Idioma.t("SEGUIR: MODO INFINITO"), Idioma.t("SALIR AL MENÚ")]
-	for i in 2:
+	var textos := {"infinito": Idioma.t("SEGUIR: MODO INFINITO"), "otra": Idioma.t("OTRA MANO"), "menu": Idioma.t("SALIR AL MENÚ")}
+	var lista := opciones()
+	for i in lista.size():
+		var caja := _caja_opcion(i)
 		var elegida := i == _opcion
-		draw_rect(cajas[i], Color8(143, 35, 64) if elegida and i == 0 else Color8(74, 52, 102) if elegida else Color8(42, 31, 61))
-		draw_rect(cajas[i], COLOR_ORO if elegida else COLOR_GRIS, false, 1.0)
-		draw_string(Juego.fuente, cajas[i].position + Vector2(0, 13), textos[i], HORIZONTAL_ALIGNMENT_CENTER, cajas[i].size.x, 8, COLOR_CREMA)
+		var fuerte: bool = lista[i] != "menu"
+		draw_rect(caja, Color8(143, 35, 64) if elegida and fuerte else Color8(74, 52, 102) if elegida else Color8(42, 31, 61))
+		draw_rect(caja, COLOR_ORO if elegida else COLOR_GRIS, false, 1.0)
+		var texto: String = textos[lista[i]]
+		if elegida and Mando.activo:
+			texto += "  [%s]" % Mando.nombre("aceptar")
+		draw_string(Juego.fuente, caja.position + Vector2(0, 13), texto, HORIZONTAL_ALIGNMENT_CENTER, caja.size.x, 8, COLOR_CREMA)
+
+
+## La barra del siguiente desbloqueo: debajo de lo desbloqueado, o en su sitio si no hay nada.
+func _dibujar_objetivo() -> void:
+	if _objetivo.is_empty():
+		return
+	var y := 236.0
+	if not _novedades.is_empty():
+		y = 232.0 + ceili(float(_novedades.size()) / POR_FILA) * 47.0 + 14.0
+	if y > 318.0:
+		return
+	var actual := int(_objetivo.actual)
+	var meta := maxi(int(_objetivo.meta), 1)
+	draw_string(Juego.fuente, Vector2(0, y), Idioma.t("SIGUIENTE: %s") % _objetivo.texto, HORIZONTAL_ALIGNMENT_CENTER, 640, 8, COLOR_GRIS)
+	var barra := Rect2(220, y + 5, 160, 6)
+	draw_rect(barra, Color8(42, 31, 61))
+	draw_rect(Rect2(barra.position, Vector2(barra.size.x * clampf(float(actual) / meta, 0.0, 1.0), barra.size.y)), COLOR_ORO)
+	draw_rect(barra, COLOR_GRIS, false, 1.0)
+	draw_string(Juego.fuente, Vector2(barra.end.x + 6, y + 11), "%d/%d" % [actual, meta], HORIZONTAL_ALIGNMENT_LEFT, -1, 8, COLOR_CREMA)
+
+
+## El Dueño, pequeño, y su comentario. "y" es la línea base del texto.
+func _dibujar_frase(y: float, escala: float) -> void:
+	if _frase == "":
+		return
+	var texto := FrasesDB.texto(_frase)
+	var lado := 16.0 * escala
+	var ancho := Juego.fuente.get_string_size(texto, HORIZONTAL_ALIGNMENT_LEFT, -1, 8).x
+	var x := 320.0 - (lado + 6.0 + ancho) * 0.5
+	draw_texture_rect(_tex_dueno, Rect2(x, y - 4.0 - lado * 0.5, lado, lado), false)
+	draw_string(Juego.fuente, Vector2(x + lado + 6.0, y), texto, HORIZONTAL_ALIGNMENT_LEFT, -1, 8, COLOR_DUENO)
 
 
 func _dibujar_monedas() -> void:
@@ -297,10 +374,15 @@ func _dibujar_titulo() -> void:
 	draw_set_transform(Vector2.ZERO)
 	var frase: String
 	if _gano:
-		frase = Idioma.t("POR ESTA VEZ, LA CASA HA PERDIDO.")
+		# Al ganar, el Dueño habla en lugar de la frase de siempre (si tiene algo que decir).
+		if _frase != "":
+			_dibujar_frase(100.0, 1.0)
+		else:
+			draw_string(Juego.fuente, Vector2(0, 100), Idioma.t("POR ESTA VEZ, LA CASA HA PERDIDO."), HORIZONTAL_ALIGNMENT_CENTER, 640, 8, COLOR_CREMA)
 	else:
+		_dibujar_frase(78.0, 2.0)
 		frase = (Idioma.t("HAS LLEGADO AL PISO %d EN EL MODO INFINITO.") % Juego.piso) if Juego.infinito else (Idioma.t("HAS CAÍDO EN EL PISO %d DE %d.") % [Juego.piso, Juego.PISOS_TOTALES])
-	draw_string(Juego.fuente, Vector2(0, 100), frase, HORIZONTAL_ALIGNMENT_CENTER, 640, 8, COLOR_CREMA)
+		draw_string(Juego.fuente, Vector2(0, 100), frase, HORIZONTAL_ALIGNMENT_CENTER, 640, 8, COLOR_CREMA)
 	if Juego.diario:
 		var nota := Idioma.t("RETO DEL %s") % Juego.fecha_reto
 		if not Juego.reto_puntuable:

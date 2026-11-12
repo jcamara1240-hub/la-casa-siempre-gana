@@ -153,8 +153,15 @@ func empujar_todos(centro: Vector2, fuerza: float, aturdir_seg := 0.0) -> void:
 func _comprobar_contacto() -> void:
 	for e in en_radio(jugador.position, 5.0):
 		if e.hace_contacto:
-			jugador.recibir_golpe(1)
+			jugador.recibir_golpe(1, causa_de(e))
 			break
+
+
+## Lo que se apunta como causa del golpe que da este enemigo (o el jefe de la sala).
+static func causa_de(e: Enemigo) -> Dictionary:
+	if e is Jefe:
+		return {"tipo": "jefe", "id": e.id_jefe}
+	return {"tipo": "enemigo", "id": e.tipo, "rango": e.rango}
 
 
 func _humo_del_puro(delta: float) -> void:

@@ -295,6 +295,7 @@ func bala_enemiga(origen: Vector2, velocidad: Vector2, clase := "moneda") -> voi
 	p.texture = _tex_enemigas.get(clase, _tex_enemigas["moneda"])
 	p.position = origen
 	p.iniciar_enemigo(velocidad * (1.0 - Juego.stat("bala_lenta")), self)
+	p.causa = causa_en(origen)
 	Sonido.tocar("disparo", randf_range(0.8, 1.1), -9.0)
 	_balas_enemigas.append(p)
 	p.tree_exiting.connect(_olvidar_bala.bind(p))
@@ -363,10 +364,24 @@ func golpear(e: Enemigo, a: Dictionary, retroceso: Vector2) -> void:
 	impacto.emit(e.position, direccion, critico)
 
 
+## Quién suelta una bala o un aviso que nace en ese punto, para saber qué te mató:
+## con un jefe en la sala, el jefe; si no, el enemigo más cercano a ese punto.
+func causa_en(origen: Vector2) -> Dictionary:
+	if horda == null:
+		return {"tipo": "bala"}
+	if horda.jefe != null and is_instance_valid(horda.jefe) and not horda.jefe.muerto:
+		return {"tipo": "jefe", "id": horda.jefe.id_jefe}
+	var cerca: Array = horda.en_radio(origen, 6.0)  # la rejilla: barato aunque salgan muchas balas
+	if not cerca.is_empty():
+		return Horda.causa_de(cerca[0])
+	return {"tipo": "bala"}
+
+
 ## Un aviso en el suelo que, pasado un momento, explota: lo usa el Bingo.
 func zona_peligro(centro: Vector2, radio: float, retardo: float, duracion := 0.0) -> void:
 	var z := ZonaPeligro.new()
 	z.iniciar(centro, radio, retardo, self, duracion)
+	z.causa = causa_en(centro)
 	add_child(z)
 
 

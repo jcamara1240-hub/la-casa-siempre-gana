@@ -64,7 +64,7 @@ func _caja_objeto(i: int) -> Rect2:
 
 
 func _caja_transformacion(i: int) -> Rect2:
-	return Rect2(Vector2(44.0 + (i % 5) * 112.0, _y_transformaciones + (i / 5) * 24.0), Vector2(106, 18))
+	return Rect2(Vector2(44.0 + (i % 5) * 112.0, _y_transformaciones + (i / 5) * 38.0), Vector2(106, 34))
 
 
 func _gui_input(evento: InputEvent) -> void:
@@ -176,14 +176,42 @@ func _mirar(p: Vector2) -> void:
 	for i in (_cartas.size() if _pagina == 0 else 0):
 		if _caja_carta(i).has_point(p):
 			_info(Progreso.carta_libre(_cartas[i]), CartasDB.nombre(_cartas[i]), CartasDB.descripcion(_cartas[i]))
+			if not Progreso.carta_libre(_cartas[i]):
+				_info_cerrada_carta(_cartas[i])
 	for i in (_objetos.size() if _pagina == 1 else 0):
 		if _caja_objeto(i).has_point(p):
 			_info(Progreso.objeto_libre(_objetos[i]), ObjetosDB.nombre(_objetos[i]), ObjetosDB.descripcion(_objetos[i]))
+			if not Progreso.objeto_libre(_objetos[i]):
+				_texto_info = Idioma.t("LO ABRE UN JEFE: CADA JEFE QUE VENCES ABRE 2 OBJETOS AL AZAR.") + "\n" + _recuento()
 	var ids: Array = ObjetosDB.TRANSFORMACIONES.keys() if _pagina == 1 else []
 	for i in ids.size():
 		if _caja_transformacion(i).has_point(p):
 			var datos: Dictionary = ObjetosDB.TRANSFORMACIONES[ids[i]]
 			_info(Progreso.transformaciones.has(ids[i]), Idioma.t(datos.nombre), ObjetosDB.descripcion_transformacion(ids[i]))
+			if not Progreso.transformaciones.has(ids[i]):
+				_info_transformacion_oculta(ids[i])
+
+
+## Una carta cerrada: de qué rareza es, cómo se abre y cuánto llevas.
+func _info_cerrada_carta(id: String) -> void:
+	_titulo_info = "%s (%s)" % [Idioma.t("BLOQUEADO"), Idioma.t(CartasDB.NOMBRE_RAREZA[CartasDB.CARTAS[id].rareza])]
+	_texto_info = Idioma.t("LA ABRE UN JEFE: CADA JEFE QUE VENCES ABRE 3 CARTAS AL AZAR.") + "\n" + _recuento()
+
+
+func _recuento() -> String:
+	return Idioma.t("CARTAS: %d/%d   OBJETOS: %d/%d   JEFES VENCIDOS: %d/%d") % [Progreso.cartas_libres(), _cartas.size(),
+		Progreso.objetos_libres(), _objetos.size(), Progreso.jefes_vencidos.size(), Jefe.NOMBRES.size()]
+
+
+## Una transformación sin descubrir: solo se nombran las piezas que ya has visto.
+func _info_transformacion_oculta(id: String) -> void:
+	var datos: Dictionary = ObjetosDB.TRANSFORMACIONES[id]
+	var vistas: Array = (datos.piezas as Array).filter(func(p): return Progreso.visto("objetos", p))
+	_titulo_info = "???"
+	_texto_info = Idioma.t("TRANSFORMACIÓN SIN DESCUBRIR. REÚNE %d PIEZAS.") % int(datos.necesarias) + " " \
+		+ Idioma.t("PIEZAS VISTAS: %d/%d") % [vistas.size(), datos.piezas.size()]
+	if not vistas.is_empty():
+		_texto_info += ": " + ", ".join(vistas.map(func(p): return ObjetosDB.nombre(p).to_upper()))
 
 
 func _info(libre: bool, titulo: String, texto: String) -> void:
@@ -215,8 +243,9 @@ func _draw() -> void:
 		var conocida: bool = Progreso.transformaciones.has(ids[i])
 		draw_rect(caja, Color8(42, 31, 61))
 		var nombre: String = Idioma.t(ObjetosDB.TRANSFORMACIONES[ids[i]].nombre) if conocida else "???"
-		draw_string(Juego.fuente, caja.position + Vector2(0, 12), nombre, HORIZONTAL_ALIGNMENT_CENTER, caja.size.x, 8,
+		draw_string(Juego.fuente, caja.position + Vector2(0, 11), nombre, HORIZONTAL_ALIGNMENT_CENTER, caja.size.x, 8,
 				COLOR_ORO if conocida else COLOR_GRIS)
+		_dibujar_piezas(ids[i], caja, conocida)
 	# Las marcas van a la derecha de la línea del título, una al lado de la otra.
 	var derecha := 596.0
 	if Progreso.victorias_extremo > 0:
@@ -233,6 +262,18 @@ func _draw() -> void:
 			CAJA_VOLVER.size.x, 8, COLOR_CREMA)
 	if Mando.activo:
 		_dibujar_mando()
+
+
+## Las piezas de una transformación: en color las que ya has visto, en sombra las demás.
+func _dibujar_piezas(id: String, caja: Rect2, conocida: bool) -> void:
+	var piezas: Array = ObjetosDB.TRANSFORMACIONES[id].piezas
+	var paso := 16.0
+	var x0 := caja.get_center().x - (piezas.size() * paso - 4.0) * 0.5
+	for j in piezas.size():
+		var vista: bool = conocida or Progreso.visto("objetos", piezas[j])
+		var tex: Texture2D = _tex_objetos[piezas[j]]
+		var tinte := Color.WHITE if vista else Color(0.3, 0.27, 0.36)
+		draw_texture(tex, Vector2(x0 + j * paso, caja.position.y + 16 + (12 - tex.get_height()) * 0.5), tinte)
 
 
 ## Con el mando: los botones de las pestañas a los lados y un marco dorado en la casilla.

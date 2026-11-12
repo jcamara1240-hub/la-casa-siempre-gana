@@ -30,6 +30,7 @@ var _paredes := 0
 var _metralla := false
 var _anulada := false
 var _t := 0.0
+var causa: Dictionary = {}  # quién la disparó (solo las enemigas), ver Ataques.causa_en
 
 
 func iniciar_jugador(velocidad: Vector2, ataque: Dictionary, vida: float, dueno: Ataques) -> void:
@@ -145,7 +146,7 @@ func _actuar_enemiga() -> void:
 		queue_free()
 		return
 	if position.distance_to(_dueno.jugador.global_position) < 7.0 and not _dueno.jugador.rodando():
-		_dueno.jugador.recibir_golpe(1)
+		_dueno.jugador.recibir_golpe(1, causa)
 		queue_free()
 
 

@@ -15,12 +15,19 @@ const MURO_VEL := 220.0  # antes 190
 const NOMBRES := PersonajesDB.JEFES
 
 var nombre := "JEFE"
+var id_jefe := ""  # el de PersonajesDB.JEFES: lo apunta crear()
 var vida_base := 300.0
 
 var _letrero: Label
 
 
 static func crear(id: String) -> Jefe:
+	var j := _nuevo(id)
+	j.id_jefe = id
+	return j
+
+
+static func _nuevo(id: String) -> Jefe:
 	match id:
 		"pez": return JefePez.new()
 		"tragaperras": return JefeTragaperras.new()

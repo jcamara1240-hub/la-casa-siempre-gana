@@ -21,6 +21,8 @@ const CAJA_SUBIR := Rect2(588, 106, 20, 20)
 const CAJA_BAJAR := Rect2(588, 252, 20, 20)
 const CAJA_ACEPTAR := Rect2(226, 200, 90, 18)
 const CAJA_AHORA_NO := Rect2(324, 200, 90, 18)
+const CAJA_COPIAR := Rect2(240, 182, 160, 16)
+const ENLACE := "https://hellboy1240.itch.io/la-casa-siempre-gana"
 const FILAS_VISIBLES := 15
 const Y_CABECERA := 102.0
 const Y_FILAS := 114.0
@@ -52,6 +54,7 @@ var _eligiendo_nombre := false
 var _error_nombre := ""
 var _esperando_nombre := false
 var _campo: LineEdit
+var _copiado := ""  # el último texto copiado, que se enseña también en pantalla
 
 
 func _ready() -> void:
@@ -86,6 +89,7 @@ func abrir() -> void:
 	_conectar()
 	_fecha = Juego.fecha_hoy()
 	_pestana = Pestana.HOY
+	_copiado = ""
 	_cerrar_nombre()
 	if hay_mundial():
 		_pedir()
@@ -293,6 +297,8 @@ func tocar(p: Vector2) -> void:
 		return
 	if CAJA_JUGAR.has_point(p):
 		_jugar()
+	elif _pestana == Pestana.HOY and puede_copiar() and CAJA_COPIAR.has_point(p):
+		copiar_resultado()
 	elif CAJA_VOLVER.has_point(p):
 		_volver()
 	elif hay_mundial() and CAJA_PESTANA_HOY.has_point(p):
@@ -334,6 +340,8 @@ func tecla(codigo: int, repetida := false) -> bool:
 		_jugar()
 	elif codigo == KEY_ESCAPE and not repetida:
 		_volver()
+	elif codigo in [KEY_C, KEY_Y] and not repetida and not mundial and puede_copiar():
+		copiar_resultado()
 	elif codigo in [KEY_LEFT, KEY_RIGHT, KEY_TAB] and hay_mundial():
 		_cambiar_pestana(Pestana.HOY if mundial else Pestana.MUNDIAL)
 	elif not mundial:
@@ -355,6 +363,51 @@ func tecla(codigo: int, repetida := false) -> bool:
 	else:
 		return false
 	return true
+
+
+# ---------------------------------------------------------------- compartir
+## Solo hay algo que compartir cuando ya has terminado el intento puntuable de hoy.
+func puede_copiar() -> bool:
+	var d: Dictionary = Progreso.reto_detalle
+	return Progreso.reto_fecha == _fecha and String(d.get("fecha", "")) == _fecha
+
+
+## Al portapapeles (DisplayServer.clipboard_set) y, por si el navegador no deja, en pantalla.
+func copiar_resultado() -> void:
+	Sonido.tocar("clic")
+	_copiado = texto_compartir(Progreso.reto_detalle, Progreso.racha_viva(_fecha))
+	DisplayServer.clipboard_set(_copiado)
+	queue_redraw()
+
+
+## El resultado para pegar fuera del juego. Va aparte de Idioma: lleva minúsculas y un "·"
+## que la fuente pixel no tiene (en pantalla se enseña en mayúsculas y con guiones).
+const COMPARTIR := {
+	"es": {"juego": "La Casa Siempre Gana", "reto": "Reto %s", "ganado": "¡ganado!", "piso": "piso %d/%d",
+		"pts": "%s pts", "dia": "racha: 1 día", "dias": "racha: %d días"},
+	"en": {"juego": "The House Always Wins", "reto": "Daily %s", "ganado": "won!", "piso": "floor %d/%d",
+		"pts": "%s pts", "dia": "streak: 1 day", "dias": "streak: %d days"},
+}
+
+
+static func texto_compartir(d: Dictionary, racha: int) -> String:
+	var c: Dictionary = COMPARTIR.get(Idioma.actual, COMPARTIR["es"])
+	var piso: String = c.ganado if d.get("gano", false) else c.piso % [int(d.get("piso", 1)), Juego.PISOS_TOTALES]
+	var dias: String = c.dia if racha == 1 else c.dias % maxi(racha, 1)
+	return "%s · %s · %s · %s · %s\n%s" % [c.juego, c.reto % String(d.get("fecha", "")), piso,
+		c.pts % miles(int(d.get("puntos", 0))), dias, ENLACE]
+
+
+## 23410 -> "23.410" (o "23,410" en inglés).
+static func miles(n: int) -> String:
+	var txt := str(absi(n))
+	var sep := "," if Idioma.actual == "en" else "."
+	var partes: Array = []
+	while txt.length() > 3:
+		partes.push_front(txt.substr(txt.length() - 3))
+		txt = txt.substr(0, txt.length() - 3)
+	partes.push_front(txt)
+	return ("-" if n < 0 else "") + sep.join(partes)
 
 
 # ---------------------------------------------------------------- dibujo
@@ -398,6 +451,9 @@ func _texto(y: float, texto: String, color: Color, grande := false) -> void:
 func _dibujar_hoy() -> void:
 	_texto(90, Idioma.t("MISMA MAZMORRA PARA TODOS HOY (%s). JUEGAS CON EL TAHÚR.") % _fecha, COLOR_GRIS)
 	_texto(104, Idioma.t("NUEVO RETO EN %s (UTC)") % hasta_manana(), COLOR_GRIS)
+	var racha := Progreso.racha_viva(_fecha)
+	if racha > 0:
+		_texto(120, Idioma.t("RACHA: 1 DÍA") if racha == 1 else Idioma.t("RACHA: %d DÍAS") % racha, COLOR_ORO)
 	if not Progreso.reto_puntuable(_fecha):
 		_texto(144, Idioma.t("TU MARCA DE HOY: %d") % Progreso.reto_mejor_hoy(_fecha), COLOR_CREMA, true)
 		var d: Dictionary = Progreso.reto_detalle
@@ -409,6 +465,18 @@ func _dibujar_hoy() -> void:
 			_texto(176, Idioma.t("MEJOR PRÁCTICA: %d (NO PUNTÚA)") % practica, COLOR_GRIS)
 	else:
 		_texto(144, Idioma.t("AÚN NO HAS JUGADO EL RETO DE HOY"), COLOR_CREMA, true)
+	if puede_copiar():
+		var etiqueta := Idioma.t("COPIAR RESULTADO")
+		if Mando.activo:
+			etiqueta += "  [%s]" % Mando.nombre_boton(JOY_BUTTON_Y)
+		_boton(CAJA_COPIAR, etiqueta, false)
+		draw_rect(CAJA_COPIAR, COLOR_ORO, false, 1.0)
+	if _copiado != "":
+		# Lo mismo que se ha copiado, por si el navegador no deja usar el portapapeles.
+		_texto(284, Idioma.t("COPIADO AL PORTAPAPELES:"), COLOR_VERDE)
+		var lineas := _copiado.split("\n")
+		for i in lineas.size():
+			_texto(296 + i * 11, lineas[i].replace("·", "-").to_upper(), COLOR_CREMA)
 	_texto(210, Idioma.t("SOLO PUNTÚA EL PRIMER INTENTO DEL DÍA. LOS DEMÁS SON DE PRÁCTICA."), COLOR_ORO)
 	_texto(230, Idioma.t("PUNTOS: 1000 POR PISO, 5000 POR GANAR, 2 POR BAJA, 1 POR MONEDA,"), COLOR_GRIS)
 	_texto(242, Idioma.t("-100 POR GOLPE RECIBIDO Y, SI GANAS, 3 POR SEGUNDO POR DEBAJO DE 25 MINUTOS."), COLOR_GRIS)

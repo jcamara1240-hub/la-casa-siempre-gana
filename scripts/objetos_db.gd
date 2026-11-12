@@ -85,6 +85,38 @@ static func descripcion_transformacion(id: String) -> String:
 	return "%s %s %s" % [Idioma.t(datos.desc), Idioma.t("REÚNE %d DE:") % int(datos.necesarias), ", ".join(piezas)]
 
 
+## Cuántas piezas de una transformación hay en una lista de objetos.
+static func piezas_que_tienes(id: String, objetos: Array) -> int:
+	return (TRANSFORMACIONES[id].piezas as Array).filter(func(p): return objetos.has(p)).size()
+
+
+## Las transformaciones (aún no hechas) a las que les falta justo una pieza.
+static func a_un_paso(objetos: Array, hechas: Array) -> Array:
+	var lista: Array = []
+	for id in TRANSFORMACIONES:
+		if not hechas.has(id) and piezas_que_tienes(id, objetos) == int(TRANSFORMACIONES[id].necesarias) - 1:
+			lista.append(id)
+	return lista
+
+
+## La transformación que completaría ese objeto si lo cogieras, o "".
+static func completa(objeto: String, objetos: Array, hechas: Array) -> String:
+	if objetos.has(objeto):
+		return ""
+	for id in TRANSFORMACIONES:
+		if hechas.has(id) or not (TRANSFORMACIONES[id].piezas as Array).has(objeto):
+			continue
+		if piezas_que_tienes(id, objetos) + 1 >= int(TRANSFORMACIONES[id].necesarias):
+			return id
+	return ""
+
+
+## Las pistas de transformaciones no estropean el descubrimiento: solo salen si ya la
+## conseguiste alguna vez o si llevas 10 partidas o más.
+static func pista_permitida(id: String) -> bool:
+	return Progreso.transformaciones.has(id) or Progreso.partidas >= 10
+
+
 static func nombre(id: String) -> String:
 	return Idioma.t(OBJETOS[id].nombre)
 

@@ -97,8 +97,22 @@ func _correr() -> void:
 	_ok(m._pantalla.visible, "al morir sale la pantalla final")
 	await _tecla(KEY_ENTER)
 	_ok(m._pantalla.visible and m._pantalla.animacion_terminada(), "Enter salta la animación sin cerrar")
+	_ok(m._pantalla.opciones() == ["otra", "menu"] and m._pantalla._opcion == 0, "al perder: OTRA MANO (elegida) y SALIR AL MENÚ")
+	# OTRA MANO: misma partida desde cero, sin pasar por el menú.
+	juego.personaje = "tahur"
+	juego.mesa = 1
 	await _tecla(KEY_ENTER)
-	_ok(menu.visible and menu._items[0] == "jugar" and not m._pantalla.visible, "Enter vuelve al menú")
+	await physics_frame
+	_ok(not menu.visible and not paused and not m._pantalla.visible and juego.personaje == "tahur" and juego.mesa == 1
+			and juego.vida == juego.vida_max and juego.piso == 1, "Enter da OTRA MANO: mismo personaje y mesa, partida nueva")
+
+	juego.vida = 1
+	m.jugador._invulnerable_t = 0.0  # el parpadeo del golpe anterior
+	m.jugador.recibir_golpe(1)
+	await process_frame
+	await _tecla(KEY_ENTER)
+	await _tecla(KEY_ESCAPE)
+	_ok(menu.visible and menu._items[0] == "jugar" and not m._pantalla.visible, "Esc vuelve al menú")
 
 	print("FALLOS: ", _fallos)
 	quit(1 if _fallos > 0 else 0)

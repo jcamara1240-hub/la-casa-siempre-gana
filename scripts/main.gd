@@ -174,6 +174,7 @@ func _ready() -> void:
 	_barra.sustitucion_cancelada.connect(_cerrar_selector)
 	_pantalla.aceptada.connect(_al_cerrar_final)
 	_pantalla.seguir_infinito.connect(_seguir_infinito)
+	_pantalla.otra_mano.connect(_otra_mano)
 	_menu.continuar.connect(_reanudar)
 	_menu.ir_a_portada.connect(_ir_al_menu)
 	_crear_pantallas_extra()
@@ -214,6 +215,7 @@ func _crear_pantallas_extra() -> void:
 	_reto.jugar_reto.connect(empezar_reto)
 	Juego.logro_obtenido.connect(_hud.avisar_logro)
 	Juego.transformacion_obtenida.connect(_al_transformarse)
+	Juego.a_un_paso.connect(_al_quedar_a_un_paso)
 	# La sala de apuestas: su panel va encima de todo, como el de los eventos.
 	_panel_apuestas = PanelApuestas.new()
 	$UI.add_child(_panel_apuestas)
@@ -278,6 +280,17 @@ func _al_cerrar_final() -> void:
 	if era_reto:
 		_menu.cerrar()
 		_reto.abrir()
+
+
+## OTRA MANO: la misma partida (personaje, mesa y modo) desde cero, sin pasar por el menú.
+func _otra_mano() -> void:
+	var personaje: String = Juego.personaje
+	var mesa: int = Juego.mesa
+	var extremo: bool = Juego.extremo and not Juego.imposible
+	var imposible: bool = Juego.imposible
+	_ir_al_menu()
+	_menu.cerrar()
+	empezar_partida(personaje, mesa, extremo, imposible)
 
 
 ## Tras ganar se sigue bajando con todo lo que llevabas.
@@ -878,6 +891,8 @@ func _texto_danio(posicion: Vector2, cantidad: float, color: Color) -> void:
 
 
 func _al_golpear_jugador() -> void:
+	if actual.get("tipo") == TIPO.APUESTAS:
+		Juego.ultima_causa["apuestas"] = true
 	_sin_golpes = false
 	_golpes_sala += 1
 	Juego.golpes += 1
@@ -1166,6 +1181,9 @@ func _crear_objeto_suelo(id: String, posicion: Vector2) -> void:
 	var r := _crear_recogible(Recogible.Clase.OBJETO, "res://assets/objetos/pedestal.png", posicion)
 	r.datos = {"id": id}
 	r.offset = Vector2(0, 8)
+	_ver_objeto(id)
+	if objeto_completa(id) != "":
+		r.add_child(Brillo.new(Vector2(0, -12), 12.0))
 	var icono := Sprite2D.new()
 	icono.texture = ObjetosDB.textura(id)
 	icono.scale = Vector2(2, 2)
@@ -1213,6 +1231,9 @@ func _icono_articulo(id: String) -> Sprite2D:
 		icono.texture = ObjetosDB.textura(id.trim_prefix(PREFIJO_OBJETO))
 		icono.scale = Vector2(2, 2)
 		icono.position = Vector2(0, -12)
+		_ver_objeto(id.trim_prefix(PREFIJO_OBJETO))
+		if objeto_completa(id.trim_prefix(PREFIJO_OBJETO)) != "":
+			icono.add_child(Brillo.new(Vector2.ZERO, 6.0))
 		return icono
 	match id:
 		ARTICULO_CORAZON:
@@ -1412,6 +1433,12 @@ func _recoger_objeto(id: String) -> void:
 	_ajustar_mesas()
 
 
+## Te falta una pieza para una transformación (ya conocida, o llevas 10 partidas).
+func _al_quedar_a_un_paso(id: String) -> void:
+	_hud.avisar_paso(id)
+	Sonido.tocar("mult", 1.4, -4.0)
+
+
 func _al_transformarse(id: String) -> void:
 	var datos: Dictionary = ObjetosDB.TRANSFORMACIONES[id]
 	mostrar_cartel(Idioma.t(datos.nombre).to_upper(), Idioma.t(datos.desc))
@@ -1535,6 +1562,11 @@ func _acabar(gano: bool) -> void:
 	get_tree().paused = true
 	Sonido.musica("")
 	Guardado.borrar()
+	# Las derrotas seguidas (para el Dueño): ganar las borra; morir en el infinito no cuenta.
+	if gano:
+		Progreso.contadores["derrotas_seguidas"] = 0
+	elif not Juego.infinito:
+		Progreso.sumar("derrotas_seguidas", 1)
 	if Juego.infinito:
 		Progreso.registrar_infinito(Juego.piso)
 	else:
@@ -1548,3 +1580,39 @@ func _acabar(gano: bool) -> void:
 		else:
 			Progreso.registrar_practica(Juego.fecha_reto, int(resumen.puntos))
 	_pantalla.mostrar_final(gano)
+
+
+# ------------------------------------------------------------ pistas de transformación
+## La transformación que completa ese objeto si lo coges, si se puede dar la pista; o "".
+func objeto_completa(id: String) -> String:
+	var t := ObjetosDB.completa(id, Juego.objetos, Juego.transformaciones)
+	return t if t != "" and ObjetosDB.pista_permitida(t) else ""
+
+
+## Un objeto que se te ofrece (tienda, tesoro, premio) cuenta como pieza vista en la colección.
+func _ver_objeto(id: String) -> void:
+	if Progreso.ver("objetos", id):
+		Progreso.guardar()
+
+
+## Un halo suave que late detrás de un objeto que completaría una transformación.
+## "centro" y "radio" van en el espacio del padre (el icono puede estar escalado).
+class Brillo extends Node2D:
+	var centro := Vector2.ZERO
+	var radio := 10.0
+	var _t := 0.0
+
+	func _init(en: Vector2 = Vector2.ZERO, r: float = 10.0) -> void:
+		centro = en
+		radio = r
+		show_behind_parent = true
+
+	func _process(delta: float) -> void:
+		_t += delta
+		queue_redraw()
+
+	func _draw() -> void:
+		var pulso := 0.5 + 0.5 * sin(_t * 4.0)
+		for i in 3:
+			draw_circle(centro, radio * (1.0 + i * 0.4 + pulso * 0.3),
+					Color(0.97, 0.78, 0.29, (0.24 - i * 0.07) * (0.6 + 0.4 * pulso)))

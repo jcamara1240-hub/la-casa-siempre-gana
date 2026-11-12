@@ -95,7 +95,7 @@ func _unhandled_input(evento: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 
-func recibir_golpe(cantidad := 1) -> void:
+func recibir_golpe(cantidad := 1, causa: Dictionary = {}) -> void:
 	if _invulnerable_t > 0.0 or invulnerable or rodando():
 		return
 	_invulnerable_t = INVULNERABLE_SEG + Juego.stat("invulnerable")
@@ -109,6 +109,7 @@ func recibir_golpe(cantidad := 1) -> void:
 		return
 	# En el modo infinito, cada cuatro pisos extra los golpes quitan un corazón más.
 	# Hardcore: desde el piso 3 cada golpe se lleva un corazón entero.
+	Juego.ultima_causa = causa.duplicate()
 	Juego.herir(cantidad + Juego.pisos_extra() / 4 + (1 if Juego.piso >= GOLPE_DOBLE_PISO and Juego.stat("chaleco") <= 0.0 else 0))
 	# El Espejo de Mano: el golpe te lo llevas, pero la sala se queda sin balas.
 	if Juego.stat("espejo") > 0.0 and ataques != null:
