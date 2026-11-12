@@ -14,20 +14,21 @@ Solo te mueves. Tu personaje ataca por su cuenta, y lo que hace depende de una f
 
 - 5 pisos generados al azar. Al entrar en una sala se cierran las puertas hasta que no quede nadie.
 - 13 jefes: el Pez Rojo siempre abre la partida y el Dueño del Casino siempre la cierra. En medio salen tres entre la Tragaperras, la Ruleta, la Mosca Crupier, el Rey del 21, los Dados Locos, el Revólver, la Bingo, el Trilero Mayor, la Caja Registradora, el Coctelero y el Jugador de Póker. Cada uno funciona con las reglas de su juego: la Mosca reparte manos de baccarat y el Rey se queda aturdido si se pasa de 21.
-- 75 cartas (Pareja, Full, Comodín, All In, Mano del Muerto, Recortada, Ruleta Rusa...) y 44 objetos pasivos.
+- 75 cartas (Pareja, Full, Comodín, All In, Mano del Muerto, Recortada, Ruleta Rusa...) y 54 objetos pasivos.
 - 10 transformaciones si juntas ciertos objetos.
 - 16 tipos de enemigos, entre ellos un crupier que reparte naipes en abanico, un matón con metralleta y un botones que lanza bombas.
 - Voltereta, órdagos que limpian la pantalla, mesas de póker que se vuelcan y una Fiebre que acelera las cartas si encadenas bajas.
 - 6 personajes con su propio mazo y 5 niveles de dificultad.
 - Salas de evento: trileros, doble o nada, un prestamista, una caja fuerte, un mendigo y una barra con un chupito que mejor no probar.
-- Reto diario: la misma mazmorra para todo el mundo cada día.
-- 34 logros y partida guardada.
+- Reto diario: la misma mazmorra, las mismas oleadas y las mismas tiendas para todo el mundo cada día, con un intento que puntúa y racha de días.
+- 38 logros y partida guardada.
 - Lo que desbloqueas se queda guardado entre partidas.
 - Modo extremo: un golpe y a casa, sin tienda y con jefes que tienen el triple de vida.
 - Modo imposible: como el extremo, pero con solo dos ranuras de cartas y sin salas de tesoro.
 - Modo infinito: al ganar puedes seguir bajando con lo que llevas, y cada piso es peor que el anterior.
 - Se puede jugar en el móvil, con un joystick que aparece donde pones el dedo.
-- En español e inglés.
+- Se puede jugar con mando, con vibración y ayudas con los botones de cada marca.
+- En español, inglés, portugués de Brasil, francés, alemán e italiano.
 
 | | |
 |---|---|
@@ -70,9 +71,21 @@ La última ronda va de que ganar cueste de verdad, sin daño que no se pueda esq
 - **Más luz y más cine**: la sala se queda en penumbra durante la pelea, las balas enemigas iluminan el suelo, los focos del casino barren la sala, los jefes laten (en rojo cuando se enfadan) y las luces se desbordan con un resplandor. Los jefes entran y caen con franjas de cine y la cámara acercándose.
 - **Más fácil de leer**: los ataques en línea recta enseñan por dónde van a pasar, se ve tu caja de choque cuando hay balas cerca y las cartas cuyo multiplicador crece (Racha Caliente, Hucha, Fiebre, Mesa Llena...) enseñan lo que multiplican ahora mismo.
 
+## La sala de apuestas, los raros y el Contrato
+
+- **Sala de apuestas**: en algunos pisos hay una sala con una tragaperras y una ruleta. Se juega con monedas del juego (o con un corazón, si vas sin blanca) y lo mismo te sale un 777 que una emboscada.
+- **Raros y élites**: algunos enemigos salen con un modificador (Veloz, Blindado, Explosivo, Divisor...) y los élites con dos, nombre propio y mejor botín.
+- **Contrato de la Casa**: cuando ganas con un personaje puedes firmar cláusulas que lo ponen más difícil (un corazón menos, tienda más cara, jefes con más vida...). Cada una suma calor, y el récord de calor se guarda por personaje. Los premios son solo de aspecto: dorsos de carta y un traje de gala.
+- **Mesas por personaje**: cada personaje sube de mesa por su cuenta y lleva una ficha con la más alta que ha ganado.
+- **La cuenta de las cartas**: en cada ciclo se ve lo que suma o multiplica cada carta y el total.
+- **Otra mano**: al morir puedes repetir sin pasar por el menú, y el Dueño del Casino te suelta un comentario según qué te haya matado.
+- **Tabla mundial del reto diario**: el cliente y el servidor están en el repositorio (`scripts/online.gd` y `servidor/`), pero viene apagada hasta que se configura un servidor.
+
 ## Controles
 
-WASD o flechas para moverte, Espacio o Shift (o clic derecho) para la voltereta, Q o F para el órdago, E para volcar una mesa o comprar, ratón para arrastrar cartas cuando la sala está limpia y Esc para pausar. En el móvil, desliza el dedo por la sala para andar; la voltereta y el órdago tienen su propio botón y las cartas se arrastran igual.
+Con mando: stick o cruceta para moverte, A/Cruz o RB para la voltereta, X/Cuadrado o LB para el órdago, Y/Triángulo para interactuar, Select para ordenar las cartas y Start para pausar.
+
+Con teclado: WASD o flechas para moverte, Espacio o Shift (o clic derecho) para la voltereta, Q o F para el órdago, E para volcar una mesa o comprar, ratón para arrastrar cartas cuando la sala está limpia y Esc para pausar. En el móvil, desliza el dedo por la sala para andar; la voltereta y el órdago tienen su propio botón y las cartas se arrastran igual.
 
 ## Cómo abrirlo
 
