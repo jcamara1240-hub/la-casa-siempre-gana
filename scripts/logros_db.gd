@@ -30,6 +30,16 @@ const LOGROS := {
 	"mendigo": {"nombre": "Buen Corazón", "desc": "Dale monedas al mendigo."},
 	"reto": {"nombre": "Cita Diaria", "desc": "Juega un reto diario."},
 	"cartas": {"nombre": "La Baraja Entera", "desc": "Desbloquea todas las cartas."},
+	# Voltereta, Fiebre, mesas y órdago: los dos contadores van en Progreso.contadores ("por_los_pelos",
+	# "mesas") y los otros dos se marcan con Juego.marcar_logro() en el momento en que pasan.
+	"afeitado": {"nombre": "Afeitado Apurado", "desc": "Haz 50 volteretas por los pelos en total."},
+	"rojo_vivo": {"nombre": "Al Rojo Vivo", "desc": "Limpia una sala con la Fiebre al máximo."},
+	"mal_perdedor": {"nombre": "Mal Perdedor", "desc": "Vuelca 20 mesas en total."},
+	"sin_despeinarse": {"nombre": "Sin Despeinarse", "desc": "Vence a un jefe sin gastar ningún órdago."},
+	# Roce, Desatado y propina: contadores "roces", "desatados" y "propinas" de Progreso.contadores.
+	"roces": {"nombre": "A Flor de Piel", "desc": "Deja que 100 balas te pasen rozando sin rodar."},
+	"desatado": {"nombre": "Sin Freno", "desc": "Desátate 25 veces en total."},
+	"servicio": {"nombre": "Servicio Rápido", "desc": "Cobra 25 propinas por rapidez."},
 }
 
 

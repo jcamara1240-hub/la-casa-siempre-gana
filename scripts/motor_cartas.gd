@@ -6,7 +6,11 @@ signal ciclo_empezado(plan: Dictionary)
 signal paso_ejecutado(paso: Dictionary)
 signal ciclo_terminado
 
-const DURACION_CICLO := 0.85
+# Ciclo más corto que en la ronda 1 (0,85 s, 0,1 s entre cartas y 0,55 s de reparto).
+const DURACION_CICLO := 0.62
+const HUECO_MAX := 0.07
+const REPARTO := 0.4  # lo que pueden ocupar los huecos entre cartas en un ciclo
+const ESPERA_MIN := 0.1
 
 var ataques: Ataques
 var activo := false
@@ -20,12 +24,13 @@ var _pasos_ciclo := 0
 func parar() -> void:
 	activo = false
 	_cola.clear()
-	_espera = 0.3
+	_espera = 0.15  # antes 0,3: al cerrarse la sala las cartas arrancan ya
 	ciclo_terminado.emit()
 
 
+## La Fiebre acelera el ciclo un 15 % por nivel (y el desatado, x1,5), encima de los objetos.
 func _duracion_ciclo() -> float:
-	return DURACION_CICLO / (1.0 + Juego.stat("ciclo"))
+	return DURACION_CICLO / (1.0 + Juego.stat("ciclo")) / Juego.factor_fiebre()
 
 
 func _physics_process(delta: float) -> void:
@@ -44,7 +49,7 @@ func _physics_process(delta: float) -> void:
 	paso_ejecutado.emit(paso)
 	_espera = _hueco
 	if _cola.is_empty():
-		_espera = maxf(_duracion_ciclo() - _hueco * _pasos_ciclo, 0.15)
+		_espera = maxf(_duracion_ciclo() - _hueco * _pasos_ciclo, ESPERA_MIN)
 
 
 func _nuevo_ciclo() -> void:
@@ -57,7 +62,7 @@ func _nuevo_ciclo() -> void:
 	if Juego.azar.randf() < Juego.stat("doble_ciclo"):
 		_cola += plan.pasos
 	_pasos_ciclo = _cola.size()
-	_hueco = minf(0.1, 0.55 / maxf(1.0, float(_pasos_ciclo)))
+	_hueco = minf(HUECO_MAX, REPARTO / maxf(1.0, float(_pasos_ciclo))) / Juego.factor_fiebre()
 	_espera = 0.0
 	if _cola.is_empty():
 		_espera = _duracion_ciclo()

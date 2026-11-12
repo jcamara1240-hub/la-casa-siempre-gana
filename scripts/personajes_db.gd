@@ -18,7 +18,7 @@ const PERSONAJES := {
 		"cartas": ["boomerang", "doble"], "vida": 8, "oro": 0, "efecto": {}, "ranuras": 6,
 		"requisito": "Consigue una transformación."},
 	"guarda": {"nombre": "El Gorila", "desc": "Mucha vida, pero anda más despacio.",
-		"cartas": ["taco", "bala"], "vida": 14, "oro": 0, "efecto": {"velocidad": -0.15},
+		"cartas": ["botella", "bala"], "vida": 14, "oro": 0, "efecto": {"velocidad": -0.15},
 		"requisito": "Elimina a 1.000 enemigos en total."},
 }
 

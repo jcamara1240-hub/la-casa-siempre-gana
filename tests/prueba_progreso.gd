@@ -28,6 +28,16 @@ func _correr() -> void:
 	Progreso.objetos_extra = []
 	Progreso.jefes_vencidos = []
 	Progreso.mesa_max = 0
+	var cerradas: Array = []
+	for id in ["tommy", "dinamita", "trucada", "pelos", "fiebre", "recortada", "corcho", "mina", "botella", "empujon"]:
+		if not Progreso.carta_libre(id):
+			cerradas.append(id)
+	for id in ["tirantes", "petaca", "gatillo", "naipe_manga"]:
+		if not Progreso.objeto_libre(id):
+			cerradas.append(id)
+	_ok(cerradas.is_empty(), "lo nuevo básico sale desde la primera partida (falta: %s)" % [cerradas])
+	_ok(not Progreso.carta_libre("laser") and not Progreso.carta_libre("ordago") and not Progreso.objeto_libre("pitillera"),
+		"el láser, el órdago y la pitillera hay que ganárselos")
 	var azar := RandomNumberGenerator.new()
 	var libres_antes := Progreso.cartas_libres()
 	_ok(libres_antes < CartasDB.CARTAS.size(), "hay cartas por desbloquear (%d de %d)" % [libres_antes, CartasDB.CARTAS.size()])
@@ -118,6 +128,8 @@ func _correr() -> void:
 	comprobar_extremo(m)
 	await comprobar_guardado(m)
 	comprobar_logros(m)
+	comprobar_objetos_nuevos(m)
+	await comprobar_armas(m)
 	await process_frame
 	print("FALLOS: ", _fallos)
 	quit(1 if _fallos > 0 else 0)
@@ -206,4 +218,89 @@ func comprobar_logros(m) -> void:
 		igual = igual and m.salas.has(k) and m.salas[k].tipo == a1[k]
 	_ok(igual and J.diario and J.personaje == "tahur", "el reto diario da la misma mazmorra")
 	m._ir_al_menu()
+
+
+## Los objetos nuevos: sus estadísticas existen y hacen lo que dicen.
+func comprobar_objetos_nuevos(m) -> void:
+	var especiales := ["vida_max", "ranura", "monedas", "ordagos"]  # dar_objeto las trata aparte
+	var malas: Array = []
+	for id in ObjetosDB.OBJETOS:
+		for clave in ObjetosDB.OBJETOS[id].efecto:
+			if not J.STATS_BASE.has(clave) and not especiales.has(clave):
+				malas.append("%s.%s" % [id, clave])
+	for id in ObjetosDB.TRANSFORMACIONES:
+		for clave in ObjetosDB.TRANSFORMACIONES[id].efecto:
+			if not J.STATS_BASE.has(clave):
+				malas.append("%s.%s" % [id, clave])
+	_ok(malas.is_empty(), "las estadísticas de los objetos existen (mal: %s)" % [malas])
+	m.empezar_partida("tahur", 0)
+	var ordagos_antes: int = J.ordagos
+	J.dar_objeto("petaca")
+	_ok(J.ordagos == ordagos_antes + 1 and is_equal_approx(J.stat("ordago_extra"), 1.0), "la petaca da un órdago al momento")
+	J.dar_objeto("gatillo")
+	_ok(is_equal_approx(J.stat("retroceso"), 0.5) and is_equal_approx(J.stat("ciclo"), 0.1), "gatillo fácil")
+	J.dar_objeto("tirantes")
+	_ok(J.transformaciones.is_empty(), "dos piezas del Pistolero no transforman")
+	J.dar_objeto("naipe_manga")
+	_ok(J.transformaciones == ["pistolero"], "tres piezas forman al Pistolero")
+	m._ir_al_menu()
+
+
+## Cada arma nueva hace daño, y los modificadores nuevos no rompen ningún ataque.
+func comprobar_armas(m) -> void:
+	m.empezar_partida("tahur", 0)
+	m.jugador.invulnerable = true
+	await physics_frame
+	var centro: Vector2 = m.jugador.global_position
+	var enemigos: Array = []
+	for i in 6:
+		# Porteros con mucha vida: no se mueren ni salen volando.
+		var e = m._horda.crear("portero", centro + Vector2.RIGHT.rotated(TAU * i / 6.0) * 50.0, 30.0)
+		e.nacer_ya()
+		enemigos.append(e)
+	for _i in 15:
+		await physics_frame
+	var ataques = m._ataques  # sin tipo: con -s se compila antes de que exista Juego
+	var cuenta := {"disparo": 0, "impacto": 0, "explosion": 0}
+	ataques.disparo.connect(func(_o, _d, _f): cuenta.disparo += 1)
+	ataques.impacto.connect(func(_p, _d, _c): cuenta.impacto += 1)
+	ataques.explosion_en.connect(func(_c, _r): cuenta.explosion += 1)
+	var sin_dano: Array = []
+	for id in ["recortada", "tommy", "ruleta_rusa", "dinamita", "laser", "corcho", "mina", "botella"]:
+		ataques.limpiar()  # que no cuente lo que quede del arma anterior
+		await physics_frame
+		var antes := _vida_total(enemigos)
+		ataques.lanzar(Combo.resolver([id]).ataques[0])
+		for _i in 90:
+			await physics_frame
+		if _vida_total(enemigos) >= antes:
+			sin_dano.append(id)
+	_ok(sin_dano.is_empty(), "las armas nuevas hacen daño (no: %s)" % [sin_dano])
+	_ok(cuenta.disparo == 8 and cuenta.impacto > 8 and cuenta.explosion >= 2, "avisan del disparo, los impactos y las explosiones (%s)" % [cuenta])
+	for mod in ["trucada", "empujon", "metralla", "calibre"]:
+		for id in ["bala", "explosion", "rayo", "cuchilla", "boomerang", "laser", "mina", "botella", "dinamita", "corcho", "tommy", "recortada"]:
+			ataques.lanzar(Combo.resolver([mod, id]).ataques[0])
+		for _i in 40:
+			await physics_frame
+	_ok(enemigos.all(func(e): return is_instance_valid(e)), "los modificadores nuevos funcionan con todos los ataques")
+	var disparos_antes: int = cuenta.disparo
+	ataques.ataque_suelto("nova", 2.0, 8, centro)
+	_ok(cuenta.disparo == disparos_antes + 1, "un ataque suelto también avisa del disparo")
+	ataques.limpiar()
+	await physics_frame
+	for i in 5:
+		ataques.bala_enemiga(Vector2(100 + i * 4, 60), Vector2.ZERO)
+	_ok(ataques.balas_enemigas_cerca(Vector2(108, 60), 20.0) == 5 and ataques.balas_enemigas_cerca(Vector2(400, 200), 20.0) == 0,
+		"se cuentan las balas enemigas cercanas")
+	_ok(ataques.borrar_balas_enemigas() == 5 and ataques.balas_enemigas_cerca(Vector2(108, 60), 50.0) == 0, "el órdago borra las balas enemigas")
+	m.jugador.invulnerable = false
+	m._ir_al_menu()
+
+
+func _vida_total(enemigos: Array) -> float:
+	var total := 0.0
+	for e in enemigos:
+		if is_instance_valid(e):
+			total += e.vida
+	return total
 

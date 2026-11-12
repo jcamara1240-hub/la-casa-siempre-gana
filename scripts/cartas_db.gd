@@ -50,6 +50,23 @@ const CARTAS := {
 	"ruleta_gira": {"nombre": "Ruleta Giratoria", "tipo": Tipo.ATAQUE, "rareza": 1, "dano": 3.0, "n": 2,
 		"desc": "Dos fichas orbitan a tu alrededor durante el ciclo."},
 
+	"recortada": {"nombre": "Recortada", "tipo": Tipo.ATAQUE, "rareza": 0, "dano": 2.0, "n": 6,
+		"desc": "Seis perdigones en abanico ancho. Poco alcance y mucho empujón."},
+	"tommy": {"nombre": "Metralleta", "tipo": Tipo.ATAQUE, "rareza": 1, "dano": 1.5, "n": 8,
+		"desc": "Ocho balas a ráfaga, una detrás de otra."},
+	"ruleta_rusa": {"nombre": "Ruleta Rusa", "tipo": Tipo.ATAQUE, "rareza": 1, "dano": 6.0, "n": 1,
+		"desc": "Una bala. Una de cada seis veces hace daño x6."},
+	"dinamita": {"nombre": "Cartucho de Dinamita", "tipo": Tipo.ATAQUE, "rareza": 1, "dano": 14.0, "n": 1, "radio": 44.0,
+		"desc": "Lo lanzas, cuenta hasta uno y revienta en área."},
+	"laser": {"nombre": "Láser de Seguridad", "tipo": Tipo.ATAQUE, "rareza": 2, "dano": 9.0, "n": 1,
+		"desc": "Un rayo instantáneo que lo atraviesa todo en línea recta."},
+	"corcho": {"nombre": "Corcho de Champán", "tipo": Tipo.ATAQUE, "rareza": 0, "dano": 5.0, "n": 1, "paredes": 3,
+		"desc": "Rebota 3 veces en las paredes y empuja fuerte."},
+	"mina": {"nombre": "Ficha Trampa", "tipo": Tipo.ATAQUE, "rareza": 0, "dano": 9.0, "n": 2, "radio": 24.0,
+		"desc": "Dejas dos fichas en el suelo que estallan cuando alguien las pisa."},
+	"botella": {"nombre": "Botella Rota", "tipo": Tipo.ATAQUE, "rareza": 0, "dano": 7.0, "n": 1,
+		"desc": "Un barrido cuerpo a cuerpo que aparta a todos los que tienes encima."},
+
 	# ---- Modificadores: los gasta el siguiente ataque de su derecha.
 	"ciega_peq": {"nombre": "Ciega Pequeña", "tipo": Tipo.MODIFICADOR, "rareza": 0, "mod": "dano", "valor": 2.0,
 		"desc": "El siguiente ataque hace +2 de daño."},
@@ -88,6 +105,15 @@ const CARTAS := {
 		"desc": "El siguiente ataque hace +1 de daño por cada carta a su izquierda."},
 	"mano": {"nombre": "Mano Caliente", "tipo": Tipo.MODIFICADOR, "rareza": 0, "mod": "mano", "valor": 2,
 		"desc": "El siguiente ataque hace +2 de daño y quema."},
+
+	"trucada": {"nombre": "Bala Trucada", "tipo": Tipo.MODIFICADOR, "rareza": 1, "mod": "busca", "valor": 1,
+		"desc": "El siguiente ataque persigue a los enemigos."},
+	"empujon": {"nombre": "Empujón", "tipo": Tipo.MODIFICADOR, "rareza": 0, "mod": "empuje", "valor": 1,
+		"desc": "El siguiente ataque empuja el triple y aturde un momento."},
+	"metralla": {"nombre": "Metralla", "tipo": Tipo.MODIFICADOR, "rareza": 1, "mod": "metralla", "valor": 1,
+		"desc": "El siguiente ataque suelta 3 esquirlas al impactar."},
+	"calibre": {"nombre": "Gran Calibre", "tipo": Tipo.MODIFICADOR, "rareza": 1, "mod": "calibre", "valor": 4.0,
+		"desc": "El siguiente ataque hace +4 de daño con balas más gordas y lentas."},
 
 	# ---- Multiplicadores: solo miran lo que tienen a su izquierda.
 	"propina": {"nombre": "Propina", "tipo": Tipo.MULTIPLICADOR, "rareza": 0, "mult": "fijo", "valor": 1.5,
@@ -136,6 +162,13 @@ const CARTAS := {
 		"desc": "x2 si está en una ranura impar: la 1, la 3, la 5..."},
 	"casa": {"nombre": "La Casa Gana", "tipo": Tipo.MULTIPLICADOR, "rareza": 2, "mult": "casa", "valor": 2.5,
 		"desc": "x2.5, pero te cuesta 1 moneda en cada ciclo."},
+
+	"fiebre": {"nombre": "Fiebre del Juego", "tipo": Tipo.MULTIPLICADOR, "rareza": 1, "mult": "fiebre", "valor": 0.5,
+		"desc": "x1 más x0.5 por cada nivel de Fiebre."},
+	"pelos": {"nombre": "Por los Pelos", "tipo": Tipo.MULTIPLICADOR, "rareza": 1, "mult": "voltereta", "valor": 3.0,
+		"desc": "x3 si has hecho una voltereta en los últimos 2 segundos."},
+	"ordago": {"nombre": "Órdago", "tipo": Tipo.MULTIPLICADOR, "rareza": 2, "mult": "ordago", "valor": 1.0,
+		"desc": "x1 más x1 por cada órdago que guardes sin gastar."},
 }
 
 

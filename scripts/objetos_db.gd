@@ -34,6 +34,23 @@ const OBJETOS := {
 	"chapa": {"nombre": "Chapa de Seguridad", "desc": "Las balas enemigas van un 15% más lentas.", "efecto": {"bala_lenta": 0.15}},
 	"mechero": {"nombre": "Mechero de Oro", "desc": "Todos tus ataques queman a los enemigos.", "efecto": {"quema_global": 1.0}},
 	"seguro": {"nombre": "Seguro de la Banca", "desc": "Ignoras el primer golpe de cada sala.", "efecto": {"seguro": 1.0}},
+	"tirantes": {"nombre": "Tirantes", "desc": "La voltereta se recarga un 30% antes.", "efecto": {"voltereta_rapida": 0.3}},
+	"petaca": {"nombre": "Petaca", "desc": "+1 órdago ahora y otro más en cada piso.", "efecto": {"ordago_extra": 1.0, "ordagos": 1}},
+	"pitillera": {"nombre": "Pitillera de Plata", "desc": "Tus órdagos también hacen daño a todos los enemigos.", "efecto": {"ordago_dano": 1.0}},
+	"zapatos_claque": {"nombre": "Zapatos de Claqué", "desc": "Rodar a través de un enemigo le hace daño.", "efecto": {"voltereta_dano": 1.0}},
+	"casquillo": {"nombre": "Casquillo de la Suerte", "desc": "La Fiebre tarda el doble en bajar.", "efecto": {"fiebre_dura": 1.0}},
+	"naipe_manga": {"nombre": "As en la Manga", "desc": "Cada voltereta lanza naipes en todas direcciones.", "efecto": {"voltereta_bala": 1.0}},
+	"tapete_reforzado": {"nombre": "Tapete Reforzado", "desc": "Las mesas volcadas aguantan el triple y golpean más fuerte.", "efecto": {"mesas": 1.0}},
+	# Hardcore: pensados para lo que aprieta ahora (élites, golpes de un corazón, oleadas).
+	"chaleco": {"nombre": "Chaleco Antibalas", "desc": "Los golpes vuelven a quitar solo medio corazón.", "efecto": {"chaleco": 1.0}},
+	"espuelas": {"nombre": "Espuelas", "desc": "Después de rodar corres un 30% más durante dos segundos.", "efecto": {"espuelas": 0.3}},
+	"cronometro": {"nombre": "Cronómetro", "desc": "Las propinas por rapidez valen el triple.", "efecto": {"propina_extra": 2.0}},
+	"trofeo_caza": {"nombre": "Trofeo de Caza", "desc": "Cada élite que eliminas te cura medio corazón.", "efecto": {"elite_cura": 1.0}},
+	"bala_plata": {"nombre": "Bala de Plata", "desc": "Un 50% más de daño a élites y jefes.", "efecto": {"dano_gordos": 0.5}},
+	"navaja": {"nombre": "Navaja de Afeitar", "desc": "Los roces y los por los pelos suben la Fiebre el doble.", "efecto": {"roce_extra": 1.0}},
+	"campana": {"nombre": "Campana de Recepción", "desc": "Los enemigos nacen aturdidos un segundo.", "efecto": {"campana": 1.0}},
+	"espejo": {"nombre": "Espejo de Mano", "desc": "Cuando te golpean, desaparecen todas las balas enemigas.", "efecto": {"espejo": 1.0}},
+	"gatillo": {"nombre": "Gatillo Fácil", "desc": "Ciclos un 10% más rápidos y un 50% más de empujón.", "efecto": {"ciclo": 0.1, "retroceso": 0.5}},
 }
 
 # Isaac-style: reúne las piezas necesarias de un conjunto y te transformas.
@@ -52,6 +69,12 @@ const TRANSFORMACIONES := {
 		"piezas": ["anillo_sello", "corbata", "baston", "pajarita"], "necesarias": 3, "efecto": {"dano_global": 3.0}},
 	"noctambulo": {"nombre": "El Noctámbulo", "desc": "+15% de velocidad y más invulnerabilidad.", "color": "#6fc3e8",
 		"piezas": ["zapatos", "gafas", "reloj", "traje"], "necesarias": 3, "efecto": {"velocidad": 0.15, "invulnerable": 0.4}},
+	"pistolero": {"nombre": "El Pistolero", "desc": "Ciclos un 15% más rápidos y la voltereta se recarga antes.", "color": "#e0b070",
+		"piezas": ["tirantes", "zapatos_claque", "naipe_manga", "gatillo"], "necesarias": 3, "efecto": {"ciclo": 0.15, "voltereta_rapida": 0.2}},
+	"cazador": {"nombre": "El Cazador", "desc": "Otro 50% más de daño a élites y jefes, y los roces suben más la Fiebre.", "color": "#c9d4e0",
+		"piezas": ["trofeo_caza", "bala_plata", "navaja", "campana"], "necesarias": 3, "efecto": {"dano_gordos": 0.5, "roce_extra": 0.5}},
+	"farolero": {"nombre": "El Farolero", "desc": "+1 órdago por piso y la Fiebre baja más despacio.", "color": "#9fd0c0",
+		"piezas": ["petaca", "pitillera", "casquillo", "tapete_reforzado"], "necesarias": 3, "efecto": {"ordago_extra": 1.0, "fiebre_dura": 1.0}},
 }
 
 

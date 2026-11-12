@@ -7,14 +7,28 @@ extends RefCounted
 ##   - Un ataque se apunta con lo que llevara acumulado.
 ##   - Un multiplicador solo afecta a lo que ya está apuntado (lo de su izquierda).
 ##
-## "ctx" lleva lo que depende de la partida (monedas, racha, vida y azar). Sin azar
-## se usa el valor medio: así la barra enseña una previsión sin tirar la moneda.
-## Esta clase no toca la escena, así que se puede probar sola.
+## "ctx" lleva lo que depende de la partida (monedas, racha, vida, fiebre, voltereta,
+## órdagos y azar). Sin azar se usa el valor medio: así la barra enseña una previsión
+## sin tirar la moneda. Esta clase no toca la escena, así que se puede probar sola.
+
+const PROB_RULETA := 6  # la Ruleta Rusa acierta una de cada seis
+const PREMIO_RULETA := 6.0
 
 
 static func _pendiente_vacio() -> Dictionary:
 	return {"dano": 0.0, "pct": 0.0, "n": 0, "perfora": 0, "rebote": 0, "quema": 0, "frio": 0,
-		"crit": 0.0, "oro": 0, "ranuras": []}
+		"crit": 0.0, "oro": 0, "busca": 0, "empuje": 0, "metralla": 0, "calibre": 0, "ranuras": []}
+
+
+## Un ataque fuera de la fila (lo lanzan los objetos), con todos sus campos.
+static func ataque_suelto(id: String, dano: float, n: int) -> Dictionary:
+	if not CartasDB.CARTAS.has(id) or CartasDB.CARTAS[id].tipo != CartasDB.Tipo.ATAQUE:
+		id = "bala"
+	var a := _crear_ataque(id, CartasDB.CARTAS[id], _pendiente_vacio(), {"dano": 0.0, "perfora": 0}, {})
+	a.dano = dano
+	a.n = n
+	a.premio = false
+	return a
 
 
 static func resolver(fila: Array, ctx := {}) -> Dictionary:
@@ -47,7 +61,7 @@ static func resolver(fila: Array, ctx := {}) -> Dictionary:
 					paso.texto = carta.nombre
 
 				CartasDB.Tipo.ATAQUE:
-					var ataque := _crear_ataque(id, carta, pendiente, aura)
+					var ataque := _crear_ataque(id, carta, pendiente, aura, ctx)
 					ataques.append(ataque)
 					pendiente = _pendiente_vacio()
 					total += ataque.dano * ataque.n
@@ -116,12 +130,15 @@ static func _aplicar_modificador(carta: Dictionary, p: Dictionary, aura: Diction
 		"mano":
 			p.dano += float(carta.valor)
 			p.quema += 1
+		"calibre":
+			p.dano += float(carta.valor)
+			p.calibre += 1
 		_:
 			p[carta.mod] += carta.valor
 	p.ranuras.append(indice)
 
 
-static func _crear_ataque(id: String, carta: Dictionary, p: Dictionary, aura: Dictionary) -> Dictionary:
+static func _crear_ataque(id: String, carta: Dictionary, p: Dictionary, aura: Dictionary, ctx: Dictionary) -> Dictionary:
 	var perfora: int = int(carta.get("perfora", 0)) + p.perfora + aura.perfora
 	var rebote: int = int(carta.get("rebote", 0)) + p.rebote
 	var a := {
@@ -138,15 +155,32 @@ static func _crear_ataque(id: String, carta: Dictionary, p: Dictionary, aura: Di
 		"vuelve": carta.get("vuelve", false),
 		"radio": float(carta.get("radio", 34.0)),
 		"duracion": 0.9,
+		"busca": int(p.busca),
+		"empuje": int(p.empuje),
+		"metralla": int(p.metralla),
+		"calibre": int(p.calibre),
+		"paredes": int(carta.get("paredes", 0)),  # rebotes contra las paredes de la sala
+		"premio": false,  # la Ruleta Rusa ha salido x6
 	}
 	# Atravesar y rebotar no significan nada en un ataque sin proyectil: se traducen.
 	match id:
 		"rayo":
 			a.n += p.rebote + p.perfora / 2
-		"explosion", "molotov", "lluvia", "jackpot", "bola8":
+		"explosion", "molotov", "lluvia", "jackpot", "bola8", "dinamita", "mina", "botella":
 			a.radio += 7.0 * (p.perfora + p.rebote)
 		"cuchilla", "ruleta_gira":
 			a.duracion += 0.2 * (p.perfora + p.rebote)
+		"laser":
+			# El láser ya lo atraviesa todo: atravesar lo ensancha y rebotar lo refleja en las paredes.
+			a.radio = 4.0 + 3.0 * p.perfora
+			a.paredes += p.rebote
+		"ruleta_rusa":
+			var azar = ctx.get("azar")
+			if azar == null:
+				a.dano *= (PROB_RULETA - 1 + PREMIO_RULETA) / PROB_RULETA  # previsión: el daño medio
+			elif azar.randi_range(1, PROB_RULETA) == PROB_RULETA:
+				a.dano *= PREMIO_RULETA
+				a.premio = true
 	return a
 
 
@@ -192,6 +226,12 @@ static func _factor(carta: Dictionary, n_ataques: int, izquierda: Array, ranura:
 			return valor if multiplicadores == 1 else 1.0
 		"casa":
 			return valor if int(ctx.get("monedas", 1)) > 0 else 1.0
+		"fiebre":
+			return 1.0 + valor * clampi(int(ctx.get("fiebre", 0)), 0, 3)
+		"voltereta":
+			return valor if bool(ctx.get("voltereta", false)) else 1.0
+		"ordago":
+			return 1.0 + valor * maxi(int(ctx.get("ordagos", 0)), 0)
 	return valor
 
 

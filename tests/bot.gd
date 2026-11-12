@@ -2,6 +2,7 @@ extends SceneTree
 ## Juega partidas enteras cruzando las puertas de verdad.
 ##   godot --headless --fixed-fps 60 --path . -s res://tests/bot.gd -- modo=invencible partidas=1
 ##   godot --headless --fixed-fps 60 --path . -s res://tests/bot.gd -- modo=normal partidas=20
+##   modo=extremo o modo=imposible: un golpe y fuera. mesa=N para la dificultad de mesa.
 ## Con capturas=DIRECTORIO guarda imágenes (necesita pantalla).
 
 # Mismos valores que Recogible.Clase: nombrar esa clase aquí la compilaría antes que los autoloads.
@@ -19,6 +20,10 @@ var _capturas := ""
 var _tomadas := {}
 var _pulsadas := {}
 var _partida := 0
+var _salas_t: Array = []  # lo que tarda en limpiarse cada sala normal
+var _todas_t: Array = []
+var _golpes := {"contacto": 0, "bala": 0, "otro": 0}  # qué te ha dado, en todas las partidas
+var _peligro := "otro"  # lo que tenía encima en el último fotograma (si el golpe mata, ya no está)
 
 
 func _initialize() -> void:
@@ -37,13 +42,27 @@ func _correr() -> void:
 	var invencible: bool = _args.get("modo", "invencible") == "invencible"
 	var victorias := 0
 	var informe: Array = []
+	var pisos := {}
+	var bajas := 0.0
+	var tiempo := 0.0
 	for n in partidas:
 		var res: Dictionary = await _jugar(invencible)
 		if res.gana:
 			victorias += 1
 		informe.append(res)
-		print("partida %d: %s vida=%d oro=%d cartas=%s total=%d muertos=%d piso=%d objetos=%d" % [
-			n, "GANA" if res.gana else "pierde", res.vida, res.oro, res.cartas, res.total, res.muertos, res.salas, res.objetos])
+		pisos[res.salas] = int(pisos.get(res.salas, 0)) + 1
+		bajas += res.muertos
+		tiempo += res.t
+		print("partida %d: %s vida=%d oro=%d cartas=%s total=%d muertos=%d piso=%d en=%s objetos=%d ordagos=%d t=%d bps=%.2f roces=%d desatados=%d propinas=%d/%d" % [
+			n, "GANA" if res.gana else "pierde", res.vida, res.oro, res.cartas, res.total, res.muertos, res.salas, res.donde, res.objetos, res.ordagos,
+			res.t, res.muertos / maxf(res.t, 1.0), res.roces, res.desatados, res.propinas, _salas_t.size()])
+		_todas_t += _salas_t
+	var claves: Array = pisos.keys()
+	claves.sort()
+	_todas_t.sort()
+	var mediana: float = _todas_t[_todas_t.size() / 2] if not _todas_t.is_empty() else 0.0
+	print("PISOS %s  BAJAS/SEG %.2f  SALA_MEDIANA %.1fs" % [", ".join(claves.map(func(k): return "%d:%d" % [k, pisos[k]])), bajas / maxf(tiempo, 1.0), mediana])
+	print("GOLPES contacto=%d bala=%d otro=%d" % [_golpes.contacto, _golpes.bala, _golpes.otro])
 	print("VICTORIAS %d/%d" % [victorias, partidas])
 	quit()
 
@@ -59,9 +78,16 @@ func _jugar(invencible: bool) -> Dictionary:
 	m._pantalla.visible = false
 	m._menu.cerrar()
 	var ids: Array = ["tahur", "borracho", "crupier", "heredera", "mago", "guarda"]
-	m.empezar_partida(ids[_partida % ids.size()], int(_args.get("mesa", "0")))
+	var modo: String = _args.get("modo", "invencible")
+	m.empezar_partida(ids[_partida % ids.size()], int(_args.get("mesa", "0")), modo == "extremo", modo == "imposible")
+	_salas_t = []
+	var P = load("res://scripts/progreso.gd")
+	var antes := {}
+	for clave in ["roces", "desatados", "propinas"]:
+		antes[clave] = int(P.contadores.get(clave, 0))
 	_partida += 1
 	m.jugador.invulnerable = invencible
+	m.jugador.golpeado.connect(_al_golpe)
 	_visitadas = {GeneradorMazmorra.INICIO: true}
 	await _esperar(5)
 	await _captura("inicio")
@@ -69,8 +95,28 @@ func _jugar(invencible: bool) -> Dictionary:
 		_visitadas = {GeneradorMazmorra.INICIO: true}
 		await _recorrer(GeneradorMazmorra.INICIO, Vector2i.ZERO)
 	var plan := Combo.resolver(J.cartas)
-	return {"gana": J.vida > 0, "vida": J.vida, "oro": J.oro,
-		"cartas": ",".join(J.cartas), "total": plan.total, "muertos": J.enemigos_eliminados, "salas": J.piso, "objetos": J.objetos.size()}
+	# Dónde cae: en el jefe o en la sala normal número N del piso.
+	var donde: String = "jefe" if m.actual.get("tipo") == GeneradorMazmorra.Tipo.JEFE else "sala%d" % m._salas_limpiadas
+	return {"gana": J.vida > 0, "vida": J.vida, "oro": J.oro, "donde": "-" if J.vida > 0 else donde,
+		"cartas": ",".join(J.cartas), "total": plan.total, "muertos": J.enemigos_eliminados, "salas": J.piso, "objetos": J.objetos.size(),
+		"ordagos": J.ordagos, "t": J.tiempo_partida,
+		"roces": int(P.contadores.get("roces", 0)) - antes.roces,
+		"desatados": int(P.contadores.get("desatados", 0)) - antes.desatados,
+		"propinas": int(P.contadores.get("propinas", 0)) - antes.propinas}
+
+
+## Al recibir un golpe, lo que había encima: un enemigo, una bala, o una zona/explosión.
+func _al_golpe() -> void:
+	var que := _que_hay_encima(m.jugador.position, 6.0, 9.0)
+	_golpes[_peligro if que == "otro" else que] += 1
+
+
+func _que_hay_encima(yo: Vector2, radio_enemigo: float, radio_bala: float) -> String:
+	if not m._horda.en_radio(yo, radio_enemigo).is_empty():
+		return "contacto"
+	if m._ataques.balas_enemigas_cerca(yo, radio_bala) > 0:
+		return "bala"
+	return "otro"
 
 
 func _acabada() -> bool:
@@ -131,7 +177,8 @@ func _cruzar(d: Vector2i) -> bool:
 			return false
 		if m.actual.pos != destino and not m._cambiando_sala:
 			m.jugador.position = Sala.HUECOS[d].get_center() + Vector2(d) * 8.0
-	push_error("no se pudo cruzar la puerta %s en %s pausa=%s selector=%s sustituir=%s combate=%s cambiando=%s jugador=%s piso=%s" % [d, m.actual.pos, paused, m._selector.visible, m._barra.modo_sustituir, m.en_combate, m._cambiando_sala, m.jugador.position, J.piso])
+	push_error("no se pudo cruzar la puerta %s en %s pausa=%s selector=%s sustituir=%s combate=%s cambiando=%s jugador=%s piso=%s tipo=%s limpia=%s abiertas=%s vecinas=%s vivos=%d oleadas=%d" % [d, m.actual.pos, paused, m._selector.visible, m._barra.modo_sustituir, m.en_combate, m._cambiando_sala, m.jugador.position, J.piso,
+		m.actual.tipo, m.actual.get("limpia"), m._sala.get("_puertas_abiertas"), m._sala.get("_vecinas").keys() if m._sala.get("_vecinas") is Dictionary else [], m._horda.enemigos.size(), m._oleadas.size()])
 	quit(2)
 	return true
 
@@ -156,11 +203,20 @@ func _resolver_sala() -> bool:
 			print(m.actual.pos, " t=", t, " vivos=", m._horda.enemigos.size(), " oleadas=", m._oleadas.size(), " pausa=", paused, " jugador=", m.jugador.position, " motor=", m._motor.activo, " hijos_ataques=", m._ataques.get_child_count(), " e0=", m._horda.enemigos[0].vida if m._horda.enemigos.size()>0 else -1, " ", m._horda.enemigos[0]._nacer if m._horda.enemigos.size()>0 else -1, " ", m._horda.enemigos[0].position if m._horda.enemigos.size()>0 else Vector2.ZERO, " fps=", Engine.get_frames_per_second(), " efectos=", m._efectos.get_child_count(), " cola=", m._motor._cola.size(), " esp=", m._motor._espera)
 		if t == 360:
 			await _captura("combate" if m.actual.tipo != GeneradorMazmorra.Tipo.JEFE else "jefe")
+		if not m.en_combate and m.actual.tipo == GeneradorMazmorra.Tipo.NORMAL and m.get("_sala_t") != null:
+			_salas_t.append(m._sala_t)
 		if t > 60 * 300:
 			push_error("sala interminable en %s: %s, jugador %s, columnas %s, cartas %s, enemigos %s" % [m.actual.pos, m.actual.tipo, m.jugador.position, m._sala.solidos.size(), J.cartas, m._horda.enemigos.map(func(e): return [e.tipo, e.position, e.activo()])])
 			quit(3)
 			return true
 	_soltar_teclas()
+	# Si la huida le ha dejado metido en el hueco de una puerta, al abrirse cruzaría solo
+	# y el recorrido se descuadraría: se le aparta del borde.
+	# Lo mismo con una voltereta pedida en el último momento: se anula.
+	m.jugador._pedida = 0.0
+	m.jugador._rodar_t = 0.0
+	m.jugador.velocity = Vector2.ZERO
+	m.jugador.position = m.jugador.position.clamp(Vector2(40, 44), Vector2(600, 272))
 	await _esperar(70)
 	for r in m._recogibles.get_children():
 		if not is_instance_valid(r):
@@ -281,10 +337,16 @@ func _comprar() -> void:
 
 func _esquivar(perseguir := false) -> void:
 	var yo: Vector2 = m.jugador.position
+	_peligro = _que_hay_encima(m.jugador.position, 12.0, 16.0)
 	var huida := Vector2.ZERO
 	for e in m._horda.en_radio(yo, 90.0):
 		var d: Vector2 = yo - e.position
 		huida += d / maxf(d.length_squared(), 1.0)
+	# Las marcas de nacimiento se ven en el suelo: como una persona, no se queda al lado.
+	for pendiente in m._por_nacer:
+		var d: Vector2 = yo - pendiente[2]
+		if d.length_squared() < 70.0 * 70.0:
+			huida += d / maxf(d.length_squared(), 1.0) * 0.7
 	huida += (Sala.CENTRO - yo) * 0.00006
 	var cerca: Array = m._horda.en_radio(yo, 90.0)
 	if cerca.is_empty() or perseguir:
@@ -295,6 +357,16 @@ func _esquivar(perseguir := false) -> void:
 	_pulsar(KEY_A, huida.x < -0.002)
 	_pulsar(KEY_S, huida.y > 0.002)
 	_pulsar(KEY_W, huida.y < -0.002)
+	# Como una persona: rueda de vez en cuando con enemigos cerca, y si se ve
+	# rodeado de balas, tira un órdago. Así la voltereta y el órdago también se prueban.
+	if not cerca.is_empty() and randf() < 0.03:
+		m.jugador.pedir_voltereta()
+	if J.ordagos > 0 and randf() < 0.05 and m._ataques.balas_enemigas_cerca(yo, 40.0) >= 5:
+		m.lanzar_ordago()
+	# Al límite (o en extremo, donde siempre lo está) se tira de órdago antes, como haría cualquiera.
+	elif J.ordagos > 0 and (J.al_limite() or J.extremo) and randf() < 0.2 \
+			and (m._ataques.balas_enemigas_cerca(yo, 28.0) >= 3 or not m._horda.en_radio(yo, 16.0).is_empty()):
+		m.lanzar_ordago()
 
 
 func _pulsar(tecla: Key, si: bool) -> void:
