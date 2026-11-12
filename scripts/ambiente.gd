@@ -25,6 +25,9 @@ const COLOR_SOMBRA := Color(0.03, 0.02, 0.07, 0.45)
 const COLOR_ORO := Color8(247, 198, 74)
 const COLOR_AVISO := Color8(214, 61, 79)
 const COLOR_FIEBRE := Color8(240, 129, 60)
+# Con muchos raros juntos sus etiquetas se pisarían: solo las de los más cercanos al jugador
+# (los élites primero) y sin solaparse. A los demás los distingue el aura.
+const ETIQUETAS_MAX := 4
 
 
 ## Una capa que se pinta llamando a una función del ambiente.
@@ -37,6 +40,10 @@ class Lienzo extends Node2D:
 
 var _mundo: Node2D
 var _jugador  # el de player.gd
+var _con_etiqueta: Array = []  # los raros y élites que enseñan etiqueta este frame
+var _cand_e: Array = []  # candidatos a etiqueta, del más cercano al más lejano
+var _cand_d: Array = []
+var _cajas_etiqueta: Array = []
 var _jugo  # Jugo: para el humo y los trozos al aparecer
 var _restos: Lienzo
 var _luz: Lienzo
@@ -659,6 +666,7 @@ func _pintar_avisos(l: Node2D) -> void:
 	if horda == null:
 		return
 	var parpadeo := int(_t * 14.0) % 2 == 0
+	_elegir_etiquetas(horda)
 	for e in horda.enemigos:
 		if not e.activo() or e is Jefe:
 			continue
@@ -687,21 +695,66 @@ func _pintar_avisos(l: Node2D) -> void:
 ## Raros y élites: su etiqueta sobre la cabeza (encima del "!" si va a atacar) y, si llevan
 ## escudo, el arco que les cubre de frente. Se lee en plena horda y por encima del posproceso.
 func _pintar_rango(l: Node2D, e, parpadeo: bool) -> void:
-	var texto: String = e.etiqueta()
 	var color: Color = Enemigo.COLOR_ELITE if e.elite else Enemigo.COLOR_RARO
-	var tex: Texture2D = e.texture
-	var alto: float = 16.0 if tex == null else float(tex.get_height()) / e.vframes * absf(e.scale.y)
-	var sube := 10.0 if AVISAN.has(e.tipo) and e.frame == 3 else 0.0
+	var texto: String = e.etiqueta() if e in _con_etiqueta else ""
 	if texto != "":
-		var fuente: Font = Juego.fuente
-		var ancho := fuente.get_string_size(texto, HORIZONTAL_ALIGNMENT_LEFT, -1, 8).x
-		var x := clampf(roundf(e.position.x - ancho * 0.5), 2.0, 638.0 - ancho)
-		var y := roundf(e.position.y - alto * 0.5 - 2.0 - sube)
-		l.draw_rect(Rect2(x - 1.0, y - 7.0, ancho + 2.0, 8.0), Color(0.08, 0.06, 0.12, 0.6))
-		l.draw_string(fuente, Vector2(x, y), texto, HORIZONTAL_ALIGNMENT_LEFT, -1, 8, color)
+		var caja := _caja_etiqueta(e, texto)
+		l.draw_rect(caja, Color(0.08, 0.06, 0.12, 0.6))
+		l.draw_string(Juego.fuente, caja.position + Vector2(1.0, 7.0), texto, HORIZONTAL_ALIGNMENT_LEFT, -1, 8, color)
 	if e.tiene_mod("escudo"):
 		var ang: float = e.frente().angle()
 		l.draw_arc(e.position, e.radio + 4.0, ang - 0.9, ang + 0.9, 8, Color(color, 0.85 if parpadeo else 0.65), 2.0)
+
+
+## Dónde va la etiqueta (con su fondo): sobre la cabeza, o encima del "!" si va a atacar.
+func _caja_etiqueta(e, texto: String) -> Rect2:
+	var tex: Texture2D = e.texture
+	var alto: float = 16.0 if tex == null else float(tex.get_height()) / e.vframes * absf(e.scale.y)
+	var sube := 10.0 if AVISAN.has(e.tipo) and e.frame == 3 else 0.0
+	var ancho := Juego.fuente.get_string_size(texto, HORIZONTAL_ALIGNMENT_LEFT, -1, 8).x
+	var x := clampf(roundf(e.position.x - ancho * 0.5), 2.0, 638.0 - ancho)
+	var y := roundf(e.position.y - alto * 0.5 - 2.0 - sube)
+	return Rect2(x - 1.0, y - 7.0, ancho + 2.0, 8.0)
+
+
+## Qué raros y élites llevan etiqueta: como mucho ETIQUETAS_MAX, los élites antes y luego los
+## más cercanos al jugador, saltándose la que pisaría a otra ya puesta. Se miran solo los
+## 2 x ETIQUETAS_MAX más cercanos (inserción en una lista corta): nada que ordenar por frame.
+func _elegir_etiquetas(horda) -> void:
+	_con_etiqueta.clear()
+	_cand_e.clear()
+	_cand_d.clear()
+	var origen: Vector2 = _jugador.position if _jugador != null else CENTRO_PANTALLA
+	var tope := ETIQUETAS_MAX * 2
+	for e in horda.enemigos:
+		if e.rango <= 0 or not e.activo() or e is Jefe:
+			continue
+		var d: float = origen.distance_squared_to(e.position) - (1.0e9 if e.elite else 0.0)
+		if _cand_d.size() >= tope and d >= _cand_d[-1]:
+			continue
+		var i := _cand_d.bsearch(d)
+		_cand_d.insert(i, d)
+		_cand_e.insert(i, e)
+		if _cand_d.size() > tope:
+			_cand_d.pop_back()
+			_cand_e.pop_back()
+	_cajas_etiqueta.clear()
+	for e in _cand_e:
+		var texto: String = e.etiqueta()
+		if texto == "":
+			continue
+		var caja := _caja_etiqueta(e, texto).grow(1.0)
+		var pisa := false
+		for otra in _cajas_etiqueta:
+			if caja.intersects(otra):
+				pisa = true
+				break
+		if pisa:
+			continue
+		_cajas_etiqueta.append(caja)
+		_con_etiqueta.append(e)
+		if _con_etiqueta.size() >= ETIQUETAS_MAX:
+			return
 
 
 ## El rótulo de la oleada, pegado al muro de arriba: dos rayas entran desde los lados, el

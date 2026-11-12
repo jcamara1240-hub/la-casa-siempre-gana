@@ -345,6 +345,8 @@ const EN := {
 	"Reina": "Queen", "Crupier": "Dealer", "Matón": "Thug", "Camarero": "Waiter",
 	"Cazarrarezas": "Rarity Hunter", "Elimina a 50 enemigos raros.": "Kill 50 rare enemies.",
 	"Trato VIP": "VIP Treatment", "Elimina a un élite sin recibir daño desde que aparece.": "Kill an elite without taking damage after it appears.",
+	# Sala de apuestas con mando: la ayuda enseña el botón de interactuar.
+	"%s: JUGAR A LA TRAGAPERRAS": "%s: PLAY THE SLOT MACHINE", "%s: JUGAR A LA RULETA": "%s: PLAY ROULETTE",
 }
 
 

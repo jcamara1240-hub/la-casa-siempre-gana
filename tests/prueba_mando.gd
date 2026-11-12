@@ -126,6 +126,11 @@ func _correr() -> void:
 	await _ir_a_boton(menu, "logros")
 	await _pulsar(JOY_BUTTON_A)
 	_ok(m._logros.visible, "A abre los logros")
+	if m._logros._paginas > 1:
+		await _pulsar(JOY_BUTTON_RIGHT_SHOULDER)
+		_ok(m._logros._pagina == 1, "RB pasa a la siguiente página de logros")
+		await _pulsar(JOY_BUTTON_DPAD_LEFT)
+		_ok(m._logros._pagina == 0, "la cruceta vuelve a la primera")
 	await _pulsar(JOY_BUTTON_B)
 	_ok(not m._logros.visible and menu.visible, "B sale de los logros")
 
