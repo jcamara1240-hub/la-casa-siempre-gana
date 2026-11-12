@@ -131,7 +131,7 @@ func _ready() -> void:
 func cargar_ajustes() -> void:
 	var cfg := ConfigFile.new()
 	var hay := cfg.load(RUTA_AJUSTES) == OK
-	var por_defecto := "es" if OS.get_locale_language() == "es" else "en"
+	var por_defecto := OS.get_locale_language() if Idioma.IDIOMAS.has(OS.get_locale_language()) else "en"
 	var idioma: String = cfg.get_value("ajustes", "idioma", por_defecto) if hay else por_defecto
 	Idioma.actual = idioma if Idioma.IDIOMAS.has(idioma) else "es"
 	if hay:
