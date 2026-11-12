@@ -420,7 +420,9 @@ func jefe_del_piso() -> String:
 
 
 func contexto_combo(con_azar := false) -> Dictionary:
-	var ctx := {"monedas": oro, "racha": racha, "vida": vida, "dano_global": stat("dano_global"),
+	# En cooperativo, la vida que cuenta es la del que va peor de los que siguen en pie.
+	var v := vida if not coop else (vida2 if vida <= 0 else (vida if vida2 <= 0 else mini(vida, vida2)))
+	var ctx := {"monedas": oro, "racha": racha, "vida": v, "dano_global": stat("dano_global"),
 		"fiebre": nivel_fiebre(), "voltereta": rodo_hace_poco(), "ordagos": ordagos}
 	if con_azar:
 		ctx["azar"] = azar_combate

@@ -3,6 +3,8 @@ extends SceneTree
 ##   godot --headless --fixed-fps 60 --path . -s res://tests/bot.gd -- modo=invencible partidas=1
 ##   godot --headless --fixed-fps 60 --path . -s res://tests/bot.gd -- modo=normal partidas=20
 ##   modo=extremo o modo=imposible: un golpe y fuera. mesa=N para la dificultad de mesa.
+##   coop=1: cooperativo, con un J2 en el "mando 1" (eventos de stick inventados) que también
+##   esquiva, rueda y lanza órdagos. pisos=N para en cuanto llega al piso N+1.
 ## Con capturas=DIRECTORIO guarda imágenes (necesita pantalla).
 
 # Mismos valores que Recogible.Clase: nombrar esa clase aquí la compilaría antes que los autoloads.
@@ -24,6 +26,9 @@ var _salas_t: Array = []  # lo que tarda en limpiarse cada sala normal
 var _todas_t: Array = []
 var _golpes := {"contacto": 0, "bala": 0, "otro": 0}  # qué te ha dado, en todas las partidas
 var _peligro := "otro"  # lo que tenía encima en el último fotograma (si el golpe mata, ya no está)
+var _coop := false
+var _stick := Vector2(9, 9)  # lo último que se mandó al stick del J2 (para no repetir eventos)
+const MANDO_J2 := 1
 
 
 func _initialize() -> void:
@@ -54,7 +59,7 @@ func _correr() -> void:
 		bajas += res.muertos
 		tiempo += res.t
 		print("partida %d: %s vida=%d oro=%d cartas=%s total=%d muertos=%d piso=%d en=%s objetos=%d ordagos=%d t=%d bps=%.2f roces=%d desatados=%d propinas=%d/%d" % [
-			n, "GANA" if res.gana else "pierde", res.vida, res.oro, res.cartas, res.total, res.muertos, res.salas, res.donde, res.objetos, res.ordagos,
+			n, "GANA" if res.gana else ("para (pisos=%s)" % _args.pisos if _parar_por_pisos() else "pierde"), res.vida, res.oro, res.cartas, res.total, res.muertos, res.salas, res.donde, res.objetos, res.ordagos,
 			res.t, res.muertos / maxf(res.t, 1.0), res.roces, res.desatados, res.propinas, _salas_t.size()])
 		_todas_t += _salas_t
 	var claves: Array = pisos.keys()
@@ -79,6 +84,10 @@ func _jugar(invencible: bool) -> Dictionary:
 	m._menu.cerrar()
 	var ids: Array = ["tahur", "borracho", "crupier", "heredera", "mago", "guarda"]
 	var modo: String = _args.get("modo", "invencible")
+	_coop = _args.get("coop", "0") == "1"
+	if _coop:
+		# El J1 con el teclado (WASD) y el J2 con el mando 1: así se prueba que cada uno mueve al suyo.
+		m._coop_cfg = {"personaje2": ids[(_partida + 1) % ids.size()], "entrada1": -1, "entrada2": MANDO_J2}
 	m.empezar_partida(ids[_partida % ids.size()], int(_args.get("mesa", "0")), modo == "extremo", modo == "imposible")
 	_salas_t = []
 	var P = load("res://scripts/progreso.gd")
@@ -88,6 +97,8 @@ func _jugar(invencible: bool) -> Dictionary:
 	_partida += 1
 	m.jugador.invulnerable = invencible
 	m.jugador.golpeado.connect(_al_golpe)
+	if _coop:
+		m.jugador2.invulnerable = invencible
 	_visitadas = {GeneradorMazmorra.INICIO: true}
 	await _esperar(5)
 	await _captura("inicio")
@@ -97,7 +108,9 @@ func _jugar(invencible: bool) -> Dictionary:
 	var plan := Combo.resolver(J.cartas)
 	# Dónde cae: en el jefe o en la sala normal número N del piso.
 	var donde: String = "jefe" if m.actual.get("tipo") == GeneradorMazmorra.Tipo.JEFE else "sala%d" % m._salas_limpiadas
-	return {"gana": J.vida > 0, "vida": J.vida, "oro": J.oro, "donde": "-" if J.vida > 0 else donde,
+	if _coop:
+		print("COOP: J2 %s vida=%d/%d piso=%d caidas_j2_vistas=%d" % [J.personaje2, J.vida2, J.vida_max2, J.piso, _caidas_j2])
+	return {"gana": J.vida > 0 and not _parar_por_pisos(), "vida": J.vida, "oro": J.oro, "donde": "-" if J.vida > 0 else donde,
 		"cartas": ",".join(J.cartas), "total": plan.total, "muertos": J.enemigos_eliminados, "salas": J.piso, "objetos": J.objetos.size(),
 		"ordagos": J.ordagos, "t": J.tiempo_partida,
 		"roces": int(P.contadores.get("roces", 0)) - antes.roces,
@@ -120,7 +133,11 @@ func _que_hay_encima(yo: Vector2, radio_enemigo: float, radio_bala: float) -> St
 
 
 func _acabada() -> bool:
-	return m._pantalla.visible
+	return m._pantalla.visible or _parar_por_pisos()
+
+
+func _parar_por_pisos() -> bool:
+	return _args.has("pisos") and J.piso > int(_args.pisos)
 
 
 ## Recorre el árbol de salas. El jefe se deja para el final.
@@ -216,6 +233,12 @@ func _resolver_sala() -> bool:
 			quit(3)
 			return true
 	_soltar_teclas()
+	if _coop:
+		_stick_j2(Vector2.ZERO)
+		m.jugador2._pedida = 0.0
+		m.jugador2._rodar_t = 0.0
+		m.jugador2.velocity = Vector2.ZERO
+		m.jugador2.position = m.jugador2.position.clamp(Vector2(40, 44), Vector2(600, 272))
 	# Si la huida le ha dejado metido en el hueco de una puerta, al abrirse cruzaría solo
 	# y el recorrido se descuadraría: se le aparta del borde.
 	# Lo mismo con una voltereta pedida en el último momento: se anula.
@@ -373,6 +396,71 @@ func _esquivar(perseguir := false) -> void:
 	elif J.ordagos > 0 and (J.al_limite() or J.extremo) and randf() < 0.2 \
 			and (m._ataques.balas_enemigas_cerca(yo, 28.0) >= 3 or not m._horda.en_radio(yo, 16.0).is_empty()):
 		m.lanzar_ordago()
+	if _coop:
+		_esquivar_j2(perseguir)
+
+
+var _caidas_j2 := 0
+var _j2_caido_antes := false
+
+
+## El J2 con su "mando": se mueve con el stick (eventos de verdad del dispositivo 1), rueda
+## con A y lanza órdagos con X. Si el otro está en el suelo, va a levantarlo.
+func _esquivar_j2(perseguir: bool) -> void:
+	var j2 = m.jugador2
+	if j2 == null:
+		return
+	if j2.caido and not _j2_caido_antes:
+		_caidas_j2 += 1
+	_j2_caido_antes = j2.caido
+	var yo: Vector2 = j2.position
+	var huida := Vector2.ZERO
+	if m.jugador.caido:
+		huida = (m.jugador.position - yo) * 0.01
+	else:
+		for e in m._horda.en_radio(yo, 90.0):
+			var d: Vector2 = yo - e.position
+			huida += d / maxf(d.length_squared(), 1.0)
+		huida += (Sala.CENTRO - yo) * 0.00006
+		var cerca: Array = m._horda.en_radio(yo, 90.0)
+		var quedan: int = m._horda.enemigos.size() + m._por_nacer.size()
+		if cerca.is_empty() or perseguir:
+			var lista: Array = m._horda.mas_cercanos(yo, 1)
+			if not lista.is_empty():
+				huida = (lista[0].position - yo).normalized()
+		if (perseguir or quedan <= 2) and not m._horda.enemigos.is_empty():
+			# Lo que haría un compañero: rodear al último por la espalda (el escudo mira al J1).
+			var e = m._horda.mas_cercanos(m.jugador.position, 1)
+			if not e.is_empty():
+				var detras: Vector2 = e[0].position + (e[0].position - m.jugador.position).normalized() * 18.0
+				huida = (detras - yo).normalized()
+		if not cerca.is_empty() and randf() < 0.03:
+			_boton_j2(JOY_BUTTON_A)
+		if J.ordagos > 0 and randf() < 0.05 and m._ataques.balas_enemigas_cerca(yo, 40.0) >= 5:
+			_boton_j2(JOY_BUTTON_X)
+	_stick_j2(huida.normalized() if huida.length() > 0.002 else Vector2.ZERO)
+
+
+func _stick_j2(v: Vector2) -> void:
+	v = (v * 4.0).round() / 4.0  # pocos valores: no hace falta un evento por fotograma
+	if v == _stick:
+		return
+	_stick = v
+	for eje in [JOY_AXIS_LEFT_X, JOY_AXIS_LEFT_Y]:
+		var e := InputEventJoypadMotion.new()
+		e.device = MANDO_J2
+		e.axis = eje
+		e.axis_value = v.x if eje == JOY_AXIS_LEFT_X else v.y
+		Input.parse_input_event(e)
+
+
+func _boton_j2(boton: int) -> void:
+	for pulsado in [true, false]:
+		var e := InputEventJoypadButton.new()
+		e.device = MANDO_J2
+		e.button_index = boton
+		e.pressed = pulsado
+		Input.parse_input_event(e)
 
 
 func _pulsar(tecla: Key, si: bool) -> void:
