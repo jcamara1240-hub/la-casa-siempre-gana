@@ -46,6 +46,35 @@ const COLOR_GRIS := Color8(168, 154, 142)
 const COLOR_ROJO := Color8(214, 61, 79)
 const COLOR_FIEBRE := Color8(240, 129, 60)
 const COLOR_MARCO := Color8(74, 52, 102)
+const COLOR_SUMA := Color8(46, 111, 176)
+
+# Desglose del ciclo, como en Balatro: encima de cada carta, lo que suma o multiplica
+# ("+5", "x2") en el orden en que se ejecuta, y al final el total da un salto (en oro y con
+# sonido si bate tu mejor combo). Los ciclos pueden ir muy deprisa (Fiebre, desatado), así que:
+#   - cada etiqueta vive APORTE_VIDA aunque el ciclo sea más corto: se lee entera;
+#   - mientras el total no cambie, se desglosa como mucho un ciclo cada DESGLOSE_PAUSA; los
+#     ciclos de en medio solo mueven el número, sin etiquetas ni salto (si no, sería un parpadeo);
+#   - si el total cambia (carta nueva, fiebre...) se vuelve a desglosar antes (DESGLOSE_MIN),
+#     y un récord se desglosa siempre; su sonido, como mucho uno cada RECORD_SONIDO.
+# Con varios ciclos dobles (objeto "doble_ciclo") solo se desglosa el primer pase.
+const APORTE_VIDA := 0.55
+const DESGLOSE_PAUSA := 1.6
+const DESGLOSE_MIN := 0.6
+const RECORD_SONIDO := 2.0
+const POP_SEG := 0.35
+
+var desgloses := 0  # cuántos ciclos se han desglosado (lo miran las pruebas)
+var _aporte_texto: Array = []
+var _aporte_t: Array = []
+var _aporte_mult: Array = []
+var _desglose := false  # el ciclo en marcha se está desglosando
+var _desglose_pasos := 0  # los pasos que quedan de su primer pase
+var _desde_desglose := 99.0
+var _total_desglose := -1
+var _record := false
+var _pop_t := 0.0
+var _pop_record := false
+var _record_espera := 0.0
 
 
 func _ready() -> void:
@@ -55,6 +84,12 @@ func _ready() -> void:
 	position = Vector2(0, 304)
 	size = Vector2(640, 56)
 	mouse_filter = Control.MOUSE_FILTER_STOP
+	_aporte_texto.resize(Juego.RANURAS_MAX)
+	_aporte_texto.fill("")
+	_aporte_t.resize(Juego.RANURAS_MAX)
+	_aporte_t.fill(0.0)
+	_aporte_mult.resize(Juego.RANURAS_MAX)
+	_aporte_mult.fill(false)
 	Juego.cartas_cambiadas.connect(_recalcular)
 	Juego.estado_cambiado.connect(_al_cambiar_estado)
 	_recalcular()
@@ -109,10 +144,54 @@ func _fila_visible() -> Array:
 	return Juego.cartas
 
 
-func _al_empezar_ciclo(_plan: Dictionary) -> void:
+func _al_empezar_ciclo(plan: Dictionary) -> void:
 	_anim_activa = true
 	_total_visible = 0.0
 	_paso_n = 0
+	_empezar_desglose(plan)
+
+
+## ¿Se desglosa este ciclo? Ver la cadencia arriba, junto a APORTE_VIDA.
+func _empezar_desglose(plan: Dictionary) -> void:
+	_desglose = false
+	if not Juego.desglose_ciclo or plan.pasos.is_empty():
+		return
+	var total := roundi(plan.total)
+	var record: bool = plan.get("record", false)
+	var espera := DESGLOSE_MIN if total != _total_desglose else DESGLOSE_PAUSA
+	if not record and _desde_desglose < espera:
+		return
+	_desglose = true
+	_desglose_pasos = plan.pasos.size()
+	_record = record
+	_total_desglose = total
+	_desde_desglose = 0.0
+	_aporte_t.fill(0.0)
+	desgloses += 1
+
+
+func _apuntar_aporte(paso: Dictionary) -> void:
+	if not _desglose or _desglose_pasos <= 0:
+		return
+	_desglose_pasos -= 1
+	var r: int = paso.ranura
+	var aporte := String(paso.get("aporte", ""))
+	if aporte != "" and r < _aporte_t.size():
+		var valor := float(paso.valor)
+		_aporte_mult[r] = aporte == "mult"
+		_aporte_texto[r] = ("X" + Combo._numero(valor)) if aporte == "mult" else ("+" + _cifra(valor))
+		_aporte_t[r] = APORTE_VIDA
+	if _desglose_pasos == 0:
+		# La última carta: el total salta.
+		_pop_t = 1.0
+		_pop_record = _record
+		if _record and _record_espera <= 0.0:
+			Sonido.tocar("remate", 1.2, -5.0)
+			_record_espera = RECORD_SONIDO
+
+
+static func _cifra(v: float) -> String:
+	return str(roundi(v)) if v >= 10.0 or is_equal_approx(v, roundf(v)) else "%.1f" % v
 
 
 func _al_ejecutar_paso(paso: Dictionary) -> void:
@@ -139,10 +218,12 @@ func _al_ejecutar_paso(paso: Dictionary) -> void:
 		_etiqueta_t = 0.7
 		_etiqueta_dur = _etiqueta_t
 		_etiqueta_color = COLOR_ROJO
+	_apuntar_aporte(paso)
 
 
 func parar_animacion() -> void:
 	_anim_activa = false
+	_desglose = false
 	_recalcular()
 
 
@@ -154,6 +235,11 @@ func _process(delta: float) -> void:
 	for i in _mult_cambio.size():
 		_mult_cambio[i] = maxf(0.0, _mult_cambio[i] - delta * 1.6)
 	_etiqueta_t = maxf(0.0, _etiqueta_t - delta)
+	for i in _aporte_t.size():
+		_aporte_t[i] = maxf(0.0, _aporte_t[i] - delta)
+	_pop_t = maxf(0.0, _pop_t - delta / POP_SEG)
+	_desde_desglose += delta
+	_record_espera -= delta
 	# La Fiebre, las volteretas y los órdagos cambian en plena sala: se mira a menudo
 	# para que sus cartas se enciendan y se apaguen a tiempo.
 	_refresco_t -= delta
@@ -358,6 +444,8 @@ func _draw() -> void:
 		_dibujar_multiplicador(i, carta)
 		if rebote > 0.0:
 			_dibujar_disparo(carta, rebote)
+	for i in mini(fila.size(), _aporte_t.size()):
+		_dibujar_aporte(i)
 	if _cursor_visible():
 		_dibujar_cursor()
 	elif _arrastrando != -1:
@@ -382,6 +470,26 @@ func _dibujar_multiplicador(ranura: int, carta: Rect2) -> void:
 	draw_rect(placa.grow(1.0), color if cambio > 0.3 else COLOR_MARCO)
 	draw_rect(placa, COLOR_FONDO)
 	draw_string(Juego.fuente, placa.position + Vector2(2.0, 8.0), texto, HORIZONTAL_ALIGNMENT_LEFT, -1, 8, color)
+
+
+## Lo que ha sumado o multiplicado la carta en el desglose: una placa azul (suma) o roja
+## (multiplica) sobre su borde de arriba, que entra grande y se apaga sola.
+func _dibujar_aporte(ranura: int) -> void:
+	var queda: float = _aporte_t[ranura]
+	if queda <= 0.0:
+		return
+	var texto: String = _aporte_texto[ranura]
+	var pasado := APORTE_VIDA - queda
+	var escala := 1.5 if pasado < 0.05 else 1.0
+	var alfa := clampf(queda / 0.15, 0.0, 1.0)
+	var ancho := roundf(Juego.fuente.get_string_size(texto, HORIZONTAL_ALIGNMENT_LEFT, -1, 8).x)
+	var centro := ORIGEN + Vector2(ranura * ANCHO_RANURA + 16.0, 1.0)
+	var placa := Rect2(-roundf(ancho * 0.5) - 2.0, -5.0, ancho + 4.0, 10.0)
+	draw_set_transform(centro, 0.0, Vector2(escala, escala))
+	draw_rect(placa.grow(1.0), Color(COLOR_FONDO, alfa))
+	draw_rect(placa, Color(COLOR_ROJO if _aporte_mult[ranura] else COLOR_SUMA, alfa))
+	draw_string(Juego.fuente, Vector2(placa.position.x + 2.0, 3.0), texto, HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color(COLOR_CREMA, alfa))
+	draw_set_transform(Vector2.ZERO)
 
 
 ## Un destello crema al principio, el borde blanco y unas chispas que suben de la carta;
@@ -443,7 +551,17 @@ func _dibujar_combo() -> void:
 	var numero := str(roundi(_total_visible))
 	var color := COLOR_CREMA.lerp(COLOR_ORO, _total_pulso)
 	var y := roundf(42.0 - _total_pulso * 3.0)
-	draw_string(Juego.fuente_grande, Vector2(x, y), numero, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, color)
+	if _pop_t > 0.0:
+		# El total del desglose: un salto de escala; en oro si es récord.
+		var escala := 1.0 + 0.5 * _pop_t * _pop_t
+		if _pop_record:
+			color = COLOR_ORO
+			draw_string(fuente, Vector2(x + 76.0, 15), Idioma.t("¡RÉCORD!"), HORIZONTAL_ALIGNMENT_LEFT, -1, 8, COLOR_ORO)
+		draw_set_transform(Vector2(x, 42.0), 0.0, Vector2(escala, escala))
+		draw_string(Juego.fuente_grande, Vector2(0.0, y - 42.0), numero, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, color)
+		draw_set_transform(Vector2.ZERO)
+	else:
+		draw_string(Juego.fuente_grande, Vector2(x, y), numero, HORIZONTAL_ALIGNMENT_LEFT, -1, 16, color)
 	if _etiqueta_t > 0.0:
 		var ancho := Juego.fuente_grande.get_string_size(numero, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x
 		# El multiplicador entra de golpe al doble de tamaño (creciendo hacia la derecha,

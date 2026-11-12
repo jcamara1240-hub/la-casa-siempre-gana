@@ -54,6 +54,9 @@ func _physics_process(delta: float) -> void:
 
 func _nuevo_ciclo() -> void:
 	var plan := Combo.resolver(Juego.cartas, Juego.contexto_combo(true))
+	# Récord: supera (en número entero) el mejor combo que ya llevabas en la partida.
+	plan["record"] = Juego.mejor_combo > 0.0 and roundi(plan.total) > roundi(Juego.mejor_combo)
+	plan["duracion"] = _duracion_ciclo()
 	Juego.mejor_combo = maxf(Juego.mejor_combo, plan.total)
 	if plan.coste > 0:
 		Juego.gastar_oro(mini(plan.coste, Juego.oro))

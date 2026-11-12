@@ -431,6 +431,18 @@ def protagonista():
         guardar(hoja(frames, 6), f"personajes/pj_{nombre}.png")
         if nombre == "tahur":
             guardar(hoja(frames, 6), "personajes/protagonista.png")
+    # Traje de gala (premio del Contrato de la Casa): esmoquin negro con solapa y pajarita de oro.
+    for nombre, mapa in MAPAS_PERSONAJE.items():
+        gala = dict(mapa)
+        oscuro = mapa.get("R") in ("d", "k")  # quien ya viste de negro, de blanco
+        gala.update({"R": "c", "r": "s", "y": "y"} if oscuro else {"R": "k", "r": "d", "y": "y"})
+        frames = []
+        for d in ("frente", "espalda", "lado"):
+            frames += [
+                fotograma(d, "quieto", 0, gala), fotograma(d, "quieto", 1, gala),
+                fotograma(d, "a", 0, gala), fotograma(d, "b", 1, gala), fotograma(d, "c", 0, gala), fotograma(d, "b", 1, gala),
+            ]
+        guardar(hoja(frames, 6), f"personajes/pj_{nombre}_gala.png")
 
 
 # ---------------------------------------------------------------- enemigos
@@ -1476,6 +1488,15 @@ def objetos():
         for i in range(3, 13, 4):
             pon(dorso, i + 1, j + 1, "y"); pon(dorso, i, j + 2, "o"); pon(dorso, i + 2, j + 2, "o")
     guardar(dorso, "objetos/carta_suelo.png")
+    # Dorsos que se ganan con el calor del Contrato de la Casa: tapete, medianoche y oro.
+    for n, (borde, fondo, dibujo, punto) in enumerate((("y", "g", "G", "m"), ("B", "k", "b", "B"), ("k", "y", "o", "c")), 1):
+        alt = lienzo(16, 22)
+        rect(alt, 0, 0, 16, 22, "k"); rect(alt, 1, 1, 14, 20, borde); rect(alt, 2, 2, 12, 18, fondo)
+        for j in range(3, 19, 4):
+            for i in range(3, 13, 4):
+                pon(alt, i + 1, j + 1, punto); pon(alt, i, j + 2, dibujo); pon(alt, i + 2, j + 2, dibujo)
+        rect(alt, 6, 9, 4, 4, borde); rect(alt, 7, 10, 2, 2, punto)
+        guardar(alt, f"objetos/carta_suelo_{n}.png")
 
     columna = lienzo(16, 24)
     for n, y in enumerate(range(16, -1, -4)):

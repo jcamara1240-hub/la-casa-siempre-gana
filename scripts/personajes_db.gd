@@ -39,6 +39,29 @@ const MESAS := [
 ]
 
 
+## Contrato de la Casa (el Calor de Hades): castigos sueltos que el jugador combina tras ganar
+## una vez con un personaje. Son las mesas descompuestas, más algún mando del director y de la
+## tienda. Se suman encima de la mesa elegida. El calor de la partida es la suma.
+const CLAUSULAS := {
+	"plomo": {"nombre": "FICHAS PESADAS", "desc": "ENEMIGOS CON UN 25% MÁS DE VIDA.", "calor": 1},
+	"recargo": {"nombre": "RECARGO", "desc": "LA TIENDA, UN 30% MÁS CARA.", "calor": 1},
+	"propina": {"nombre": "SIN PROPINAS", "desc": "EL RELOJ DE LA PROPINA, UN 40% MÁS CORTO.", "calor": 1},
+	"oleadas": {"nombre": "PRISAS", "desc": "CADA OLEADA ENTRA ANTES DE QUE ACABES LA ANTERIOR.", "calor": 2},
+	"sin_cura": {"nombre": "SIN BOTIQUÍN", "desc": "LA TIENDA NO VENDE CORAZONES.", "calor": 2},
+	"corazon": {"nombre": "CORAZÓN EMPEÑADO", "desc": "EMPIEZAS CON UN CORAZÓN MENOS.", "calor": 2},
+	"jefes": {"nombre": "JEFES DE HIERRO", "desc": "LOS JEFES, CON UN 40% MÁS DE VIDA.", "calor": 2},
+	"ranura": {"nombre": "MESA ESTRECHA", "desc": "EMPIEZAS CON UNA RANURA MENOS.", "calor": 3},
+}
+
+
+static func calor_de(clausulas: Array) -> int:
+	var total := 0
+	for c in clausulas:
+		if CLAUSULAS.has(c):
+			total += int(CLAUSULAS[c].calor)
+	return total
+
+
 static func nombre(id: String) -> String:
 	return Idioma.t(PERSONAJES[id].nombre)
 
@@ -47,5 +70,8 @@ static func descripcion(id: String) -> String:
 	return Idioma.t(PERSONAJES[id].desc)
 
 
+## Con el traje de gala puesto (premio del Contrato de la Casa), el dibujo alternativo.
 static func textura(id: String) -> Texture2D:
+	if Progreso.lleva_traje(id):
+		return load("res://assets/personajes/pj_%s_gala.png" % id)
 	return load("res://assets/personajes/pj_%s.png" % id)

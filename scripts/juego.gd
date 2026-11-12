@@ -67,6 +67,8 @@ var diario := false
 var imposible := false
 var infinito := false
 var transformaciones: Array = []
+## Las cláusulas del Contrato de la Casa de esta partida (ver PersonajesDB.CLAUSULAS).
+var contrato: Array = []
 var novedades: Array = []  # lo desbloqueado en esta partida
 var tiempo_partida := 0.0
 var mejor_combo := 0.0
@@ -109,6 +111,7 @@ var sacudida := true
 var numeros_dano := true
 var volumen_musica := 0.6
 var volumen_efectos := 0.8
+var desglose_ciclo := true  # la cuenta de cada carta encima de la fila ("+5", "x2")
 
 # Pantallas táctiles
 var tactil := OS.has_feature("mobile") or OS.has_feature("web_android") or OS.has_feature("web_ios")
@@ -141,6 +144,7 @@ func cargar_ajustes() -> void:
 		volumen_musica = cfg.get_value("ajustes", "volumen_musica", 0.6)
 		volumen_efectos = cfg.get_value("ajustes", "volumen_efectos", 0.8)
 		Mando.vibracion = cfg.get_value("ajustes", "vibracion", true)
+		desglose_ciclo = cfg.get_value("ajustes", "desglose_ciclo", true)
 	_aplicar_pantalla()
 
 
@@ -153,6 +157,7 @@ func guardar_ajustes() -> void:
 	cfg.set_value("ajustes", "volumen_musica", volumen_musica)
 	cfg.set_value("ajustes", "volumen_efectos", volumen_efectos)
 	cfg.set_value("ajustes", "vibracion", Mando.vibracion)
+	cfg.set_value("ajustes", "desglose_ciclo", desglose_ciclo)
 	cfg.save(RUTA_AJUSTES)
 
 
@@ -201,8 +206,12 @@ func nueva_partida(semilla := 0, id_personaje := "", id_mesa := -1, modo_extremo
 		reto_puntuable = false
 	golpes = 0
 	var datos: Dictionary = PersonajesDB.PERSONAJES[personaje]
+	# El contrato firmado en la selección; ni el reto, ni el extremo, ni el imposible lo llevan.
+	contrato = [] if reto_diario or extremo or not Progreso.contrato_disponible(personaje) else Progreso.contrato(personaje)
 	# En modo extremo hay un solo corazón, y un golpe se lo lleva entero.
 	vida_max = 2 if extremo else int(datos.vida) - (2 if mesa >= 4 else 0)
+	if clausula("corazon"):
+		vida_max = maxi(vida_max - 2, 2)
 	vida = vida_max
 	oro = int(datos.oro)
 	piso = 1
@@ -221,6 +230,8 @@ func nueva_partida(semilla := 0, id_personaje := "", id_mesa := -1, modo_extremo
 	_reiniciar_ritmo()
 	cartas = datos.cartas.duplicate()
 	var ranuras_iniciales := RANURAS_IMPOSIBLE if imposible else int(datos.get("ranuras", RANURAS_INICIALES))
+	if clausula("ranura"):
+		ranuras_iniciales = maxi(ranuras_iniciales - 1, cartas.size())
 	while cartas.size() < ranuras_iniciales:
 		cartas.append("")
 	objetos = []
@@ -327,7 +338,7 @@ func resumen_reto(gano: bool) -> Dictionary:
 # ---------------------------------------------------------------- guardado
 const CAMPOS_PARTIDA := ["vida", "vida_max", "oro", "piso", "enemigos_eliminados", "racha", "personaje", "mesa", "extremo",
 	"diario", "imposible", "infinito", "deuda", "orden_jefes", "cartas", "objetos", "stats", "transformaciones", "novedades", "tiempo_partida",
-	"mejor_combo", "oro_total", "ordagos", "presion", "fecha_reto", "reto_puntuable", "golpes"]
+	"mejor_combo", "oro_total", "ordagos", "presion", "fecha_reto", "reto_puntuable", "golpes", "contrato"]
 
 
 func volcar() -> Dictionary:
@@ -340,6 +351,7 @@ func volcar() -> Dictionary:
 func restaurar(datos: Dictionary) -> void:
 	# Las partidas guardadas antes de que existieran los órdagos empiezan con los de siempre.
 	ordagos = ORDAGOS_BASE
+	contrato = []  # las guardadas antes del Contrato de la Casa no traen ninguno
 	_reiniciar_ritmo()
 	for campo in CAMPOS_PARTIDA:
 		if datos.has(campo):
@@ -552,6 +564,16 @@ func rellenar_ordagos() -> void:
 	estado_cambiado.emit()
 
 
+## ¿Lleva esta partida esa cláusula del Contrato de la Casa?
+func clausula(id: String) -> bool:
+	return contrato.has(id)
+
+
+## El calor de la partida: la suma de sus cláusulas.
+func calor() -> int:
+	return PersonajesDB.calor_de(contrato)
+
+
 func stat(nombre: String) -> float:
 	return float(stats.get(nombre, 0.0))
 
@@ -678,6 +700,8 @@ func robar_objeto(excluir := [], rng: RandomNumberGenerator = null) -> String:
 
 func precio_final(base: int) -> int:
 	var recargo := 1.3 if mesa >= 3 else 1.0
+	if clausula("recargo"):
+		recargo *= 1.3
 	return maxi(1, roundi(base * recargo * (1.0 - minf(stat("descuento"), 0.8))))
 
 

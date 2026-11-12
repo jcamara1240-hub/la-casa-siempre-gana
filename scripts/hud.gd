@@ -136,6 +136,8 @@ func _draw() -> void:
 	if Juego.deuda > 0:
 		draw_rect(Rect2(2, 28, 70, 11), Color(0.08, 0.06, 0.12, 0.8))
 		draw_string(Juego.fuente, Vector2(6, 37), Idioma.t("DEUDA %d") % Juego.deuda, HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color8(214, 61, 79))
+	if Juego.calor() > 0:
+		_dibujar_calor(40.0 if Juego.deuda > 0 else 28.0)
 	_dibujar_mapa()
 	_dibujar_reservas()
 	if horda != null and is_instance_valid(horda.jefe):
@@ -143,6 +145,22 @@ func _draw() -> void:
 	elif Juego.progreso_sala >= 0.0:
 		_dibujar_sala()
 	_dibujar_chispas()
+
+
+## El calor del Contrato de la Casa, debajo del oro: una llamita y el número.
+func _dibujar_calor(y: float) -> void:
+	var texto := Idioma.t("CALOR %d") % Juego.calor()
+	draw_rect(Rect2(2, y, _ancho_texto(texto) + 16.0, 11), Color(0.08, 0.06, 0.12, 0.8))
+	dibujar_llama(self, Vector2(8, y + 9))
+	draw_string(Juego.fuente, Vector2(14, y + 9), texto, HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color8(240, 129, 60))
+
+
+## Una llamita de 5x8 con la base en "p" (la usan también la selección y el contrato).
+static func dibujar_llama(lienzo: CanvasItem, p: Vector2) -> void:
+	lienzo.draw_colored_polygon(PackedVector2Array([p + Vector2(-3, 0), p + Vector2(-3, -3), p + Vector2(-1, -5),
+		p + Vector2(0, -8), p + Vector2(1, -5), p + Vector2(3, -3), p + Vector2(3, 0)]), Color8(240, 129, 60))
+	lienzo.draw_colored_polygon(PackedVector2Array([p + Vector2(-1, 0), p + Vector2(-1, -2), p + Vector2(0, -4),
+		p + Vector2(1, -2), p + Vector2(1, 0)]), Color8(247, 198, 74))
 
 
 ## Lo que llevas de la sala, en porcentaje: las oleadas entran según lo que vas matando.

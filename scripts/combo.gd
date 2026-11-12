@@ -7,6 +7,10 @@ extends RefCounted
 ##   - Un ataque se apunta con lo que llevara acumulado.
 ##   - Un multiplicador solo afecta a lo que ya está apuntado (lo de su izquierda).
 ##
+## Cada paso lleva además su aporte al total, para enseñar la cuenta carta a carta:
+## "aporte" es "suma", "mult" o "" (no cambia el total) y "valor" lo que suma o multiplica.
+## Rehaciendo la cuenta con esos pasos, en orden, sale exactamente "total".
+##
 ## "ctx" lleva lo que depende de la partida (monedas, racha, vida, fiebre, voltereta,
 ## órdagos y azar). Sin azar se usa el valor medio: así la barra enseña una previsión
 ## sin tirar la moneda. Esta clase no toca la escena, así que se puede probar sola.
@@ -52,7 +56,8 @@ static func resolver(fila: Array, ctx := {}) -> Dictionary:
 			else:
 				id = efectivas[-1]
 		var carta: Dictionary = CartasDB.CARTAS[id]
-		var paso := {"ranura": i, "tipo": carta.tipo, "texto": "", "ataque": {}, "sin_efecto": sin_copia}
+		var paso := {"ranura": i, "tipo": carta.tipo, "texto": "", "ataque": {}, "sin_efecto": sin_copia,
+			"aporte": "", "valor": 0.0}
 
 		if not sin_copia:
 			match carta.tipo:
@@ -67,6 +72,8 @@ static func resolver(fila: Array, ctx := {}) -> Dictionary:
 					total += ataque.dano * ataque.n
 					paso.ataque = ataque
 					paso.texto = "+%d" % roundi(ataque.dano * ataque.n)
+					paso.aporte = "suma"
+					paso.valor = ataque.dano * ataque.n
 
 				CartasDB.Tipo.MULTIPLICADOR:
 					if carta.mult == "eco":
@@ -79,6 +86,8 @@ static func resolver(fila: Array, ctx := {}) -> Dictionary:
 							total += copia.dano * copia.n
 							paso.ataque = copia
 							paso.texto = "+%d" % roundi(copia.dano * copia.n)
+							paso.aporte = "suma"
+							paso.valor = copia.dano * copia.n
 					else:
 						var factor := _factor(carta, ataques.size(), efectivas, i, fila, multiplicadores, ctx)
 						if ataques.is_empty() or is_equal_approx(factor, 1.0):
@@ -87,6 +96,8 @@ static func resolver(fila: Array, ctx := {}) -> Dictionary:
 							for a in ataques:
 								a.dano *= factor
 							total *= factor
+							paso.aporte = "mult"
+							paso.valor = factor
 							if carta.mult == "casa":
 								coste += 1
 						paso.texto = "x%s" % _numero(factor)

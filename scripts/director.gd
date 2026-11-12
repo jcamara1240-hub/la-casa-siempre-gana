@@ -69,6 +69,17 @@ static func plan_sala(azar: RandomNumberGenerator, salas_limpiadas: int, piso: i
 	}
 
 
+## Las cláusulas del Contrato de la Casa que tocan el plan de la sala.
+## "oleadas": hay que matar menos de cada oleada para que entre la siguiente (se pisan).
+const CONTRATO_UMBRAL := 0.7
+
+
+static func aplicar_contrato(plan: Dictionary, contrato: Array) -> Dictionary:
+	if contrato.has("oleadas"):
+		plan.umbral = float(plan.umbral) * CONTRATO_UMBRAL
+	return plan
+
+
 ## La presión después de una sala: sube si la has bordado y baja con cada golpe.
 static func ajustar(presion: float, golpes: int, a_tiempo: bool) -> float:
 	if golpes <= 0:

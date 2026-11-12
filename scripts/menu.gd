@@ -68,7 +68,7 @@ func _ir_a(vista: Vista) -> void:
 		Vista.PAUSA:
 			_items = ["continuar", "opciones", "portada"]
 		Vista.OPCIONES:
-			_items = ["idioma", "musica", "efectos", "sacudida", "numeros", "vibracion", "volver"]
+			_items = ["idioma", "musica", "efectos", "sacudida", "numeros", "desglose", "vibracion", "volver"]
 			if not web:
 				_items.insert(3, "pantalla")
 	queue_redraw()
@@ -215,6 +215,9 @@ func _activar(id: String, sentido: int) -> void:
 		"numeros":
 			Juego.numeros_dano = not Juego.numeros_dano
 			Juego.guardar_ajustes()
+		"desglose":
+			Juego.desglose_ciclo = not Juego.desglose_ciclo
+			Juego.guardar_ajustes()
 		"vibracion":
 			Mando.vibracion = not Mando.vibracion
 			Juego.guardar_ajustes()
@@ -250,6 +253,7 @@ func _texto(id: String) -> String:
 		"sacudida": return Idioma.t("SACUDIDA DE PANTALLA: %s") % _si_no(Juego.sacudida)
 		"numeros": return Idioma.t("NÚMEROS DE DAÑO: %s") % _si_no(Juego.numeros_dano)
 		"vibracion": return Idioma.t("VIBRACIÓN DEL MANDO: %s") % _si_no(Mando.vibracion)
+		"desglose": return Idioma.t("CUENTA DE LAS CARTAS: %s") % _si_no(Juego.desglose_ciclo)
 	return id
 
 

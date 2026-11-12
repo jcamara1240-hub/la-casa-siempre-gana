@@ -89,7 +89,10 @@ func _preparar_datos() -> void:
 func _nombre_mesa() -> String:
 	if Juego.imposible:
 		return Idioma.t("IMPOSIBLE")
-	return Idioma.t("EXTREMO") if Juego.extremo else Idioma.t(PersonajesDB.MESAS[Juego.mesa].nombre).to_upper()
+	var nombre := Idioma.t("EXTREMO") if Juego.extremo else Idioma.t(PersonajesDB.MESAS[Juego.mesa].nombre).to_upper()
+	if Juego.calor() > 0:  # el Contrato de la Casa va con la mesa
+		nombre += "  " + Idioma.t("CALOR %d") % Juego.calor()
+	return nombre
 
 
 ## Tras ganar se puede seguir bajando, salvo en el reto diario: su marca ya está hecha.
@@ -126,6 +129,12 @@ func _preparar_novedades() -> void:
 				entrada["nombre"] = LogrosDB.nombre(n.id)
 			"mesa":
 				entrada["nombre"] = Idioma.t(PersonajesDB.MESAS[int(n.id)].nombre)
+			"dorso":
+				entrada["tex"] = load("res://assets/objetos/carta_suelo_%d.png" % int(n.id))
+				entrada["nombre"] = Idioma.t("DORSO NUEVO")
+			"traje":
+				entrada["tex"] = load("res://assets/personajes/pj_%s_gala.png" % n.id)
+				entrada["nombre"] = Idioma.t("TRAJE DE GALA: %s") % PersonajesDB.nombre(n.id).to_upper()
 		_novedades.append(entrada)
 
 
@@ -359,9 +368,12 @@ func _dibujar_novedad(n: Dictionary, p: Vector2) -> void:
 		"objeto", "logro":
 			draw_texture(_tex_cerrada, p)
 			draw_texture(n.tex, p + Vector2(10, 16))
-		"personaje":
+		"personaje", "traje":
 			draw_texture(_tex_cerrada, p)
 			draw_texture_rect_region(n.tex, Rect2(p + Vector2(0, 6), Vector2(32, 32)), Rect2(0, 0, 16, 16))
+		"dorso":
+			draw_texture(_tex_cerrada, p)
+			draw_texture(n.tex, p + Vector2(8, 11))
 		"mesa":
 			draw_texture(_tex_cerrada, p)
 			draw_rect(Rect2(p + Vector2(6, 12), Vector2(20, 20)), COLOR_ORO)

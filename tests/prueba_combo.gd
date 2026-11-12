@@ -10,6 +10,7 @@ func _initialize() -> void:
 	_datos_coherentes()
 	_reglas_del_combo()
 	_cartas_nuevas()
+	_desglose()
 	_mazmorras()
 	_traducciones()
 	print("FALLOS: %d" % _fallos)
@@ -228,6 +229,59 @@ func _cartas_nuevas() -> void:
 	_igual(suelto.n, 8, "ataque suelto: cantidad")
 	_igual(int(suelto.has("busca") and suelto.has("paredes") and suelto.has("premio")), 1, "ataque suelto: campos nuevos")
 	_igual(int(Combo.ataque_suelto("trucada", 2.0, 1).id == "bala"), 1, "ataque suelto con algo que no es un ataque")
+
+
+## El desglose (lo que suma o multiplica cada carta) rehace exactamente el total.
+func _cuadra(fila: Array, ctx := {}) -> bool:
+	var r := Combo.resolver(fila, ctx)
+	var cuenta := 0.0
+	for paso in r.pasos:
+		match String(paso.aporte):
+			"suma": cuenta += float(paso.valor)
+			"mult": cuenta *= float(paso.valor)
+			"": pass
+			_: return false
+		if not is_equal_approx(cuenta, float(paso.total)):
+			return false
+	return is_equal_approx(cuenta, float(r.total))
+
+
+func _desglose() -> void:
+	var r := Combo.resolver(["afilar", "bala", "doble_nada", "eco"])
+	var aportes: Array = r.pasos.map(func(p): return "%s:%s" % [p.aporte, Combo._numero(p.valor)])
+	if aportes != [":0", "suma:8", "mult:2", "suma:8"]:
+		_fallos += 1
+		print("MAL  desglose: ", aportes)
+	# El orden cambia la cuenta, y el desglose la sigue: 5 x2 + 5 = 15, (5 + 5) x2 = 20.
+	_igual(Combo.resolver(["bala", "doble_nada", "bala"]).pasos[-1].total, 15, "desglose: x2 en medio")
+	_igual(Combo.resolver(["bala", "bala", "doble_nada"]).pasos[-1].total, 20, "desglose: x2 al final")
+	_igual(int(Combo.resolver(["doble_nada", "bala"]).pasos[0].aporte == ""), 1, "un x2 sin nada a la izquierda no aporta")
+	var fijas := [["bala"], ["afilar", "bala", "bala"], ["bala", "eco"], ["bala", "bala", "escalera"],
+		["bala", "comodin", "pareja"], ["bala", "bala", "bala", "abanico", "abanico", "full"],
+		["calibre", "subir", "bala"], ["tapete", "bala", "bala"], ["bala", "fiebre", "pelos"], ["", "bala", "", "doble_nada"]]
+	for fila in fijas:
+		if not _cuadra(fila, {"fiebre": 1, "voltereta": true}):
+			_fallos += 1
+			print("MAL  el desglose no cuadra con el total: ", fila)
+	# Y con filas al azar, con el contexto y la Ruleta Rusa de verdad.
+	var azar := RandomNumberGenerator.new()
+	azar.seed = 31
+	var ids: Array = CartasDB.CARTAS.keys()
+	var malas := 0
+	for _i in 800:
+		var fila: Array = []
+		for _j in azar.randi_range(1, 8):
+			fila.append("" if azar.randf() < 0.1 else ids[azar.randi() % ids.size()])
+		var ctx := {"monedas": azar.randi_range(0, 60), "racha": azar.randi_range(0, 6), "vida": azar.randi_range(1, 8),
+			"fiebre": azar.randi_range(0, 3), "voltereta": azar.randf() < 0.5, "ordagos": azar.randi_range(0, 3),
+			"dano_global": float(azar.randi_range(0, 2)), "azar": azar}
+		if not _cuadra(fila, ctx):
+			malas += 1
+			if malas < 5:
+				print("MAL  el desglose no cuadra: ", fila)
+	if malas > 0:
+		_fallos += 1
+	print("desgloses comprobados: 800 al azar")
 
 
 func _mazmorras() -> void:

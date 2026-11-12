@@ -28,6 +28,9 @@ func _correr() -> void:
 	Progreso.objetos_extra = []
 	Progreso.jefes_vencidos = []
 	Progreso.mesa_max = 0
+	Progreso.mesa_max_pj = {}
+	Progreso.mesa_ganada_pj = {}
+	Progreso.contrato_pj = {}  # un Contrato de la Casa guardado cambiaría la vida y la tienda
 	var cerradas: Array = []
 	for id in ["tommy", "dinamita", "trucada", "pelos", "fiebre", "recortada", "corcho", "mina", "botella", "empujon"]:
 		if not Progreso.carta_libre(id):
@@ -49,7 +52,9 @@ func _correr() -> void:
 	Progreso.al_vencer_jefe("baccarat", azar)
 	_ok(Progreso.personaje_libre("crupier"), "con 3 jefes sale la Crupier")
 	Progreso.al_ganar(0)
-	_ok(Progreso.personaje_libre("heredera") and Progreso.mesa_max == 1, "ganar abre la Heredera y la Mesa Roja")
+	_ok(Progreso.personaje_libre("heredera") and Progreso.mesa_elegible("tahur") == 1 and Progreso.mesa_max == 1,
+		"ganar abre la Heredera y la Mesa Roja")
+	_ok(Progreso.mesa_elegible("borracho") == 0, "la Mesa Roja se abre solo para quien ganó")
 
 	Progreso.cartas_extra = []
 	for _i in 300:

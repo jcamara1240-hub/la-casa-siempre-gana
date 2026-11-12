@@ -521,7 +521,7 @@ func _empezar_combate() -> void:
 	Sonido.tocar("puerta_cierra")
 	# Todo el plan sale de la semilla de la sala: la misma sala trae lo mismo, pase lo que pase antes.
 	var rng := Juego.azar_para(int(actual.semilla), "oleadas")
-	_plan = Director.plan_sala(rng, _salas_limpiadas, Juego.piso, Juego.presion_sala())
+	_plan = Director.aplicar_contrato(Director.plan_sala(rng, _salas_limpiadas, Juego.piso, Juego.presion_sala()), Juego.contrato)
 	_oleadas = _planificar_oleadas(rng)
 	_oleadas_total = _oleadas.size()
 	_oleada_base = 0
@@ -538,6 +538,8 @@ func _empezar_combate() -> void:
 	_oleada_t = PRIMERA_OLEADA
 	_sala_t = 0.0
 	_propina_t = PROPINA_BASE + PROPINA_POR_OLEADA * _oleadas_total
+	if Juego.clausula("propina"):
+		_propina_t *= 0.6
 	_motor.activo = true
 
 
@@ -615,6 +617,8 @@ func _soltar_oleada(grupo: Array, elites: Array = []) -> void:
 	var azar := Juego.azar_combate  # dónde nacen depende de dónde estés: azar de la pelea
 	var mult := (1.3 + (Juego.piso - 1) * 1.1 + _salas_limpiadas * 0.08) * VIDA_ENEMIGOS  # hardcore: por piso, antes 0,8
 	if Juego.mesa >= 1:
+		mult *= 1.25
+	if Juego.clausula("plomo"):
 		mult *= 1.25
 	mult *= pow(1.22, Juego.pisos_extra()) * float(_plan.get("vida", 1.0))
 	var numero := _oleadas_total - _oleadas.size()
@@ -705,6 +709,8 @@ func _empezar_jefe() -> void:
 	var jefe := Jefe.crear(Juego.jefe_del_piso())
 	jefe.position = Vector2(320, 110)
 	var vida_jefe := (1.0 + (Juego.piso - 1) * 0.9) * (1.4 if Juego.mesa >= 4 else 1.0)
+	if Juego.clausula("jefes"):
+		vida_jefe *= 1.4
 	vida_jefe *= VIDA_JEFE_EXTREMO if Juego.extremo else VIDA_JEFE_NORMAL
 	vida_jefe *= Juego.refuerzo_jefe()
 	jefe.preparar(vida_jefe)
@@ -755,7 +761,7 @@ func _terminar_combate() -> void:
 	_salas_limpiadas += 1
 	if Juego.azar_para(int(actual.semilla), "carta").randf() < _prob_carta:
 		_prob_carta = 0.4
-		_crear_recogible(Recogible.Clase.CARTA, "res://assets/objetos/carta_suelo.png", Sala.CENTRO)
+		_crear_recogible(Recogible.Clase.CARTA, Progreso.ruta_dorso(), Sala.CENTRO)
 	else:
 		_prob_carta += 0.25
 
@@ -814,7 +820,7 @@ func _al_morir_rango(e: Enemigo) -> void:
 		Juego.marcar_logro("elite_limpio")
 	var tirada := Juego.azar.randf()
 	if tirada < BOTIN_ELITE_CARTA:
-		_crear_recogible(Recogible.Clase.CARTA, "res://assets/objetos/carta_suelo.png", e.position)
+		_crear_recogible(Recogible.Clase.CARTA, Progreso.ruta_dorso(), e.position)
 	elif tirada < BOTIN_ELITE_CARTA + BOTIN_ELITE_CORAZON:
 		var corazon := _crear_recogible(Recogible.Clase.CORAZON, "res://assets/objetos/corazon.png", e.position)
 		corazon.hframes = 3
@@ -1186,7 +1192,8 @@ func _llenar_tienda() -> void:
 	var objeto := Juego.robar_objeto([], rng)
 	if objeto != "":
 		actual.tienda.append({"id": PREFIJO_OBJETO + objeto, "precio": Juego.precio_final(ObjetosDB.PRECIO)})
-	actual.tienda.append({"id": ARTICULO_CORAZON, "precio": Juego.precio_final(PRECIO_CORAZON)})
+	if not Juego.clausula("sin_cura"):
+		actual.tienda.append({"id": ARTICULO_CORAZON, "precio": Juego.precio_final(PRECIO_CORAZON)})
 	actual.tienda.append({"id": ARTICULO_RANURA, "precio": Juego.precio_final(PRECIO_RANURA)})
 	actual.tienda.append({"id": ARTICULO_ORDAGO, "precio": Juego.precio_final(PRECIO_ORDAGO)})
 	actual.tienda.append({"id": ARTICULO_REBARAJAR, "precio": PRECIO_REBARAJAR})
@@ -1518,7 +1525,7 @@ func _perder() -> void:
 
 
 func _ganar() -> void:
-	Juego.novedades += Progreso.al_ganar(Juego.mesa, Juego.extremo, Juego.personaje)
+	Juego.novedades += Progreso.al_ganar(Juego.mesa, Juego.extremo, Juego.personaje, Juego.calor())
 	_acabar(true)
 
 
