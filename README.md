@@ -31,8 +31,9 @@ Solo te mueves. Tu personaje ataca por su cuenta, y lo que hace depende de una f
 
 | | |
 |---|---|
-| ![Combo](media/capturas/04_combo.png) | ![Tienda](media/capturas/05_tienda.png) |
-| ![La Ruleta](media/capturas/11_ruleta.png) | ![Personajes](media/capturas/14_personajes.png) |
+| ![Combo](media/capturas/04_combo.png) | ![Órdago](media/capturas/17_ordago.png) |
+| ![El Trilero Mayor](media/capturas/18_trilero.png) | ![El Dueño del Casino](media/capturas/19_dueno.png) |
+| ![Tesoro](media/capturas/06_tesoro.png) | ![Personajes](media/capturas/14_personajes.png) |
 
 ## Voltereta, órdago y mesas
 
