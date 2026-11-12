@@ -1133,7 +1133,11 @@ func _actualizar_hint_maquina() -> void:
 	var r := maquina_a_mano()
 	var texto := ""
 	if r != null and not Juego.tactil:
-		texto = Idioma.t("E: JUGAR A LA TRAGAPERRAS") if r.datos.maquina == "tragaperras" else Idioma.t("E: JUGAR A LA RULETA")
+		if Mando.activo:
+			var ayuda := "%s: JUGAR A LA TRAGAPERRAS" if r.datos.maquina == "tragaperras" else "%s: JUGAR A LA RULETA"
+			texto = Idioma.t(ayuda) % Mando.nombre("interactuar")
+		else:
+			texto = Idioma.t("E: JUGAR A LA TRAGAPERRAS") if r.datos.maquina == "tragaperras" else Idioma.t("E: JUGAR A LA RULETA")
 	if texto == _hint_maquina:
 		return
 	if _aviso.text == _hint_maquina:

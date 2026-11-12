@@ -203,7 +203,9 @@ func _aplicar(id: String, precio := 10, sala := {}) -> Dictionary:
 func _resultados() -> void:
 	_estado(50, 8)
 	var r := _aplicar("777")
-	_ok(J.oro == 150 and J.objetos.size() == 1 and r.has("objeto"), "777: diez veces el precio y un objeto")
+	# Algún objeto trae monedas al cogerlo: se cuentan aparte.
+	var del_objeto := int(load("res://scripts/objetos_db.gd").OBJETOS[r.objeto].efecto.get("monedas", 0)) if r.has("objeto") else 0
+	_ok(J.oro == 150 + del_objeto and J.objetos.size() == 1 and r.has("objeto"), "777: diez veces el precio y un objeto")
 	_ok(Progreso.logros.has("premio_gordo"), "777: logro Premio Gordo")
 	_estado(50, 8)
 	_aplicar("monedas")
@@ -464,7 +466,8 @@ func _partida() -> void:
 	J.cartas = ["bala", "abanico", "", "", ""]
 	m._guardar_punto()
 	var punto: Dictionary = Guardado.cargar()
-	p.pulsar_texto(Idioma.t("TIRAR DE LA PALANCA (%d)").split(" (")[0])
+	p._menu()  # si la primera fue una emboscada, el panel solo ofrecía pelear
+	_ok(p.pulsar_texto(Idioma.t("TIRAR DE LA PALANCA (%d)").split(" (")[0]), "se puede volver a tirar")
 	p.saltar_animacion()
 	var segunda: Dictionary = p._resultado.duplicate()
 	p._cerrar()
@@ -523,6 +526,7 @@ func _partida() -> void:
 	_pulsar_tecla(KEY_ESCAPE)
 	await _esperar(2)
 	_ok(not p.visible and not paused, "Esc cierra la ruleta y el juego sigue")
+	await _con_mando()
 	# Modo extremo: no hay sala de apuestas (vuelve a ser de combate).
 	var hay := false
 	for _i in 20:
@@ -541,6 +545,92 @@ func _partida() -> void:
 		tipos2.append([k, m.salas[k].tipo])
 	_ok(c1 == _sala_apuestas() and tipos1 == tipos2, "en el reto diario el piso (y su sala de apuestas) sale igual")
 	m._ir_al_menu()
+
+
+func _boton(boton: int) -> void:
+	for pulsado in [true, false]:
+		var ev := InputEventJoypadButton.new()
+		ev.device = 0
+		ev.button_index = boton
+		ev.pressed = pulsado
+		ev.pressure = 1.0 if pulsado else 0.0
+		Input.parse_input_event(ev)
+		await process_frame
+
+
+## La sala entera con mando: Y abre la máquina, la cruceta elige, A pulsa y B se marcha.
+func _con_mando() -> void:
+	var Mando = load("res://scripts/mando.gd")
+	var p = m._panel_apuestas
+	_quitar_emboscada()
+	_estado(200, 8)
+	m.jugador.position = Vector2(176, 92)
+	await _esperar(3)
+	Mando.activo = true  # lo último que se ha tocado es el mando
+	await _esperar(2)
+	_ok(m._aviso.text == Idioma.t("%s: JUGAR A LA TRAGAPERRAS") % Mando.nombre("interactuar"),
+			"con mando, la ayuda de la tragaperras enseña su botón: " + m._aviso.text)
+	await _boton(JOY_BUTTON_Y)
+	await _esperar(1)
+	_ok(p.visible and paused and p._maquina == "tragaperras", "el botón de interactuar (Y) abre la tragaperras")
+	var tiradas := int(m.actual.get("tiradas_tragaperras", 0))
+	await _boton(JOY_BUTTON_A)
+	_ok(not p.esta_girando() and int(m.actual.get("tiradas_tragaperras", 0)) == tiradas,
+			"nada más abrir, A no tira (por si venías aporreando)")
+	await _esperar(20)
+	await _boton(JOY_BUTTON_DPAD_DOWN)
+	_ok(p._botones[p._sobre].texto == Idioma.t("MARCHARSE"), "abajo señala Marcharse")
+	await _boton(JOY_BUTTON_DPAD_UP)
+	await _boton(JOY_BUTTON_A)
+	_ok(p.esta_girando() and int(m.actual.get("tiradas_tragaperras", 0)) == tiradas + 1, "A tira de la palanca")
+	await _boton(JOY_BUTTON_A)
+	_ok(not p.esta_girando() and p._texto != "", "A durante el giro lo acaba y enseña el premio")
+	await _boton(JOY_BUTTON_A)
+	_ok(not p.esta_girando() and int(m.actual.get("tiradas_tragaperras", 0)) == tiradas + 1,
+			"aporreando A no se vuelve a tirar sin ver el premio")
+	await _esperar(20)
+	await _boton(JOY_BUTTON_B)
+	await _esperar(2)
+	_ok(not p.visible, "B se marcha de la tragaperras")
+	_quitar_emboscada()
+	if m._selector.visible or m._barra.modo_sustituir:
+		m._selector.visible = false
+		m._barra.modo_sustituir = false
+	paused = false
+	# Ahora a la ruleta.
+	_estado(200, 8)
+	m.jugador.position = Vector2(472, 130)
+	await _esperar(3)
+	_ok(m._aviso.text == Idioma.t("%s: JUGAR A LA RULETA") % Mando.nombre("interactuar"),
+			"al lado de la ruleta la ayuda cambia: " + m._aviso.text)
+	await _boton(JOY_BUTTON_Y)
+	await _esperar(1)
+	_ok(p.visible and p._maquina == "ruleta" and p._sobre == 4, "Y abre la ruleta, con el cursor en el rojo")
+	await _esperar(20)
+	await _boton(JOY_BUTTON_DPAD_UP)
+	_ok(p._sobre == 0, "arriba sube a la ficha que hay encima")
+	await _boton(JOY_BUTTON_DPAD_RIGHT)
+	_ok(p._sobre == 1, "derecha pasa a la ficha siguiente")
+	await _boton(JOY_BUTTON_A)
+	_ok(p._ficha == 10, "A elige la ficha de 10")
+	await _boton(JOY_BUTTON_DPAD_DOWN)
+	_ok(p._botones[p._sobre].texto == Idioma.t("NEGRO (x2)"), "abajo baja a la apuesta más cercana (el negro)")
+	var en_ruleta := int(m.actual.get("tiradas_ruleta", 0))
+	await _boton(JOY_BUTTON_A)
+	_ok(p.esta_girando() and p._resultado.get("apuesta") == "negro" and int(p._resultado.get("cantidad", 0)) == 10
+			and int(m.actual.get("tiradas_ruleta", 0)) == en_ruleta + 1, "A apuesta 10 al negro")
+	await _boton(JOY_BUTTON_B)
+	_ok(not p.esta_girando() and p.visible, "B durante el giro lo acaba, sin cerrar")
+	await _boton(JOY_BUTTON_B)
+	_ok(p.visible, "y al ver el número, B espera un instante (pulsación arrastrada)")
+	await _esperar(20)
+	await _boton(JOY_BUTTON_B)
+	await _esperar(2)
+	_ok(not p.visible and not paused, "B se marcha de la ruleta y el juego sigue")
+	# Vuelve el teclado: la ayuda vuelve a ser la E.
+	_pulsar_tecla(KEY_SHIFT)
+	await _esperar(3)
+	_ok(not Mando.activo and m._aviso.text == Idioma.t("E: JUGAR A LA RULETA"), "con teclado la ayuda vuelve a ser la E")
 
 
 func _quitar_emboscada() -> void:

@@ -274,6 +274,54 @@ func _correr() -> void:
 	_ok(uniformes.size() == 3, "tres uniformes de camarero: %s" % str(uniformes.keys()))
 	_ok(mismo, "el uniforme sale del sitio de nacimiento (no gasta azar)")
 
+	# ---- muchos raros juntos: solo unas pocas etiquetas (las más cercanas) y sin pisarse
+	for e in horda.enemigos:
+		e.muerto = true
+	await _esperar(2)
+	var amb = m._jugo._amb
+	var juntos: Array = []
+	for i in 12:
+		var e = horda.crear("ficha", yo.position + Vector2(30 + (i % 4) * 9, (i / 4) * 5 - 5), 1.0)
+		e.hacer_rango(RARO, ["veloz"])
+		e._nacer = 0.0  # ya nacido: activo() desde ya
+		juntos.append(e)
+	var lejos = horda.crear("ficha", yo.position + Vector2(-140, 0), 1.0)
+	lejos.hacer_rango(RARO, ["veloz"])
+	lejos._nacer = 0.0
+	amb._elegir_etiquetas(horda)
+	var con: Array = amb._con_etiqueta
+	_ok(con.size() >= 1 and con.size() <= amb.ETIQUETAS_MAX, "con 13 raros solo se etiquetan unos pocos (%d)" % con.size())
+	_ok(not con.has(lejos), "el raro lejano no lleva etiqueta: le basta el aura")
+	var pisan := false
+	for i in amb._cajas_etiqueta.size():
+		for j in range(i + 1, amb._cajas_etiqueta.size()):
+			pisan = pisan or amb._cajas_etiqueta[i].intersects(amb._cajas_etiqueta[j])
+	_ok(not pisan, "las etiquetas que se ven no se pisan")
+	for e in juntos:
+		e.muerto = true
+	var separados: Array = []
+	for i in 6:
+		var e = horda.crear("ficha", yo.position + Vector2(-120 + i * 48, 40 + i * 2), 1.0)
+		e.hacer_rango(RARO, ["veloz"])
+		e._nacer = 0.0
+		separados.append(e)
+	separados.sort_custom(func(a, b): return yo.position.distance_squared_to(a.position) < yo.position.distance_squared_to(b.position))
+	amb._elegir_etiquetas(horda)
+	var cercanos := true
+	for e in separados.slice(0, amb.ETIQUETAS_MAX):
+		cercanos = cercanos and amb._con_etiqueta.has(e)
+	_ok(amb._con_etiqueta.size() == amb.ETIQUETAS_MAX and cercanos, "separados, se etiquetan los %d más cercanos" % amb.ETIQUETAS_MAX)
+	var elite_lejos = horda.crear("ficha", yo.position + Vector2(0, 120), 1.0)
+	elite_lejos.hacer_rango(ELITE, ["blindado", "veloz"])
+	elite_lejos._nacer = 0.0
+	amb._elegir_etiquetas(horda)
+	_ok(amb._con_etiqueta.has(elite_lejos), "el élite enseña su etiqueta aunque esté más lejos")
+	for e in horda.enemigos:
+		e.muerto = true
+	await _esperar(2)
+	amb._elegir_etiquetas(horda)
+	_ok(amb._con_etiqueta.is_empty(), "sin raros vivos no hay etiquetas")
+
 	# ---- rendimiento: una horda de 70 con un tercio de raros y élites no se atasca
 	for e in horda.enemigos:
 		e.muerto = true

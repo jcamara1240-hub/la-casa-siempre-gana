@@ -175,6 +175,9 @@ func _cruzar(d: Vector2i) -> bool:
 		if m.actual.pos == destino and not m._cambiando_sala:
 			await _esperar(3)
 			return false
+		if m._selector.visible or m._barra.modo_sustituir:
+			# Una carta que quedó en el suelo (la de un élite) se ha recogido de camino.
+			await _atender_objetos()
 		if m.actual.pos != destino and not m._cambiando_sala:
 			m.jugador.position = Sala.HUECOS[d].get_center() + Vector2(d) * 8.0
 	push_error("no se pudo cruzar la puerta %s en %s pausa=%s selector=%s sustituir=%s combate=%s cambiando=%s jugador=%s piso=%s tipo=%s limpia=%s abiertas=%s vecinas=%s vivos=%d oleadas=%d" % [d, m.actual.pos, paused, m._selector.visible, m._barra.modo_sustituir, m.en_combate, m._cambiando_sala, m.jugador.position, J.piso,
@@ -198,6 +201,9 @@ func _resolver_sala() -> bool:
 		t += 1
 		if _acabada():
 			return true
+		if m._selector.visible or m._barra.modo_sustituir:
+			# La carta que suelta un élite se puede recoger en plena pelea.
+			await _atender_objetos()
 		_esquivar(t > 60 * 45)
 		if _args.has("traza") and t % 600 == 0:
 			print(m.actual.pos, " t=", t, " vivos=", m._horda.enemigos.size(), " oleadas=", m._oleadas.size(), " pausa=", paused, " jugador=", m.jugador.position, " motor=", m._motor.activo, " hijos_ataques=", m._ataques.get_child_count(), " e0=", m._horda.enemigos[0].vida if m._horda.enemigos.size()>0 else -1, " ", m._horda.enemigos[0]._nacer if m._horda.enemigos.size()>0 else -1, " ", m._horda.enemigos[0].position if m._horda.enemigos.size()>0 else Vector2.ZERO, " fps=", Engine.get_frames_per_second(), " efectos=", m._efectos.get_child_count(), " cola=", m._motor._cola.size(), " esp=", m._motor._espera)
@@ -206,7 +212,7 @@ func _resolver_sala() -> bool:
 		if not m.en_combate and m.actual.tipo == GeneradorMazmorra.Tipo.NORMAL and m.get("_sala_t") != null:
 			_salas_t.append(m._sala_t)
 		if t > 60 * 300:
-			push_error("sala interminable en %s: %s, jugador %s, columnas %s, cartas %s, enemigos %s" % [m.actual.pos, m.actual.tipo, m.jugador.position, m._sala.solidos.size(), J.cartas, m._horda.enemigos.map(func(e): return [e.tipo, e.position, e.activo()])])
+			push_error("sala interminable en %s: %s, jugador %s, columnas %s, cartas %s, enemigos %s" % [m.actual.pos, m.actual.tipo, m.jugador.position, m._sala.solidos.size(), J.cartas, m._horda.enemigos.map(func(e): return [e.tipo, e.position, e.activo(), e.rango, e.mods, e.vida, e.vida_max])])
 			quit(3)
 			return true
 	_soltar_teclas()

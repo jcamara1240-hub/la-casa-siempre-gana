@@ -3,6 +3,7 @@ extends Control
 ## La tragaperras y la ruleta de la sala de apuestas. Las reglas están en Apuestas: aquí
 ## se apuesta, se anima y se enseña lo que ha salido. Con ratón (o dedo) se pulsa en los
 ## botones; con teclado, flechas para elegir y E, Intro o Espacio para pulsar. Esc sale.
+## Con mando, la cruceta o el stick eligen (arriba y abajo cambian de fila), A pulsa y B sale.
 
 signal cerrado
 signal jugada  # después de cada tirada: main guarda la partida y ya no vale recargar
@@ -46,6 +47,7 @@ var _vida_visto := -1
 var _vida_max_visto := -1
 var _destello := 0.0  # el panel se ilumina un momento con los premios buenos
 var _t := 0.0
+var _seguro := 0.0  # con el mando, un instante en el que A y B no hacen nada (ver Selector)
 # Tragaperras
 var _rodillos: Array = ["siete", "siete", "siete"]
 var _giro: Array = [0.0, 0.0, 0.0]
@@ -96,6 +98,7 @@ func abrir(maquina: String, sala: Dictionary) -> void:
 	_destello = 0.0
 	_parado = [true, true, true]
 	_ficha = Apuestas.FICHAS[0]
+	_seguro = Selector.SEGURO_MANDO
 	visible = true
 	if _maquina == "tragaperras":
 		_texto = Idioma.t("TRES IGUALES EN LA LÍNEA. CADA TIRADA CUESTA MÁS QUE LA ANTERIOR.")
@@ -238,6 +241,8 @@ func _revelar() -> void:
 		Sonido.tocar("perder")
 	if _resultado.has("objeto"):
 		Sonido.tocar("objeto")
+	# Si vienes aporreando A para acabar la animación, no vuelves a tirar sin ver el premio.
+	_seguro = Selector.SEGURO_MANDO
 	_menu()
 
 
@@ -304,6 +309,7 @@ func _process(delta: float) -> void:
 	if not visible:
 		return
 	_t += delta
+	_seguro = maxf(_seguro - delta, 0.0)
 	_destello = maxf(_destello - delta * 1.5, 0.0)
 	for i in 3:
 		_rebote[i] = maxf(_rebote[i] - delta, 0.0)
@@ -363,6 +369,12 @@ func _gui_input(evento: InputEvent) -> void:
 
 
 func _unhandled_input(evento: InputEvent) -> void:
+	if visible and Mando.es_mando(evento):
+		var tecla := Mando.tecla_mando(evento)
+		if tecla != KEY_NONE:
+			get_viewport().set_input_as_handled()
+			_entrada_mando(tecla)
+		return
 	if not visible or not (evento is InputEventKey) or not evento.pressed or evento.echo:
 		return
 	get_viewport().set_input_as_handled()
@@ -381,6 +393,60 @@ func _unhandled_input(evento: InputEvent) -> void:
 			_mover_seleccion(-1)
 		KEY_RIGHT, KEY_DOWN, KEY_D, KEY_S, KEY_TAB:
 			_mover_seleccion(1)
+
+
+## Con el mando: la cruceta o el stick recorren los botones que se pueden pulsar (arriba y
+## abajo saltan de fila: fichas, apuestas, marcharse), A pulsa y B se marcha. Mientras gira,
+## A o B acaban la animación. Al abrir y al ver un premio, A y B esperan un instante.
+func _entrada_mando(tecla: Key) -> void:
+	if _fase == Fase.GIRANDO:
+		if tecla == KEY_ENTER or tecla == KEY_ESCAPE:
+			saltar_animacion()
+		return
+	match tecla:
+		KEY_LEFT: _mover_mando(Vector2.LEFT)
+		KEY_RIGHT: _mover_mando(Vector2.RIGHT)
+		KEY_UP: _mover_mando(Vector2.UP)
+		KEY_DOWN: _mover_mando(Vector2.DOWN)
+		KEY_ENTER:
+			if _seguro > 0.0:
+				return
+			if _sobre == -1 or not _botones[_sobre].activo:
+				_sobre = _primer_activo()
+			else:
+				_pulsar(_sobre)
+		KEY_ESCAPE:
+			if _seguro > 0.0:
+				return
+			_cerrar()
+
+
+## El botón activo más cercano hacia ese lado (por filas); si no hay ninguno, el siguiente
+## en orden, como con el teclado.
+func _mover_mando(hacia: Vector2) -> void:
+	if _sobre == -1 or _sobre >= _botones.size():
+		_sobre = _primer_activo()
+		return
+	var desde: Vector2 = _botones[_sobre].caja.get_center()
+	var mejor := -1
+	var mejor_d := INF
+	for i in _botones.size():
+		if i == _sobre or not _botones[i].activo:
+			continue
+		var d: Vector2 = _botones[i].caja.get_center() - desde
+		var avance := d.dot(hacia)
+		var lado := absf(d.dot(hacia.orthogonal()))
+		if avance <= 2.0 or (hacia.x != 0.0 and lado > 4.0):
+			continue  # a izquierda y derecha, solo en la misma fila
+		var dist := avance + lado * 0.5
+		if dist < mejor_d:
+			mejor_d = dist
+			mejor = i
+	if mejor == -1:
+		_mover_seleccion(1 if hacia.x + hacia.y > 0.0 else -1)
+		return
+	_sobre = mejor
+	Sonido.tocar("mover")
 
 
 func _mover_seleccion(paso: int) -> void:
