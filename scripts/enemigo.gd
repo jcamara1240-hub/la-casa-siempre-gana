@@ -50,6 +50,56 @@ const PLACAJE_VEL := 300.0
 const VENGANZA_ELITE := 10  # balas que suelta un élite al morir
 const VENGANZA_BOMBA := 6  # y un dado bomba, si lo matas antes de que llegue
 const APLASTE := 0.32
+# Rangos, al estilo de los ARPG: normal, raro (un modificador) y élite (dos y nombre propio).
+enum Rango { NORMAL, RARO, ELITE }
+const VIDA_RARO := 1.6
+const ESCALA_RARO := 1.15
+const FURIA_RARO := 1.2  # los raros atacan un 20 % más a menudo: su "daño algo mayor"
+const COLOR_RARO := Color8(111, 195, 232)
+const COLOR_ELITE := Color8(247, 198, 74)
+const SHADER_RANGO := preload("res://shaders/contorno_rango.gdshader")
+# Probabilidad de cada rango: base, por piso, por mesa de dificultad y por piso infinito.
+# La regla de la sala (SALA VIP) las multiplica. Antes un élite salía con un 18 % fijo;
+# ahora es más duro (dos modificadores) y empieza más bajo, y los raros son lo habitual.
+const PROB_RARO := [0.14, 0.03, 0.02, 0.03]
+const PROB_ELITE := [0.07, 0.02, 0.015, 0.03]
+const PROB_RARO_MAX := 0.45
+const PROB_ELITE_MAX := 0.35
+# Los modificadores: etiqueta corta, adjetivo masculino y femenino (para el nombre del élite).
+const MODS := {
+	"veloz": {"corto": "VELOZ", "m": "Veloz", "f": "Veloz"},
+	"blindado": {"corto": "BLINDADO", "m": "Blindado", "f": "Blindada"},
+	"explosivo": {"corto": "EXPLOSIVO", "m": "Explosivo", "f": "Explosiva"},
+	"vampirico": {"corto": "VAMPIRO", "m": "Vampírico", "f": "Vampírica"},
+	"divisor": {"corto": "DIVISOR", "m": "Divisor", "f": "Divisora"},
+	"escudo": {"corto": "ESCUDO", "m": "Escudado", "f": "Escudada"},
+	"salto": {"corto": "ESQUIVO", "m": "Esquivo", "f": "Esquiva"},
+	"rastro": {"corto": "ARDIENTE", "m": "Ardiente", "f": "Ardiente"},
+}
+# El nombre de cada enemigo para los élites, y si es femenino (para concordar el adjetivo).
+const NOMBRES_RANGO := {
+	"ficha": ["Ficha", true], "dado": ["Dado", false], "sota": ["Sota", true], "naipe": ["Naipe", false],
+	"ficha_grande": ["Ficha Gorda", true], "joker": ["Bufón", false], "cubilete": ["Cubilete", false],
+	"portero": ["Portero", false], "ficha_oro": ["Ficha de Oro", true], "camara": ["Cámara", true],
+	"ratero": ["Ratero", false], "dado_bomba": ["Dado Bomba", false], "reina": ["Reina", true],
+	"crupier": ["Crupier", false], "maton": ["Matón", false], "botones": ["Camarero", false],
+}
+const VELOZ := 1.35
+const BLINDAJE := 0.2  # lo que entra del primer golpe a un blindado
+const ESCUDO_FRENTE := 0.35  # lo que entra de frente a uno con escudo
+const VAMPIRO_SEG := 1.6
+const VAMPIRO_RADIO := 70.0
+const VAMPIRO_CURA := 0.12
+const SALTO_SEG := 2.8
+const SALTO_DIST := 46.0
+const RASTRO_SEG := 0.55
+const RASTRO_RADIO := 9.0
+const RASTRO_DURA := 1.4
+const EXPLOSIVO_RADIO := 30.0
+const DIVISOR_VIDA := 0.3  # cada mitad, de la vida entera del que se parte
+const ETIQUETA_NOMBRE_SEG := 2.5  # lo que se ve el nombre del élite antes de pasar a etiquetas
+# Los camareros (el botones) salen con uno de estos uniformes.
+const VARIANTES := {"botones": ["botones", "botones_2", "botones_3"]}
 
 var tipo := ""
 var vida := 1.0
@@ -84,6 +134,20 @@ var _escala_base := Vector2.ONE
 var _animo_t := 0.0
 var _aura_t := 0.0
 var _reventado := false
+# Rango y modificadores (ver hacer_rango).
+var rango := 0
+var mods: Array = []
+var nombre_rango := ""
+var golpes_al_nacer := -1  # main lo apunta al nacer un élite: logro de matarlo sin recibir daño
+var _blindaje := false
+var _furia := 1.0
+var _mirando := Vector2.RIGHT
+var _vampiro_t := VAMPIRO_SEG
+var _salto_t := SALTO_SEG
+var _rastro_t := 0.0
+var _rastro_desde := Vector2.ZERO
+
+static var _materiales := {}
 
 
 func configurar(nombre: String, multiplicador_vida: float) -> void:
@@ -94,7 +158,12 @@ func configurar(nombre: String, multiplicador_vida: float) -> void:
 	vel = float(datos.vel) * (VEL_RITMO_EXTREMO if Juego.extremo else VEL_RITMO)
 	radio = datos.radio
 	oro_prob = float(datos.oro) * ORO_RITMO
-	texture = load("res://assets/personajes/%s.png" % nombre)
+	# Los que tienen uniformes distintos eligen uno por su sitio de nacimiento (sin gastar azar).
+	var aspecto := nombre
+	if VARIANTES.has(nombre):
+		var lista: Array = VARIANTES[nombre]
+		aspecto = lista[absi(hash(Vector2i(position.round()))) % lista.size()]
+	texture = load("res://assets/personajes/%s.png" % aspecto)
 	hframes = 4
 	_fase = randf() * TAU
 	_accion = randf_range(1.0, 2.6)
@@ -104,13 +173,187 @@ func configurar(nombre: String, multiplicador_vida: float) -> void:
 ## Un enemigo de élite: dorado, grande, duro y con premio.
 func hacer_elite() -> void:
 	elite = true
+	rango = Rango.ELITE
 	vida *= 3.0
 	vida_max = vida
 	scale = Vector2.ONE * 1.4
 	radio *= 1.3
 	self_modulate = Color(1.0, 0.82, 0.4)
-	monedas_al_morir += 2
+	monedas_al_morir += 4  # antes 2: el botín del élite está garantizado
 	oro_prob = 1.0
+
+
+## Le da un rango y sus modificadores (los elige tirar_rango con el azar de la partida).
+func hacer_rango(nuevo: int, lista_mods: Array) -> void:
+	if nuevo == Rango.ELITE:
+		hacer_elite()
+	elif nuevo == Rango.RARO:
+		rango = Rango.RARO
+		vida *= VIDA_RARO
+		vida_max = vida
+		scale = Vector2.ONE * ESCALA_RARO
+		radio *= 1.1
+		monedas_al_morir += 1
+		oro_prob = maxf(oro_prob, 0.6)
+		_furia = FURIA_RARO
+	else:
+		return
+	for m in lista_mods:
+		_aplicar_mod(String(m))
+	nombre_rango = nombre_de(tipo, mods)
+	material = material_rango(rango)
+
+
+func _aplicar_mod(m: String) -> void:
+	if not MODS.has(m) or mods.has(m):
+		return
+	mods.append(m)
+	match m:
+		"veloz":
+			vel *= VELOZ
+		"blindado":
+			_blindaje = true
+		"rastro":
+			_rastro_desde = position
+
+
+func tiene_mod(m: String) -> bool:
+	return mods.has(m)
+
+
+## El contorno de color del rango: un material por rango, compartido por todos.
+static func material_rango(r: int) -> ShaderMaterial:
+	if not _materiales.has(r):
+		var mat := ShaderMaterial.new()
+		mat.shader = SHADER_RANGO
+		mat.set_shader_parameter("color_rango", COLOR_ELITE if r == Rango.ELITE else COLOR_RARO)
+		mat.set_shader_parameter("velocidad", 9.0 if r == Rango.ELITE else 5.0)
+		_materiales[r] = mat
+	return _materiales[r]
+
+
+## Probabilidad de raro (x) y de élite (y) según el piso, la mesa y los pisos infinitos.
+static func prob_rangos(piso: int, mesa: int, pisos_extra: int, mult := 1.0) -> Vector2:
+	var p := maxi(piso - 1, 0)
+	var raro := (PROB_RARO[0] + PROB_RARO[1] * p + PROB_RARO[2] * mesa + PROB_RARO[3] * pisos_extra) * mult
+	var elite_p := (PROB_ELITE[0] + PROB_ELITE[1] * p + PROB_ELITE[2] * mesa + PROB_ELITE[3] * pisos_extra) * mult
+	return Vector2(minf(raro, PROB_RARO_MAX), minf(elite_p, PROB_ELITE_MAX))
+
+
+## Decide el rango y los modificadores de uno que va a nacer. Todo sale de azar (el de la
+## partida), y siempre con las mismas tiradas: una para el rango y una por modificador.
+## Devuelve [rango, modificadores].
+static func tirar_rango(azar: RandomNumberGenerator, nombre: String, prob: Vector2, puede_raro := true, puede_elite := true) -> Array:
+	if not (puede_raro or puede_elite):
+		return [Rango.NORMAL, []]
+	var t := azar.randf()
+	var nuevo := Rango.NORMAL
+	if puede_elite and t < prob.y:
+		nuevo = Rango.ELITE
+	elif puede_raro and t >= prob.y and t < prob.y + prob.x:
+		nuevo = Rango.RARO
+	if nuevo == Rango.NORMAL:
+		return [nuevo, []]
+	return [nuevo, elegir_mods(azar, nombre, 2 if nuevo == Rango.ELITE else 1)]
+
+
+## Los modificadores que tienen sentido para cada enemigo.
+static func mods_validos(nombre: String) -> Array:
+	var lista: Array = MODS.keys()
+	var quieto: bool = TIPOS.has(nombre) and float(TIPOS[nombre].vel) <= 0.0
+	if quieto:
+		lista.erase("veloz")
+		lista.erase("rastro")
+	if nombre == "joker":
+		lista.erase("salto")  # ya se teletransporta
+	if nombre == "dado_bomba":
+		lista.erase("explosivo")  # ya revienta
+	if nombre == "ficha_oro":
+		lista.erase("divisor")  # cada mitad soltaría el premio entero
+	return lista
+
+
+static func elegir_mods(azar: RandomNumberGenerator, nombre: String, cuantos: int) -> Array:
+	var lista := mods_validos(nombre)
+	var elegidos: Array = []
+	for _i in cuantos:
+		if lista.is_empty():
+			break
+		elegidos.append(lista.pop_at(azar.randi() % lista.size()))
+	return elegidos
+
+
+## "Ficha Blindada y Veloz" / "Swift Armored Chip".
+static func nombre_de(nombre: String, lista_mods: Array) -> String:
+	var datos: Array = NOMBRES_RANGO.get(nombre, [nombre.capitalize(), false])
+	var sustantivo := Idioma.t(String(datos[0]))
+	var adjetivos: Array = []
+	for m in lista_mods:
+		adjetivos.append(Idioma.t(String(MODS[m].f if datos[1] else MODS[m].m)))
+	if adjetivos.is_empty():
+		return sustantivo
+	if Idioma.actual == "en":
+		return " ".join(adjetivos) + " " + sustantivo
+	if adjetivos.size() == 1:
+		return sustantivo + " " + adjetivos[0]
+	return "%s %s y %s" % [sustantivo, ", ".join(adjetivos.slice(0, -1)), adjetivos[-1]]
+
+
+## Lo que se pinta sobre la cabeza: el modificador del raro; el nombre del élite al aparecer
+## y luego sus dos modificadores, que en plena horda se leen mejor.
+func etiqueta() -> String:
+	if rango == Rango.ELITE and _t < ETIQUETA_NOMBRE_SEG:
+		return nombre_rango.to_upper()
+	var cortos: Array = []
+	for m in mods:
+		cortos.append(Idioma.t(String(MODS[m].corto)))
+	return "+".join(cortos)
+
+
+## El golpe que de verdad entra: el blindaje se come casi todo el primero y el escudo, lo de frente.
+func reducir_dano(dano: float, retroceso: Vector2) -> float:
+	if mods.is_empty():
+		return dano
+	if _blindaje:
+		_blindaje = false
+		dano *= BLINDAJE
+		Sonido.tocar("impacto_fuerte", 0.7, -6.0)
+	if mods.has("escudo") and retroceso.length_squared() > 0.01 and retroceso.normalized().dot(_mirando) < -0.4:
+		dano *= ESCUDO_FRENTE
+	return dano
+
+
+func blindado() -> bool:
+	return _blindaje
+
+
+## Hacia dónde mira (hacia ti): de ahí le cubre el escudo.
+func frente() -> Vector2:
+	return _mirando
+
+
+## Lo de los modificadores que va con el tiempo. Solo lo pagan los que tienen alguno.
+func _tick_mods(delta: float, horda: Horda, dist: float) -> void:
+	if mods.has("vampirico"):
+		_vampiro_t -= delta
+		if _vampiro_t <= 0.0:
+			_vampiro_t = VAMPIRO_SEG
+			for otro in horda.en_radio(position, VAMPIRO_RADIO):
+				if not (otro is Jefe) and otro.vida < otro.vida_max:
+					otro.vida = minf(otro.vida + otro.vida_max * VAMPIRO_CURA, otro.vida_max)
+	if mods.has("salto"):
+		_salto_t -= delta
+		if _salto_t <= 0.0 and dist > 40.0:
+			_salto_t = SALTO_SEG * randf_range(0.85, 1.25)
+			var zona := Sala.INTERIOR.grow(-16.0)
+			position = (position + Vector2.RIGHT.rotated(randf() * TAU) * SALTO_DIST).clamp(zona.position, zona.end)
+			_nacer = 0.12  # un parpadeo: mientras reaparece, ni toca ni se le puede dar
+	if mods.has("rastro") and horda.ataques != null:
+		_rastro_t -= delta
+		if _rastro_t <= 0.0 and position.distance_squared_to(_rastro_desde) > 36.0:
+			_rastro_t = RASTRO_SEG
+			_rastro_desde = position
+			horda.ataques.zona_peligro(position + Vector2(0, 3), RASTRO_RADIO, 0.35, RASTRO_DURA)
 
 
 ## Lo que multiplica la velocidad de las balas enemigas.
@@ -147,9 +390,12 @@ func actualizar(delta: float, horda: Horda) -> void:
 	var hacia := horda.jugador.global_position - position
 	var dist := hacia.length()
 	var direccion: Vector2 = hacia / maxf(dist, 0.001)
-	var movimiento := _decidir(direccion, dist, delta * factor, horda)
+	var movimiento := _decidir(direccion, dist, delta * factor * _furia, horda)
 	position += (movimiento * factor + empuje) * delta
 	empuje = empuje.lerp(Vector2.ZERO, clampf(delta * 8.0, 0.0, 1.0))
+	if rango > 0 and not muerto:
+		_mirando = direccion
+		_tick_mods(delta, horda, dist)
 	if tipo != "ficha" and tipo != "ficha_grande" and tipo != "ficha_oro" and tipo != "camara":
 		flip_h = hacia.x < 0.0
 
@@ -248,6 +494,8 @@ func al_morir(horda: Horda) -> void:
 		horda.ataques.bala_enemiga(position, Vector2.RIGHT.rotated(giro + TAU * i / balas) * 95.0 * ritmo_balas(), "moneda")
 	if balas > 0:
 		Sonido.tocar("explosion", 1.5, -8.0)
+	if mods.has("explosivo") and horda.ataques != null:
+		horda.ataques.zona_peligro(position, EXPLOSIVO_RADIO, 0.55)
 
 
 ## Adónde apuntar para dar a alguien que se mueve.

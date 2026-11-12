@@ -47,7 +47,10 @@ const COLOR_FIEBRE := Color8(240, 129, 60)
 const COLOR_LIMITE := Color8(214, 61, 79)
 const VIDA_JEFE_EXTREMO := 3.0
 const VIDA_JEFE_NORMAL := 2.0  # hardcore: antes 1,4
-const PROB_ELITE := 0.18  # hardcore: antes 0,08
+# Los rangos (raro y élite) y su probabilidad viven en Enemigo (prob_rangos, tirar_rango).
+# El botín garantizado de un élite: una tirada, carta o corazón (si no, solo sus monedas).
+const BOTIN_ELITE_CARTA := 0.2
+const BOTIN_ELITE_CORAZON := 0.3
 const PRESUPUESTO_MAX := 320
 const TINTE_PISO := [Color.WHITE, Color(0.8, 0.9, 1.1), Color(0.8, 1.05, 0.85), Color(1.1, 0.9, 0.75), Color(1.15, 0.75, 0.8)]
 # tipo, coste en el presupuesto, piso mínimo, salas limpiadas mínimas, peso
@@ -90,7 +93,7 @@ var _oleada_base := 0  # los que había vivos justo al soltar la última oleada
 var _sala_previstos := 0  # enemigos que trae la sala entre todas las oleadas
 var _sala_bajas := 0
 var _golpes_sala := 0
-var _por_nacer: Array = []  # [tiempo, tipo, posición, vida, élite] de los que aún se están avisando
+var _por_nacer: Array = []  # [tiempo, tipo, posición, vida, rango, modificadores] de los que aún se están avisando
 var _sala_t := 0.0  # cronómetro de la propina
 var _propina_t := 0.0  # lo que hay para cobrarla; 0 = ya no hay propina
 var _cadena := 0
@@ -159,6 +162,7 @@ func _ready() -> void:
 	_barra.conectar_motor(_motor)
 	_crear_jugo()
 	_horda.enemigo_muerto.connect(_al_morir_enemigo)
+	_horda.rango_muerto.connect(_al_morir_rango)
 	_horda.danio_hecho.connect(_texto_danio)
 	_ataques.explosion_hecha.connect(sacudir.bind(2.0))
 	jugador.golpeado.connect(_al_golpear_jugador)
@@ -584,7 +588,9 @@ func _soltar_oleada(grupo: Array) -> void:
 	if Juego.mesa >= 1:
 		mult *= 1.25
 	mult *= pow(1.22, Juego.pisos_extra()) * float(_plan.get("vida", 1.0))
-	var prob_elite := minf((PROB_ELITE + Juego.pisos_extra() * 0.03) * float(_plan.get("elites", 1.0)), 0.55)
+	var prob := Enemigo.prob_rangos(Juego.piso, Juego.mesa, Juego.pisos_extra(), float(_plan.get("elites", 1.0)))
+	var puede_raro := Juego.piso >= 2 or _salas_limpiadas >= 1
+	var puede_elite := Juego.piso >= 2 or _salas_limpiadas >= 3
 	var numero := _oleadas_total - _oleadas.size()
 	if _jugo.has_method("oleada"):
 		_jugo.oleada(numero, _oleadas_total)
@@ -596,10 +602,10 @@ func _soltar_oleada(grupo: Array) -> void:
 	for i in mini(grupo.size(), maxi(hueco, 0)):
 		var p := _punto_de_nacimiento(azar)
 		var espera := aviso + i * ESCALONADO_NACER
-		var elite: bool = (Juego.piso >= 2 or _salas_limpiadas >= 3) and azar.randf() < prob_elite
+		var rango: Array = Enemigo.tirar_rango(azar, grupo[i], prob, puede_raro, puede_elite)
 		if _jugo.has_method("aviso_nacimiento"):
 			_jugo.aviso_nacimiento(p, espera)
-		_por_nacer.append([espera, grupo[i], p, mult, elite])
+		_por_nacer.append([espera, grupo[i], p, mult, rango[0], rango[1]])
 
 
 func _nacer_pendientes(delta: float) -> void:
@@ -613,8 +619,9 @@ func _nacer_pendientes(delta: float) -> void:
 			e.vel *= float(_plan.get("vel", 1.0))
 			if Juego.stat("campana") > 0.0:
 				e.aturdir(CAMPANA_SEG)
-			if pendiente[4]:
-				e.hacer_elite()
+			if int(pendiente[4]) > 0:
+				e.hacer_rango(int(pendiente[4]), pendiente[5])
+				e.golpes_al_nacer = _golpes_sala
 		i -= 1
 
 
@@ -769,6 +776,22 @@ func _al_morir_enemigo(posicion: Vector2, oro_prob: float, tipo: String, monedas
 	var ultima := _mirar_ultima_baja(tipo)
 	if tipo == "jefe" or elite or cadena or ultima:
 		_remate(posicion)
+
+
+## Un raro o un élite que cae: cuenta para los logros y el élite suelta su botín.
+func _al_morir_rango(e: Enemigo) -> void:
+	if e.rango == Enemigo.Rango.RARO:
+		Progreso.sumar("raros", 1)
+		return
+	Progreso.sumar("elites", 1)
+	if e.golpes_al_nacer >= 0 and e.golpes_al_nacer == _golpes_sala:
+		Juego.marcar_logro("elite_limpio")
+	var tirada := Juego.azar.randf()
+	if tirada < BOTIN_ELITE_CARTA:
+		_crear_recogible(Recogible.Clase.CARTA, "res://assets/objetos/carta_suelo.png", e.position)
+	elif tirada < BOTIN_ELITE_CARTA + BOTIN_ELITE_CORAZON:
+		var corazon := _crear_recogible(Recogible.Clase.CORAZON, "res://assets/objetos/corazon.png", e.position)
+		corazon.hframes = 3
 
 
 ## Muchas bajas casi a la vez: remate. Vuelve a contar desde cero tras cada uno.
@@ -1371,6 +1394,13 @@ func recogido(r: Recogible) -> void:
 			Progreso.sumar("monedas", 1 + int(Juego.stat("moneda_extra")))
 			Sonido.tocar("moneda", randf_range(0.95, 1.2), -6.0)
 			r.queue_free()
+		Recogible.Clase.CORAZON:
+			# El medio corazón que suelta un élite: si vas lleno, se queda en el suelo.
+			if Juego.vida >= Juego.vida_max:
+				return
+			r.queue_free()
+			Juego.curar(1)
+			Sonido.tocar("objeto", 1.2)
 		Recogible.Clase.CARTA:
 			r.queue_free()
 			Sonido.tocar("carta_coger")

@@ -43,6 +43,9 @@ const LOGROS := {
 	# Sala de apuestas: se marcan con Juego.marcar_logro() desde Apuestas.
 	"premio_gordo": {"nombre": "Premio Gordo", "desc": "Saca tres sietes en la tragaperras."},
 	"a_la_ruina": {"nombre": "A la Ruina", "desc": "Apuesta todo tu oro (20 o más) en la ruleta y piérdelo."},
+	# Rangos: el contador "raros" va en Progreso.contadores; "elite_limpio" lo marca main al matarlo.
+	"cazador_raros": {"nombre": "Cazarrarezas", "desc": "Elimina a 50 enemigos raros."},
+	"elite_limpio": {"nombre": "Trato VIP", "desc": "Elimina a un élite sin recibir daño desde que aparece."},
 }
 
 

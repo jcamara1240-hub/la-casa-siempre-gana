@@ -17,6 +17,8 @@ PALETA = {
     "g": "#1f5c50", "G": "#2f8a6b", "m": "#6ccf94",
     "r": "#8f2340", "R": "#d63d4f", "o": "#f0813c", "y": "#f7c64a",
     "c": "#f7ecd2", "s": "#a89a8e", "b": "#2e6fb0", "B": "#6fc3e8",
+    # Dos tonos de piel más para el personal del casino (las variantes de los camareros).
+    "t": "#c8794a", "u": "#7d4630",
 }
 
 
@@ -585,7 +587,9 @@ def portero():
         rect(img, 5, 4, 10, 2, "k")
         pie = f % 2 == 0
         rect(img, 5, 17, 4, 3 if pie else 2, "k"); rect(img, 11, 17, 4, 2 if pie else 3, "k")
-        frames.append(contorno(img))
+        con_margen = lienzo(22, 22)
+        con_margen.alpha_composite(img, (1, 1))
+        frames.append(contorno(con_margen))
     guardar(hoja(frames), "personajes/portero.png")
 
 
@@ -682,27 +686,63 @@ def maton():
     guardar(hoja(frames), "personajes/maton.png")
 
 
+# Los camareros del casino (el "botones" de la horda): chaleco, pajarita, paño al brazo y la
+# bandeja en alto. Hay tres variantes de color y de piel; el juego elige una al nacer.
+# Fotogramas: 0-2 andando (0 y 2 con la zancada, 1 de paso y un poco más alto) y 3 el aviso,
+# con la bomba encendida en la bandeja en lugar de la copa.
+VARIANTES_CAMARERO = [
+    # chaleco, sombra del chaleco, pajarita, piel, pelo, bigote
+    ("R", "r", "k", "o", "k", False),
+    ("G", "g", "R", "t", "d", False),
+    ("v", "p", "y", "u", "k", True),
+]
+
+
+def camarero(f, chaleco, sombra, pajarita, piel, pelo, bigote):
+    img = lienzo(16, 18)
+    b = 0 if f == 1 else 1
+    aviso = f == 3
+    # Las piernas (pantalón oscuro, zapatos negros): la zancada se ve en el largo de cada una.
+    izq, der = {0: (4, 9), 1: (5, 8), 2: (5, 9), 3: (5, 8)}[f]
+    largo_izq, largo_der = {0: (5, 4), 1: (5, 5), 2: (4, 5), 3: (4, 4)}[f]
+    rect(img, izq, 12 + b, 2, largo_izq - b, "p"); rect(img, izq, 11 + largo_izq, 2, 1, "k")
+    rect(img, der, 12 + b, 2, largo_der - b, "p"); rect(img, der, 11 + largo_der, 2, 1, "k")
+    # El cuerpo: camisa blanca, chaleco cerrado abajo y un botón dorado.
+    rect(img, 4, 7 + b, 7, 5, "c")
+    rect(img, 4, 7 + b, 2, 5, chaleco); rect(img, 9, 7 + b, 2, 5, chaleco)
+    rect(img, 4, 10 + b, 7, 2, chaleco); pon(img, 4, 8 + b, sombra); pon(img, 4, 9 + b, sombra)
+    pon(img, 7, 10 + b, "y")
+    # La pajarita sobre el cuello.
+    rect(img, 5, 6 + b, 5, 1, "c")
+    pon(img, 6, 6 + b, pajarita); pon(img, 7, 6 + b, "k" if pajarita != "k" else "s"); pon(img, 8, 6 + b, pajarita)
+    # La cabeza: pelo engominado con raya, patilla y ojos mirando a donde va.
+    rect(img, 5, 3 + b, 5, 3, piel)
+    rect(img, 4, 1 + b, 6, 2, pelo); pon(img, 4, 3 + b, pelo); pon(img, 6, 1 + b, "s" if pelo == "k" else "v")
+    pon(img, 7, 4 + b, "k"); pon(img, 9, 4 + b, "k")
+    if bigote:
+        rect(img, 7, 5 + b, 3, 1, "k")
+    # El brazo del paño: la manga blanca y el paño colgando, con una raya.
+    rect(img, 2, 7 + b, 2, 3, "c"); pon(img, 2, 10 + b, piel)
+    rect(img, 1, 9 + b, 2, 4, "c"); pon(img, 1, 12 + b, "s"); pon(img, 2, 12 + b, "s"); pon(img, 1, 10 + b, "R")
+    # El brazo de la bandeja, en alto.
+    rect(img, 11, 6 + b, 1, 2, "c"); pon(img, 12, 5 + b, piel)
+    rect(img, 10, 4 + b, 5, 1, "s"); pon(img, 10, 4 + b, "c")
+    if aviso:
+        # La bomba servida: negra, con el brillo y la mecha encendida.
+        rect(img, 10, 1 + b, 4, 3, "R"); pon(img, 10, 1 + b, "k"); pon(img, 13, 3 + b, "r"); pon(img, 11, 1 + b, "c")
+        pon(img, 13, 0 + b, "y"); pon(img, 14, 0 + b, "c"); rect(img, 10, 4 + b, 5, 1, "y")
+    else:
+        # Una copa de cóctel.
+        rect(img, 11, 1 + b, 3, 1, "B"); pon(img, 12, 2 + b, "B"); pon(img, 12, 3 + b, "c")
+        pon(img, 13, 0 + b, "R")
+    return contorno(img)
+
+
 def botones():
-    """El botones del hotel: gorrito, chaqueta roja y una bomba con la mecha encendida."""
-    frames = []
-    for f in range(4):
-        img = lienzo(16, 16)
-        b = 1 if f in (1, 3) else 0
-        aviso = f == 3
-        rect(img, 5, 1 + b, 5, 2, "R"); rect(img, 5, 3 + b, 5, 1, "y")  # el gorrito
-        elipse(img, 7.5, 6.0 + b, 3.6, 2.8, "o")
-        pon(img, 6, 6 + b, "k"); pon(img, 9, 6 + b, "k"); rect(img, 7, 8 + b, 2, 1, "r")
-        rect(img, 4, 9 + b, 7, 4, "R"); rect(img, 4, 9 + b, 7, 1, "y")  # la chaqueta y sus botones
-        for y in (10, 12):
-            pon(img, 6, y + b, "y"); pon(img, 8, y + b, "y")
-        rect(img, 2, 10 + b, 2, 2, "R")
-        elipse(img, 13.0, 9.0 + b, 2.2, 2.2, "R" if aviso else "d")  # la bomba en alto
-        pon(img, 12, 8 + b, "c" if aviso else "v")
-        pon(img, 13, 6 + b, "o"); pon(img, 14, 5 + b, "y" if aviso else "o")
-        pie = f % 2 == 0
-        rect(img, 5, 13 + b, 2, 3 - b if pie else 2 - b, "r"); rect(img, 8, 13 + b, 2, 2 - b if pie else 3 - b, "r")
-        frames.append(contorno(img))
-    guardar(hoja(frames), "personajes/botones.png")
+    """El camarero de la horda (en el código sigue siendo el "botones"): tres variantes."""
+    for n, variante in enumerate(VARIANTES_CAMARERO):
+        frames = [camarero(f, *variante) for f in range(4)]
+        guardar(hoja(frames), "personajes/botones.png" if n == 0 else f"personajes/botones_{n + 1}.png")
 
 
 def jefe():
@@ -857,45 +897,152 @@ def bingo():
 
 
 def cajero():
+    """La Caja Registradora: con cara en el visor, patas cortas y el cajón de boca.
+    0 y 1 anda (cada fotograma una pata adelantada), 2 abre el cajón y aspira."""
     frames = []
     for f in range(3):
         img = lienzo(48, 48)
-        rect(img, 6, 16, 36, 24, "s"); rect(img, 8, 18, 32, 20, "p"); rect(img, 12, 6, 24, 12, "s"); rect(img, 14, 8, 20, 8, "k")
-        texto(img, 16, 10, "777", "m")
-        for j in range(3):
+        b = 1 if f == 1 else 0
+        # Patas (se alternan al andar; al aspirar se plantan abiertas).
+        izq, der = {0: (40, 42), 1: (42, 40), 2: (42, 42)}[f]
+        rect(img, 13, 38, 4, izq - 36, "s"); rect(img, 31, 38, 4, der - 36, "s")
+        rect(img, 10, izq + 2, 9, 2, "k"); rect(img, 29, der + 2, 9, 2, "k")
+        pon(img, 11, izq + 2, "s"); pon(img, 30, der + 2, "s")
+        # El cuerpo de latón con su teclado.
+        rect(img, 6, 15 + b, 36, 24, "s"); rect(img, 8, 17 + b, 32, 20, "p"); rect(img, 6, 15 + b, 36, 1, "c")
+        for j in range(2):
             for i in range(5):
-                rect(img, 11 + i * 6, 21 + j * 5, 4, 3, "c" if (i + j + f) % 3 else "y")
-        cajon = 40 if f < 2 else 42
-        rect(img, 4, cajon, 40, 6, "k"); rect(img, 6, cajon + 1, 36, 3, "y" if f == 2 else "r")
+                rect(img, 11 + i * 6, 19 + j * 5 + b, 4, 3, "c" if (i + j + f) % 3 else "y")
+        # El visor de arriba: dos ojos verdes enfadados (en rojo cuando aspira).
+        rect(img, 12, 4 + b, 24, 12, "s"); rect(img, 14, 6 + b, 20, 8, "k"); rect(img, 12, 4 + b, 24, 1, "c")
+        ojo = "R" if f == 2 else "m"
+        rect(img, 17, 9 + b, 4, 3, ojo); rect(img, 27, 9 + b, 4, 3, ojo)
+        linea(img, 16, 7 + b, 21, 9 + b, ojo); linea(img, 32, 7 + b, 27, 9 + b, ojo)
+        # El cajón es la boca: cerrado con dientes de moneda, o abierto y lleno de oro.
+        if f == 2:
+            rect(img, 4, 31, 40, 9, "k"); rect(img, 6, 32, 36, 6, "r")
+            for i in range(7):
+                rect(img, 8 + i * 5, 33 + (i % 2), 3, 3, "y")
+        else:
+            rect(img, 4, 30 + b, 40, 6, "k"); rect(img, 6, 31 + b, 36, 3, "r")
+            for i in range(6):
+                rect(img, 9 + i * 6, 31 + b, 2, 2, "y")
+        # La manivela del lado.
+        rect(img, 42, 22 + b, 3, 3, "s"); rect(img, 44, 18 + b, 2, 6, "s"); rect(img, 43, 16 + b, 4, 3, "R")
         frames.append(contorno(img))
     guardar(hoja(frames), "personajes/cajero.png")
 
 
+def brazo(img, x0, y0, x1, y1, letra, grosor=3):
+    """Un brazo (o cualquier trazo) grueso: una línea repetida en un cuadrado."""
+    for dy in range(grosor):
+        for dx in range(grosor):
+            linea(img, x0 + dx, y0 + dy, x1 + dx, y1 + dy, letra)
+
+
+def coctelera(img, x, y):
+    """La coctelera plateada: tapón, cuerpo con brillo y la cinta del medio."""
+    rect(img, x + 1, y, 3, 2, "s"); pon(img, x + 2, y, "c")
+    rect(img, x, y + 2, 5, 8, "s"); rect(img, x + 1, y + 2, 1, 7, "c"); rect(img, x, y + 5, 5, 1, "k")
+    rect(img, x + 4, y + 2, 1, 8, "p")
+
+
 def coctelero():
+    """El Coctelero: un barman de los años 20, con chaleco, pajarita, ligas en las mangas, mandil
+    largo y bigote de manillar. 0 y 1 baila, 2 y 3 agita la coctelera (arriba y abajo, alternando
+    muy deprisa); el 2 es también el lanzamiento."""
     frames = []
     for f in range(4):
         img = lienzo(48, 48)
-        d = (0, 0, 2, -2)[f]
-        for y in range(12, 44):
-            ancho = 10 + (y - 12) // 4
-            rect(img, 24 - ancho + d, y, ancho * 2, 1, "s" if y % 7 else "c")
-        rect(img, 18 + d, 3, 12, 9, "s"); rect(img, 21 + d, 0, 6, 4, "o")
-        rect(img, 16 + d, 22, 5, 5, "k"); rect(img, 28 + d, 22, 5, 5, "k"); pon(img, 18 + d, 24, "R"); pon(img, 30 + d, 24, "R")
-        rect(img, 18 + d, 33, 12, 3, "k")
+        b = -1 if f == 1 else 0  # el paso de baile: el cuerpo sube un pelín
+        agita = f >= 2
+        # Piernas y zapatos (se abren al bailar).
+        abre = (0, 2, 1, 1)[f]
+        rect(img, 18 - abre, 40, 5, 5, "p"); rect(img, 26 + abre, 40, 5, 5, "p")
+        rect(img, 17 - abre, 44, 6, 2, "k"); rect(img, 26 + abre, 44, 6, 2, "k")
+        pon(img, 18 - abre, 44, "s"); pon(img, 27 + abre, 44, "s")
+        # El mandil blanco, largo hasta las rodillas, con sus pliegues.
+        rect(img, 16, 31 + b, 17, 11 - b, "c")
+        for x in (19, 24, 29):
+            rect(img, x, 33 + b, 1, 8, "s")
+        rect(img, 16, 31 + b, 17, 1, "k")  # el cordón
+        # El torso: camisa, chaleco negro con botones dorados.
+        rect(img, 15, 21 + b, 19, 11, "c")
+        rect(img, 15, 21 + b, 6, 11, "d"); rect(img, 28, 21 + b, 6, 11, "d")
+        for y in range(21, 32):
+            ancho = max(0, (y - 21) // 3)
+            rect(img, 21, y + b, ancho, 1, "d"); rect(img, 28 - ancho, y + b, ancho, 1, "d")
+            pon(img, 21 + ancho, y + b, "p"); pon(img, 27 - ancho, y + b, "p")  # la solapa
+        rect(img, 16, 22 + b, 1, 9, "p"); rect(img, 32, 22 + b, 1, 9, "p")
+        for y in (26, 29):
+            pon(img, 24, y + b, "y")
+        rect(img, 15, 21 + b, 1, 11, "k"); rect(img, 33, 21 + b, 1, 11, "k")
+        # Cuello y pajarita roja.
+        rect(img, 20, 20 + b, 9, 2, "c")
+        rect(img, 20, 20 + b, 3, 3, "R"); rect(img, 26, 20 + b, 3, 3, "R"); rect(img, 23, 21 + b, 3, 1, "r")
+        # La cabeza.
+        elipse(img, 24, 13 + b, 7, 7.5, "o")
+        # Pelo engominado con la raya en medio.
+        for x in range(17, 32):
+            alto = 4 if abs(x - 24) > 1 else 2
+            rect(img, x, 5 + b, 1, alto + (1 if abs(x - 24) > 5 else 0), "k")
+        pon(img, 20, 6 + b, "p"); pon(img, 21, 6 + b, "p"); pon(img, 27, 6 + b, "p"); pon(img, 28, 6 + b, "p")
+        # Ojos y cejas (enfadado al agitar).
+        rect(img, 20, 12 + b, 2, 2, "k"); rect(img, 27, 12 + b, 2, 2, "k")
+        if agita:
+            pon(img, 21, 12 + b, "R"); pon(img, 28, 12 + b, "R")
+            linea(img, 19, 9 + b, 22, 11 + b, "k"); linea(img, 29, 9 + b, 26, 11 + b, "k")
+        else:
+            rect(img, 19, 10 + b, 4, 1, "k"); rect(img, 26, 10 + b, 4, 1, "k")
+        # Bigote de manillar con las puntas hacia arriba.
+        rect(img, 19, 16 + b, 11, 2, "k"); pon(img, 18, 15 + b, "k"); pon(img, 30, 15 + b, "k")
+        pon(img, 17, 14 + b, "k"); pon(img, 31, 14 + b, "k")
+        rect(img, 22, 18 + b, 5, 1, "r")
+        # Brazo izquierdo (de la pantalla): manga blanca con liga roja y el paño colgando.
+        brazo(img, 12, 22 + b, 10, 30 + b, "c")
+        rect(img, 10, 25 + b, 4, 1, "R")
+        rect(img, 9, 31 + b, 4, 3, "o")
+        rect(img, 7, 32 + b, 4, 8, "c"); rect(img, 7, 35 + b, 4, 1, "R"); rect(img, 10, 32 + b, 1, 8, "s")
+        # Brazo derecho con la coctelera: a la altura del pecho al bailar; arriba o abajo al agitar.
+        mano = {0: (37, 27), 1: (37, 25), 2: (38, 9), 3: (38, 19)}[f]
+        brazo(img, 33, 22 + b, mano[0], mano[1], "c")
+        linea(img, 34, 25 + b, 36, 25 + b, "R")
+        coctelera(img, mano[0] - 1, mano[1] - 10)
+        rect(img, mano[0], mano[1], 3, 3, "o")
+        if agita:
+            # Las rayas del meneo.
+            for dy in (-6, -2, 2):
+                pon(img, mano[0] + 6, mano[1] + dy, "c"); pon(img, mano[0] - 4, mano[1] + dy + 1, "c")
         frames.append(contorno(img))
     guardar(hoja(frames), "personajes/coctelero.png")
 
 
 def poker():
+    """El Jugador de Póker: visera verde, cara de póker, puro y cinco naipes en abanico.
+    En el 1 (va con todo) le brillan los ojos y levanta las cartas."""
     frames = []
     for f in range(2):
         img = lienzo(48, 48)
-        elipse(img, 23.5, 26, 16, 18, "o"); rect(img, 12, 8, 24, 7, "k"); rect(img, 7, 14, 34, 4, "G"); rect(img, 4, 17, 40, 3, "g")
-        rect(img, 15, 24, 7, 3, "k"); rect(img, 27, 24, 7, 3, "k")
+        # Hombros y traje.
+        elipse(img, 23.5, 41, 19, 5.5, "p"); rect(img, 21, 35, 6, 8, "c"); rect(img, 23, 36, 2, 7, "R")
+        # La cabeza y la visera.
+        elipse(img, 23.5, 22, 12, 13, "o")
+        rect(img, 12, 8, 24, 6, "k")  # pelo
+        rect(img, 8, 13, 32, 4, "G"); rect(img, 6, 16, 36, 2, "g"); rect(img, 8, 13, 32, 1, "m")
+        # Cara de póker: ojos entornados y boca recta.
+        rect(img, 15, 22, 7, 2, "k"); rect(img, 27, 22, 7, 2, "k")
         if f:
-            pon(img, 18, 25, "R"); pon(img, 30, 25, "R")
-        rect(img, 18, 35, 12, 2, "k")
-        rect(img, 8, 41, 32, 7, "p"); rect(img, 20, 41, 8, 4, "c")
+            pon(img, 18, 22, "R"); pon(img, 30, 22, "R"); pon(img, 19, 22, "y"); pon(img, 31, 22, "y")
+        rect(img, 18, 30, 12, 1, "k")
+        rect(img, 30, 29, 8, 2, "c"); rect(img, 38, 29, 1, 2, "R")  # el puro
+        # Las manos con el abanico de naipes delante del pecho.
+        alto = 31 if f else 34
+        for i in range(5):
+            x = 12 + i * 5
+            y = alto + abs(i - 2)
+            rect(img, x, y, 6, 9, "k"); rect(img, x + 1, y + 1, 4, 7, "c")
+            pon(img, x + 2, y + 2, "R" if i % 2 else "k")
+        rect(img, 9, alto + 6, 4, 4, "o"); rect(img, 35, alto + 6, 4, 4, "o")
         frames.append(contorno(img))
     guardar(hoja(frames), "personajes/poker.png")
 
@@ -905,11 +1052,12 @@ def dueno():
     for f in range(3):
         img = lienzo(48, 48)
         elipse(img, 23.5, 34, 20, 13, "p"); rect(img, 18, 24, 12, 16, "v"); rect(img, 20, 24, 8, 12, "c"); rect(img, 22, 26, 4, 12, "R")
-        elipse(img, 23.5, 17, 12, 11, "o"); rect(img, 16, 0, 16, 7, "k"); rect(img, 12, 6, 24, 3, "k"); rect(img, 16, 4, 16, 2, "R")
+        elipse(img, 23.5, 17, 12, 11, "o"); rect(img, 16, 1, 16, 6, "k"); rect(img, 12, 6, 24, 3, "k"); rect(img, 16, 4, 16, 2, "R")
         rect(img, 16, 14, 6, 3, "k"); rect(img, 26, 14, 6, 3, "k"); pon(img, 18, 15, "y"); pon(img, 28, 15, "y")
         rect(img, 28, 22, 12, 3, "c"); rect(img, 40, 22, 2, 3, "R")
         rect(img, 18, 22, 8, 3 if f == 2 else 1, "k")
-        rect(img, 8, 40 + (f % 2), 10, 8 - (f % 2), "k"); rect(img, 30, 40 + ((f + 1) % 2), 10, 8 - ((f + 1) % 2), "k")
+        rect(img, 8, 40 + (f % 2), 10, 7 - (f % 2), "k"); rect(img, 30, 40 + ((f + 1) % 2), 10, 7 - ((f + 1) % 2), "k")
+        rect(img, 9, 45, 8, 1, "s"); rect(img, 31, 45, 8, 1, "s")  # el brillo de los zapatos
         frames.append(contorno(img))
     guardar(hoja(frames), "personajes/dueno.png")
 
@@ -918,7 +1066,7 @@ def mosca():
     frames = []
     for f in range(3):
         img = lienzo(48, 48)
-        ala = [lambda: (8, 12, 14), lambda: (9, 20, 12), lambda: (6, 16, 15)][f]()
+        ala = [(8, 12, 10), (9, 20, 9), (6, 16, 10)][f]  # alto, y, ancho: 24 ± (2 * ancho + 2) cabe
         for lado in (-1, 1):
             elipse(img, 24 + lado * (ala[2] + 2), ala[1], ala[2], ala[0], "B")
             elipse(img, 24 + lado * (ala[2] + 4), ala[1] - 1, ala[2] - 5, ala[0] - 4, "c")
@@ -1020,7 +1168,7 @@ def proyectiles():
     frames = []
     for f in range(6):
         img = lienzo(48, 48)
-        r_ext = 6 + f * 3.6
+        r_ext = 6 + f * 3.1
         r_int = max(0, r_ext - (9 - f))
         for y in range(48):
             for x in range(48):
@@ -1518,6 +1666,52 @@ ICONOS.update({
     "rojo_negro": ["kkkkkkrRRRRR", "kkkkkkrRRRRR", "kkkkkkrRRRRR", "kkkkkkrRRRRR", "kkkkkkrRRRRR", "kkkkkkrRRRRR", "kkkkkkrRRRRR", "kkkkkkrRRRRR", "kkkkkkrRRRRR"],
 })
 
+# Iconos que antes copiaban a otros (y no se distinguían en la fila).
+def icono_racha():
+    """Racha Caliente: tres llamas que crecen de izquierda a derecha."""
+    img = lienzo(12, 12)
+    llamas = (
+        (0, [".R.", "RoR", "RyR", ".R."]),
+        (3, ["..R.", ".RR.", ".RoR", "RooR", "RoyR", "RyyR", ".RR."]),
+        (7, ["...R.", "..RR.", "..RoR", ".RooR", ".RoyR", "RooyR", "RoyyR", "RycyR", "RyyoR", ".RRR."]),
+    )
+    for x, filas in llamas:
+        img.alpha_composite(sprite(filas, len(filas[0])), (x, 11 - len(filas)))
+    return contorno(img)
+
+
+def icono_fajo():
+    """Fajo Volador: un taco de billetes con su faja de papel y rayas de velocidad."""
+    img = lienzo(12, 12)
+    rect(img, 2, 2, 10, 8, "k"); rect(img, 3, 3, 8, 3, "G")
+    rect(img, 3, 6, 8, 1, "m"); rect(img, 3, 7, 8, 1, "g"); rect(img, 3, 8, 8, 1, "m")
+    rect(img, 6, 2, 2, 8, "c"); rect(img, 7, 3, 1, 6, "s")
+    pon(img, 4, 4, "m"); pon(img, 9, 4, "m")
+    for y in (3, 6, 9):
+        rect(img, 0, y, 2 if y != 6 else 1, 1, "c")
+    return img
+
+
+def icono_resto():
+    """Todo al Resto: dos pilas de monedas, la de la derecha más alta."""
+    img = lienzo(12, 12)
+    for x, n in ((0, 3), (6, 5)):
+        for i in range(n):
+            y = 10 - i * 2
+            rect(img, x, y - 1, 6, 3, "k")
+            rect(img, x + 1, y, 4, 1, "o"); rect(img, x + 1, y - 1, 4, 1, "y")
+        pon(img, x + 2, 10 - (n - 1) * 2 - 1, "c")
+    return img
+
+
+ICONOS.update({
+    "mano": ["...R.R.R....", "..RoRoRoR...", "..kykykyk...", "..kckckck.k.", "..kckckckkck", "..kckckckcck",
+             ".kkcccccccck", "kcckccccccck", ".kcccccccck.", "..kccccccck.", "...kcccccck.", "....kkkkkk.."],
+    "racha": icono_racha(),
+    "resto": icono_resto(),
+    "billete": icono_fajo(),
+})
+
 CARTAS_VISUAL = {
     "bala": ("ataque", 0, "5"), "rayo": ("ataque", 0, "3"), "cuchilla": ("ataque", 1, "4"),
     "explosion": ("ataque", 1, "8"), "abanico": ("ataque", 0, "3"), "nova": ("ataque", 1, "2"),
@@ -1803,11 +1997,18 @@ def cartas():
         rect(img, 2, 2, 28, 40, oscuro)
         rect(img, 3, 3, 26, 26, "k")
         rect(img, 4, 4, 24, 24, "d")
-        for r in range(rareza + 1):
-            rect(img, 5 + r * 4, 5, 2, 2, "y" if rareza else "s")
         icono = ICONOS[id_carta] if isinstance(ICONOS[id_carta], Image.Image) else sprite(ICONOS[id_carta], 12)
         grande = icono.resize((24, icono.height * 2), Image.NEAREST)
-        img.alpha_composite(grande, (4, 4 + (24 - grande.height) // 2))
+        y_icono = 4 + (24 - grande.height) // 2
+        img.alpha_composite(grande, (4, y_icono))
+        # Las pepitas de rareza, encima del icono: si el icono llega hasta ellas, con un marco negro.
+        for r in range(rareza + 1):
+            x = 5 + r * 4
+            tapa = any(grande.getpixel((i - 4, j - y_icono))[3] for i in (x, x + 1) for j in (5, 6)
+                       if 0 <= j - y_icono < grande.height)
+            if tapa:
+                rect(img, x - 1, 4, 4, 4, "k")
+            rect(img, x, 5, 2, 2, "y" if rareza else "s")
         if etiqueta:
             texto(img, 16 - ancho_texto(etiqueta) // 2, 33, etiqueta, "c")
         else:
@@ -1970,10 +2171,17 @@ def eventos():
     rect(c, 4, 9, 8, 2, "k"); rect(c, 3, 12, 10, 9, "d"); rect(c, 7, 12, 2, 6, "y"); rect(c, 4, 21, 3, 3, "k"); rect(c, 9, 21, 3, 3, "k")
     frames.append(contorno(c))
     # La camarera con su bandeja.
+    # Media melena de los años 20 con cofia, chaleco, pajarita, paño al brazo y la bandeja en alto.
     d = lienzo(16, 24)
-    elipse(d, 6.5, 6, 4.5, 4.5, "o"); rect(d, 2, 1, 9, 4, "R"); rect(d, 4, 5, 2, 2, "k"); rect(d, 8, 5, 2, 2, "k")
-    rect(d, 2, 11, 9, 10, "k"); rect(d, 4, 12, 5, 7, "c"); rect(d, 3, 21, 3, 3, "o"); rect(d, 7, 21, 3, 3, "o")
-    rect(d, 10, 11, 6, 1, "s"); rect(d, 12, 7, 2, 4, "B")
+    elipse(d, 6.5, 7, 4.5, 4.5, "o"); rect(d, 2, 2, 9, 3, "k"); rect(d, 2, 5, 2, 5, "k"); rect(d, 9, 5, 2, 4, "k")
+    rect(d, 3, 1, 7, 1, "c"); pon(d, 5, 7, "k"); pon(d, 8, 7, "k"); pon(d, 6, 9, "R")
+    rect(d, 3, 12, 8, 6, "c"); rect(d, 3, 12, 2, 6, "r"); rect(d, 9, 12, 2, 6, "r"); rect(d, 3, 16, 8, 2, "r")
+    pon(d, 7, 16, "y"); rect(d, 5, 11, 4, 1, "c"); pon(d, 5, 11, "R"); pon(d, 6, 11, "k"); pon(d, 7, 11, "R")
+    rect(d, 3, 18, 8, 3, "k"); rect(d, 4, 21, 2, 2, "o"); rect(d, 8, 21, 2, 2, "o")
+    rect(d, 3, 23, 3, 1, "k"); rect(d, 8, 23, 3, 1, "k")
+    rect(d, 2, 12, 1, 4, "c"); rect(d, 1, 15, 2, 5, "c"); rect(d, 1, 19, 2, 1, "s"); pon(d, 1, 17, "R")
+    rect(d, 11, 11, 1, 3, "c"); pon(d, 12, 10, "o"); rect(d, 10, 9, 6, 1, "s"); pon(d, 10, 9, "c")
+    rect(d, 11, 6, 3, 1, "B"); pon(d, 12, 7, "B"); pon(d, 12, 8, "c"); pon(d, 14, 5, "R")
     frames.append(contorno(d))
     # El mendigo y la caja fuerte.
     e = lienzo(16, 24)
