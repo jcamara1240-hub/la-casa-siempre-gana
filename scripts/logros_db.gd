@@ -40,6 +40,9 @@ const LOGROS := {
 	"roces": {"nombre": "A Flor de Piel", "desc": "Deja que 100 balas te pasen rozando sin rodar."},
 	"desatado": {"nombre": "Sin Freno", "desc": "Desátate 25 veces en total."},
 	"servicio": {"nombre": "Servicio Rápido", "desc": "Cobra 25 propinas por rapidez."},
+	# Rangos: el contador "raros" va en Progreso.contadores; "elite_limpio" lo marca main al matarlo.
+	"cazador_raros": {"nombre": "Cazarrarezas", "desc": "Elimina a 50 enemigos raros."},
+	"elite_limpio": {"nombre": "Trato VIP", "desc": "Elimina a un élite sin recibir daño desde que aparece."},
 }
 
 

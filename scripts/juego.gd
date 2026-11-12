@@ -289,6 +289,7 @@ func revisar_logros(gano := false) -> void:
 		"roces": int(c.get("roces", 0)) >= 100,
 		"desatado": int(c.get("desatados", 0)) >= 25,
 		"servicio": int(c.get("propinas", 0)) >= 25,
+		"cazador_raros": int(c.get("raros", 0)) >= 50,
 		"mesa_oro": gano and mesa >= 4, "extremo": gano and extremo,
 		"reto": diario,
 		"cartas": Progreso.cartas_libres() >= CartasDB.CARTAS.size(),

@@ -517,6 +517,10 @@ func _pintar_luces_horda(l: Node2D, horda) -> void:
 			var c := Color(1.0, 0.3, 0.3, 0.3) if enfado else Color(1.0, 0.8, 0.55, 0.2)
 			c.a += 0.08 * late
 			l.draw_texture_rect(tex_luz, Rect2(e.position - Vector2(r, r * 0.8), Vector2(r * 2.0, r * 1.6)), false, c)
+		elif e.rango == Enemigo.Rango.RARO:
+			var r: float = e.radio * 2.8
+			var a := 0.18 + 0.06 * sin(_t * 5.0 + e.position.x)
+			l.draw_texture_rect(tex_luz, Rect2(e.position - Vector2(r, r * 0.8), Vector2(r * 2.0, r * 1.6)), false, Color(Enemigo.COLOR_RARO, a))
 		elif e.elite:
 			var r: float = e.radio * 3.2
 			var a := 0.22 + 0.08 * sin(_t * 6.0 + e.position.x)
@@ -615,10 +619,14 @@ func _pintar_sombras(l: Node2D) -> void:
 				ancho *= 0.75
 				color.a *= 0.7
 			_sombra(l, e.position + Vector2(0, pie), ancho, maxf(3.0, ancho * 0.32), color)
-			if e.elite and not e.muerto:
+			if e.rango > 0 and not e.muerto:
+				# El aro del rango en el suelo: dorado y doble el élite, azul el raro.
 				var pulso := 0.5 + 0.5 * sin(_t * 6.0 + e.position.y)
+				var color_aro: Color = Enemigo.COLOR_ELITE if e.elite else Enemigo.COLOR_RARO
 				l.draw_set_transform(e.position + Vector2(0, pie), 0.0, Vector2(1.0, 0.36))
-				l.draw_arc(Vector2.ZERO, ancho * 0.65 + 2.0 + pulso, 0.0, TAU, 24, Color(COLOR_ORO, 0.5 + 0.3 * pulso), 1.0)
+				l.draw_arc(Vector2.ZERO, ancho * 0.65 + 2.0 + pulso, 0.0, TAU, 24, Color(color_aro, 0.5 + 0.3 * pulso), 1.0)
+				if e.elite:
+					l.draw_arc(Vector2.ZERO, ancho * 0.65 + 5.0 + pulso, 0.0, TAU, 24, Color(color_aro, 0.25 + 0.2 * pulso), 1.0)
 				l.draw_set_transform(Vector2.ZERO)
 	# Donde va a aparecer alguien: un aro que se cierra y una cruz en el centro.
 	for m in _marcas:
@@ -654,6 +662,8 @@ func _pintar_avisos(l: Node2D) -> void:
 	for e in horda.enemigos:
 		if not e.activo() or e is Jefe:
 			continue
+		if e.rango > 0:
+			_pintar_rango(l, e, parpadeo)
 		# Los ataques en línea recta enseñan por dónde van a pasar antes de salir.
 		var linea: Vector2 = e.aviso_linea()
 		if linea != Vector2.ZERO:
@@ -672,6 +682,26 @@ func _pintar_avisos(l: Node2D) -> void:
 		var centro: Vector2 = (_jugador.position + Vector2(0, 2)).round()
 		l.draw_rect(Rect2(centro - Vector2(2, 2), Vector2(4, 4)), Color8(20, 16, 30))
 		l.draw_rect(Rect2(centro - Vector2(1, 1), Vector2(2, 2)), Color8(247, 236, 210) if parpadeo else COLOR_ORO)
+
+
+## Raros y élites: su etiqueta sobre la cabeza (encima del "!" si va a atacar) y, si llevan
+## escudo, el arco que les cubre de frente. Se lee en plena horda y por encima del posproceso.
+func _pintar_rango(l: Node2D, e, parpadeo: bool) -> void:
+	var texto: String = e.etiqueta()
+	var color: Color = Enemigo.COLOR_ELITE if e.elite else Enemigo.COLOR_RARO
+	var tex: Texture2D = e.texture
+	var alto: float = 16.0 if tex == null else float(tex.get_height()) / e.vframes * absf(e.scale.y)
+	var sube := 10.0 if AVISAN.has(e.tipo) and e.frame == 3 else 0.0
+	if texto != "":
+		var fuente: Font = Juego.fuente
+		var ancho := fuente.get_string_size(texto, HORIZONTAL_ALIGNMENT_LEFT, -1, 8).x
+		var x := clampf(roundf(e.position.x - ancho * 0.5), 2.0, 638.0 - ancho)
+		var y := roundf(e.position.y - alto * 0.5 - 2.0 - sube)
+		l.draw_rect(Rect2(x - 1.0, y - 7.0, ancho + 2.0, 8.0), Color(0.08, 0.06, 0.12, 0.6))
+		l.draw_string(fuente, Vector2(x, y), texto, HORIZONTAL_ALIGNMENT_LEFT, -1, 8, color)
+	if e.tiene_mod("escudo"):
+		var ang: float = e.frente().angle()
+		l.draw_arc(e.position, e.radio + 4.0, ang - 0.9, ang + 0.9, 8, Color(color, 0.85 if parpadeo else 0.65), 2.0)
 
 
 ## El rótulo de la oleada, pegado al muro de arriba: dos rayas entran desde los lados, el

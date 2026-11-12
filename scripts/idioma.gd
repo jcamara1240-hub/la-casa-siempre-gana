@@ -285,6 +285,17 @@ const EN := {
 	"CASA LLENA": "FULL HOUSE", "MUCHOS MÁS ENEMIGOS, PERO MÁS FLOJOS.": "MANY MORE ENEMIES, BUT WEAKER.",
 	"SALA %d%%": "ROOM %d%%",
 	"Servicio Rápido": "Fast Service", "Cobra 25 propinas por rapidez.": "Collect 25 speed tips.",
+	# Enemigos raros y élites: modificadores, nombres de los enemigos y logros.
+	"VELOZ": "SWIFT", "BLINDADO": "ARMORED", "EXPLOSIVO": "EXPLOSIVE", "VAMPIRO": "VAMPIRE",
+	"DIVISOR": "SPLITTER", "ESCUDO": "SHIELD", "ESQUIVO": "BLINKER", "ARDIENTE": "BLAZING",
+	"Veloz": "Swift", "Blindado": "Armored", "Blindada": "Armored", "Explosivo": "Explosive", "Explosiva": "Explosive",
+	"Vampírico": "Vampiric", "Vampírica": "Vampiric", "Divisor": "Splitting", "Divisora": "Splitting",
+	"Escudado": "Shielded", "Escudada": "Shielded", "Esquivo": "Blinking", "Esquiva": "Blinking", "Ardiente": "Blazing",
+	"Ficha": "Chip", "Dado": "Die", "Sota": "Jack", "Naipe": "Card", "Ficha Gorda": "Big Chip", "Bufón": "Jester",
+	"Cubilete": "Dice Cup", "Portero": "Doorman", "Cámara": "Camera", "Ratero": "Pickpocket", "Dado Bomba": "Bomb Die",
+	"Reina": "Queen", "Crupier": "Dealer", "Matón": "Thug", "Camarero": "Waiter",
+	"Cazarrarezas": "Rarity Hunter", "Elimina a 50 enemigos raros.": "Kill 50 rare enemies.",
+	"Trato VIP": "VIP Treatment", "Elimina a un élite sin recibir daño desde que aparece.": "Kill an elite without taking damage after it appears.",
 }
 
 
