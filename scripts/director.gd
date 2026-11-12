@@ -41,8 +41,9 @@ const ENJAMBRE_PRESUPUESTO := 1.7
 const ENJAMBRE_VIDA := 0.55
 
 
-## El plan de una sala. Todo sale de azar (el de la partida), así que el reto diario
-## reparte las mismas tiradas a todo el mundo; lo único personal es la presión.
+## El plan de una sala. Todo sale de azar (el de la sala, ver Juego.azar_para), así que el
+## reto diario reparte las mismas tiradas a todo el mundo. La presión, que es lo único
+## personal, en el reto diario va fija (Juego.presion_sala).
 static func plan_sala(azar: RandomNumberGenerator, salas_limpiadas: int, piso: int, presion: float) -> Dictionary:
 	var perfil: Dictionary = _elegir(azar, PERFILES)
 	var regla := ""

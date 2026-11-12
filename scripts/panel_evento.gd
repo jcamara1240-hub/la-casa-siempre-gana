@@ -37,6 +37,9 @@ var _a := 0
 var _b := 1
 var _copa_mando := -1  # con el mando: el hueco (0, 1 o 2) de la copa señalada
 var _seguro := 0.0  # al abrirse, un instante sin aceptar con el mando (ver Selector)
+## El azar de los juegos de la sala. Sale de la semilla de la sala: en el reto diario la misma
+## jugada da el mismo resultado a todo el mundo (y recargar la partida no cambia la suerte).
+var _azar := RandomNumberGenerator.new()
 var _tex_copa: Texture2D = load("res://assets/objetos/copa_trile.png")
 var _tex_moneda: Texture2D = load("res://assets/objetos/moneda.png")
 
@@ -47,8 +50,12 @@ func _ready() -> void:
 	visible = false
 
 
-func abrir(tipo: String) -> void:
+func abrir(tipo: String, azar: RandomNumberGenerator = null) -> void:
 	_tipo = tipo
+	if azar != null:
+		_azar = azar
+	else:
+		_azar.randomize()
 	_carta = ""
 	_rondas = 0
 	_usos = 0
@@ -130,7 +137,7 @@ func _apostar_trileros(cantidad: int) -> void:
 	Juego.gastar_oro(cantidad)
 	Sonido.tocar("clic")
 	_apuesta = cantidad
-	_bola = randi() % 3
+	_bola = _azar.randi() % 3
 	_revelar = _bola
 	_ir_a(Fase.ENSENAR, Idioma.t("MIRA BIEN..."))
 	_reloj = 0.9
@@ -147,8 +154,8 @@ func _empezar_mezcla() -> void:
 func _siguiente_cruce() -> void:
 	_mezclas -= 1
 	_reloj = _ritmo
-	_a = randi() % 3
-	_b = (_a + 1 + randi() % 2) % 3
+	_a = _azar.randi() % 3
+	_b = (_a + 1 + _azar.randi() % 2) % 3
 	Sonido.tocar("mezclar")
 
 
@@ -202,7 +209,7 @@ func _lanzar() -> void:
 
 
 func _resolver_lanzamiento() -> void:
-	if randf() < PROB_DOBLAR:
+	if _azar.randf() < PROB_DOBLAR:
 		_pote *= 2
 		_dobles += 1
 		if _dobles >= MAX_DOBLES:
@@ -250,7 +257,7 @@ func _prestamo() -> void:
 func _dar_mendigo() -> void:
 	Juego.gastar_oro(10)
 	Juego.marcar_logro("mendigo")
-	var objeto := Juego.robar_objeto() if randf() < 0.5 else ""
+	var objeto := Juego.robar_objeto([], _azar) if _azar.randf() < 0.5 else ""
 	if objeto != "":
 		Juego.dar_objeto(objeto)
 		Sonido.tocar("objeto")
@@ -263,13 +270,13 @@ func _dar_mendigo() -> void:
 
 func _abrir_caja() -> void:
 	var texto := ""
-	match randi() % 3:
+	match _azar.randi() % 3:
 		0:
 			Juego.ganar_oro(25)
 			Sonido.tocar("ganar")
 			texto = Idioma.t("DENTRO HAY 25 MONEDAS.")
 		1:
-			_carta = Juego.robar_cartas(1, 1.0)[0]
+			_carta = Juego.robar_cartas(1, 1.0, _azar)[0]
 			Sonido.tocar("carta_coger")
 			texto = Idioma.t("DENTRO HAY UNA CARTA: %s.") % CartasDB.nombre(_carta).to_upper()
 		_:
@@ -300,7 +307,7 @@ func _chupito() -> void:
 	Juego.gastar_oro(5)
 	_usos += 1
 	var texto := ""
-	match randi() % 4:
+	match _azar.randi() % 4:
 		0:
 			Juego.curar(2)
 			texto = Idioma.t("SIENTA BIEN: RECUPERAS UN CORAZÓN.")
@@ -310,7 +317,7 @@ func _chupito() -> void:
 			texto = Idioma.t("ENCUENTRAS 15 MONEDAS EN EL FONDO DEL VASO.")
 			Sonido.tocar("ganar")
 		2:
-			_carta = Juego.robar_cartas(1)[0]
+			_carta = Juego.robar_cartas(1, 0.0, _azar)[0]
 			texto = Idioma.t("APARECE UNA CARTA BAJO EL POSAVASOS: %s.") % CartasDB.nombre(_carta).to_upper()
 			Sonido.tocar("carta_coger")
 		_:

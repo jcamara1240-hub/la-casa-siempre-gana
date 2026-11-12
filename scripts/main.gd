@@ -89,6 +89,7 @@ var _oleadas: Array = []
 var _oleada_t := 0.0
 var _oleadas_total := 0
 var _plan: Dictionary = {}  # el plan procedural de la sala (Director.plan_sala)
+var _elites: Array = []  # por oleada, el rango de cada enemigo: [rango, modificadores] (se decide al planear la sala)
 var _oleada_base := 0  # los que había vivos justo al soltar la última oleada
 var _sala_previstos := 0  # enemigos que trae la sala entre todas las oleadas
 var _sala_bajas := 0
@@ -112,6 +113,7 @@ var _panel: PanelEvento
 var _tactiles: ControlesTactiles
 var _logros: PantallaLogros
 var _reto: PantallaReto
+var _online: Online  # la tabla mundial; sin online.cfg no hace nada ni se ve
 var _prob_carta := 0.55
 var _cambiando_sala := false
 var _carta_pendiente := ""
@@ -192,6 +194,9 @@ func _crear_pantallas_extra() -> void:
 	get_tree().quit_on_go_back = false
 	_logros = PantallaLogros.new()
 	_reto = PantallaReto.new()
+	_online = Online.new()
+	add_child(_online)
+	_reto.online = _online
 	for pantalla in [_tactiles, _panel, _seleccion, _coleccion, _logros, _reto]:
 		$UI.add_child(pantalla)
 	$UI.move_child(_tactiles, _menu.get_index())
@@ -308,10 +313,17 @@ func _notification(what: int) -> void:
 
 
 func empezar_reto() -> void:
-	# La semilla sale de la fecha: todo el mundo juega la misma mazmorra ese día.
-	Juego.nueva_partida(hash(Juego.fecha_hoy()), "tahur", 1, false, true)
+	# La semilla sale de la fecha (UTC): todo el mundo juega la misma mazmorra ese día.
+	# El primer intento del día puntúa; los demás son de práctica.
+	var fecha := Juego.fecha_hoy()
+	var puntuable := Progreso.reto_puntuable(fecha)
+	if puntuable:
+		Progreso.empezar_reto_puntuable(fecha)
+	Juego.nueva_partida_reto(fecha, puntuable)
 	Juego.revisar_logros()
 	_arrancar()
+	if not puntuable:
+		_aviso.text = Idioma.t("PRÁCTICA: ESTE INTENTO NO PUNTÚA")
 
 
 func empezar_partida(personaje := "", mesa := -1, extremo := false, imposible := false) -> void:
@@ -325,6 +337,10 @@ func continuar_partida() -> void:
 		_ir_al_menu()
 		return
 	Juego.restaurar(datos.juego)
+	# Un reto guardado de otro día se puede acabar, pero ya no puntúa.
+	var reto_caducado: bool = Juego.diario and Juego.fecha_reto != Juego.fecha_hoy()
+	if reto_caducado:
+		Juego.reto_puntuable = false
 	salas = datos.salas
 	_salas_limpiadas = datos.salas_limpiadas
 	_prob_carta = datos.prob_carta
@@ -336,6 +352,8 @@ func continuar_partida() -> void:
 	Sonido.musica("piso")
 	get_tree().paused = false
 	entrar_sala(datos.pos, Vector2i.ZERO)
+	if reto_caducado:
+		_aviso.text = Idioma.t("RETO DE OTRO DÍA: YA NO PUNTÚA")
 
 
 func _guardar_punto() -> void:
@@ -362,7 +380,8 @@ func _arrancar() -> void:
 func _generar_piso() -> void:
 	_salas_limpiadas = 0
 	if Juego.diario:
-		Juego.azar.seed = hash("%s-%d" % [Juego.fecha_hoy(), Juego.piso])
+		# La fecha del reto, no la de ahora: si pasas la medianoche jugando, sigue siendo tu reto.
+		Juego.azar.seed = Juego.semilla_de("reto:%s:%d" % [Juego.fecha_reto, Juego.piso])
 	salas = GeneradorMazmorra.generar(Juego.azar, mini(12 + Juego.piso, 15))
 	_quitar_tienda_si_extremo()
 	_quitar_apuestas_si_extremo()
@@ -500,8 +519,10 @@ func _empezar_combate() -> void:
 	_barra.en_combate = true
 	_sala.poner_puertas(false)
 	Sonido.tocar("puerta_cierra")
-	_plan = Director.plan_sala(Juego.azar, _salas_limpiadas, Juego.piso, Juego.presion)
-	_oleadas = _planificar_oleadas()
+	# Todo el plan sale de la semilla de la sala: la misma sala trae lo mismo, pase lo que pase antes.
+	var rng := Juego.azar_para(int(actual.semilla), "oleadas")
+	_plan = Director.plan_sala(rng, _salas_limpiadas, Juego.piso, Juego.presion_sala())
+	_oleadas = _planificar_oleadas(rng)
 	_oleadas_total = _oleadas.size()
 	_oleada_base = 0
 	_sala_bajas = 0
@@ -520,34 +541,42 @@ func _empezar_combate() -> void:
 	_motor.activo = true
 
 
-func _planificar_oleadas() -> Array:
+func _planificar_oleadas(rng: RandomNumberGenerator) -> Array:
 	var bruto := (11 + _salas_limpiadas * 3 + (Juego.piso - 1) * 10 + Juego.pisos_extra() * 6) * PRESUPUESTO_EXTRA
 	var presupuesto := mini(roundi(bruto * float(_plan.get("presupuesto", 1.0))), PRESUPUESTO_MAX)
 	if Juego.mesa >= 2:
 		presupuesto = int(presupuesto * 1.3)
 	# Cada sala tiene un enemigo de la casa, que sale el triple: así no se parecen entre sí.
 	_favorito = ""
-	_favorito = String(_elegir_enemigo(presupuesto)[0])
+	_favorito = String(_elegir_enemigo(presupuesto, rng)[0])
 	var oleadas: Array = []
+	_elites = []
+	# El rango de cada enemigo (normal, raro o élite) se decide aquí, con el azar de la sala.
+	var prob := Enemigo.prob_rangos(Juego.piso, Juego.mesa, Juego.pisos_extra(), float(_plan.get("elites", 1.0)))
+	var puede_raro: bool = Juego.piso >= 2 or _salas_limpiadas >= 1
+	var puede_elite: bool = Juego.piso >= 2 or _salas_limpiadas >= 3
 	for parte_oleada in Director.repartir(presupuesto, _plan.get("reparto", [0.3, 0.3, 0.4])):
 		var parte: int = parte_oleada
 		var grupo: Array = []
+		var elites: Array = []
 		while parte > 0:
-			var elegido: Array = _elegir_enemigo(parte)
+			var elegido: Array = _elegir_enemigo(parte, rng)
 			grupo.append(elegido[0])
+			elites.append(Enemigo.tirar_rango(rng, elegido[0], prob, puede_raro, puede_elite))
 			parte -= int(elegido[1])
 		oleadas.append(grupo)
+		_elites.append(elites)
 	return oleadas
 
 
-func _elegir_enemigo(presupuesto: int) -> Array:
+func _elegir_enemigo(presupuesto: int, rng: RandomNumberGenerator) -> Array:
 	var validos: Array = []
 	var suma := 0.0
 	for fila in CATALOGO:
 		if int(fila[1]) <= presupuesto and Juego.piso >= fila[2] and (Juego.piso > 1 or _salas_limpiadas >= fila[3]):
 			validos.append(fila)
 			suma += _peso(fila)
-	var tirada := Juego.azar.randf() * suma
+	var tirada := rng.randf() * suma
 	for fila in validos:
 		tirada -= _peso(fila)
 		if tirada <= 0.0:
@@ -570,7 +599,7 @@ func _actualizar_combate(delta: float) -> void:
 	var matado := 1.0 - float(vivos) / maxf(_oleada_base, 1.0)
 	var toca: bool = matado >= float(_plan.get("umbral", 0.6)) and _oleada_t <= ENTRE_OLEADAS - OLEADA_MINIMO
 	if not _oleadas.is_empty() and (_oleada_t <= 0.0 or toca):
-		_soltar_oleada(_oleadas.pop_front())
+		_soltar_oleada(_oleadas.pop_front(), _elites.pop_front() if not _elites.is_empty() else [])
 		_oleada_t = ENTRE_OLEADAS
 		_oleada_base = _horda.enemigos.size() + _por_nacer.size()
 		return
@@ -582,15 +611,12 @@ func _actualizar_combate(delta: float) -> void:
 
 
 ## La oleada no sale de golpe: primero se marca en el suelo dónde va a nacer cada uno.
-func _soltar_oleada(grupo: Array) -> void:
-	var azar := Juego.azar
+func _soltar_oleada(grupo: Array, elites: Array = []) -> void:
+	var azar := Juego.azar_combate  # dónde nacen depende de dónde estés: azar de la pelea
 	var mult := (1.3 + (Juego.piso - 1) * 1.1 + _salas_limpiadas * 0.08) * VIDA_ENEMIGOS  # hardcore: por piso, antes 0,8
 	if Juego.mesa >= 1:
 		mult *= 1.25
 	mult *= pow(1.22, Juego.pisos_extra()) * float(_plan.get("vida", 1.0))
-	var prob := Enemigo.prob_rangos(Juego.piso, Juego.mesa, Juego.pisos_extra(), float(_plan.get("elites", 1.0)))
-	var puede_raro := Juego.piso >= 2 or _salas_limpiadas >= 1
-	var puede_elite := Juego.piso >= 2 or _salas_limpiadas >= 3
 	var numero := _oleadas_total - _oleadas.size()
 	if _jugo.has_method("oleada"):
 		_jugo.oleada(numero, _oleadas_total)
@@ -602,7 +628,7 @@ func _soltar_oleada(grupo: Array) -> void:
 	for i in mini(grupo.size(), maxi(hueco, 0)):
 		var p := _punto_de_nacimiento(azar)
 		var espera := aviso + i * ESCALONADO_NACER
-		var rango: Array = Enemigo.tirar_rango(azar, grupo[i], prob, puede_raro, puede_elite)
+		var rango: Array = elites[i] if i < elites.size() else [0, []]
 		if _jugo.has_method("aviso_nacimiento"):
 			_jugo.aviso_nacimiento(p, espera)
 		_por_nacer.append([espera, grupo[i], p, mult, rango[0], rango[1]])
@@ -702,7 +728,7 @@ func _terminar_combate() -> void:
 	actual.limpia = true
 	Juego.progreso_sala = -1.0
 	Juego.balas_sala = 1.0
-	if actual.get("tipo") == TIPO.NORMAL:
+	if actual.get("tipo") == TIPO.NORMAL and not Juego.diario:
 		Juego.presion = Director.ajustar(Juego.presion, _golpes_sala, _propina_t > 0.0 and _sala_t <= _propina_t)
 	_cobrar_propina()
 	if Juego.nivel_fiebre() >= 3:
@@ -727,7 +753,7 @@ func _terminar_combate() -> void:
 		actual["emboscada"] = false
 		return  # la emboscada era un castigo: ni cuenta como sala ni deja carta
 	_salas_limpiadas += 1
-	if Juego.azar.randf() < _prob_carta:
+	if Juego.azar_para(int(actual.semilla), "carta").randf() < _prob_carta:
 		_prob_carta = 0.4
 		_crear_recogible(Recogible.Clase.CARTA, "res://assets/objetos/carta_suelo.png", Sala.CENTRO)
 	else:
@@ -742,13 +768,13 @@ func _al_morir_enemigo(posicion: Vector2, oro_prob: float, tipo: String, monedas
 		Juego.curar(1)
 	for _i in monedas:
 		_soltar_moneda(posicion)
-	if Juego.azar.randf() < oro_prob:
+	if Juego.azar_combate.randf() < oro_prob:
 		_soltar_moneda(posicion)
 	if tipo == "jefe":
 		sacudir(8.0)
 		Juego.curar(1)  # hardcore: un jefe ya solo devuelve medio corazón
 		Sonido.tocar("jefe_muere")
-		Juego.novedades += Progreso.al_vencer_jefe(Juego.jefe_del_piso(), Juego.azar)
+		Juego.novedades += Progreso.al_vencer_jefe(Juego.jefe_del_piso(), Juego.azar_combate)
 		if _sin_golpes:
 			Juego.marcar_logro("sin_tocar")
 		if not _ordago_en_sala:
@@ -854,6 +880,7 @@ func _texto_danio(posicion: Vector2, cantidad: float, color: Color) -> void:
 func _al_golpear_jugador() -> void:
 	_sin_golpes = false
 	_golpes_sala += 1
+	Juego.golpes += 1
 	_jugo.golpe_jugador()
 	if Juego.vida <= 0:
 		_jugo.cine(2.5, jugador.position, 0.1)
@@ -1016,7 +1043,7 @@ func _crear_salida_jefe(recien_ganado := false) -> void:
 	if recien_ganado or not actual.get("premio_cogido", true):
 		var id: String = actual.get("premio", "")
 		if id == "":
-			id = Juego.robar_objeto()
+			id = Juego.robar_objeto([], Juego.azar_para(int(actual.semilla), "premio"))
 			actual["premio"] = id
 			actual["premio_cogido"] = false
 		if id != "":
@@ -1125,7 +1152,7 @@ func _crear_premio_tesoro() -> void:
 		return
 	var id: String = actual.get("premio", "")
 	if id == "":
-		id = Juego.robar_objeto()
+		id = Juego.robar_objeto([], Juego.azar_para(int(actual.semilla), "premio"))
 		actual["premio"] = id
 	if id != "":
 		_crear_objeto_suelo(id, Sala.CENTRO + Vector2(46, 0))
@@ -1149,9 +1176,10 @@ func _crear_tienda() -> void:
 
 
 func _llenar_tienda() -> void:
-	for id in Juego.robar_cartas(3):
+	var rng := Juego.azar_para(int(actual.semilla), "tienda")
+	for id in Juego.robar_cartas(3, 0.0, rng):
 		actual.tienda.append({"id": id, "precio": Juego.precio_final(CartasDB.PRECIO_RAREZA[CartasDB.CARTAS[id].rareza])})
-	var objeto := Juego.robar_objeto()
+	var objeto := Juego.robar_objeto([], rng)
 	if objeto != "":
 		actual.tienda.append({"id": PREFIJO_OBJETO + objeto, "precio": Juego.precio_final(ObjetosDB.PRECIO)})
 	actual.tienda.append({"id": ARTICULO_CORAZON, "precio": Juego.precio_final(PRECIO_CORAZON)})
@@ -1355,7 +1383,10 @@ func comprar(r: Recogible) -> void:
 
 func _rebarajar(r: Recogible) -> void:
 	r.datos["precio"] = int(r.datos.precio) + 3
-	var nuevas := Juego.robar_cartas(3)
+	# Cada vez que rebarajas sale la siguiente tanda de esa tienda: la misma para todos.
+	var veces := int(actual.get("rebarajadas", 0)) + 1
+	actual["rebarajadas"] = veces
+	var nuevas := Juego.robar_cartas(3, 0.0, Juego.azar_para(int(actual.semilla), "rebarajar%d" % veces))
 	var i := 0
 	for articulo in actual.tienda:
 		if CartasDB.CARTAS.has(articulo.id) and not articulo.get("vendido", false):
@@ -1404,19 +1435,19 @@ func recogido(r: Recogible) -> void:
 		Recogible.Clase.CARTA:
 			r.queue_free()
 			Sonido.tocar("carta_coger")
-			abrir_selector(Juego.robar_cartas(2), Idioma.t("ELIGE UNA CARTA"))
+			abrir_selector(Juego.robar_cartas(2, 0.0, Juego.azar_para(int(actual.semilla), "eleccion")), Idioma.t("ELIGE UNA CARTA"))
 		Recogible.Clase.EVENTO:
 			if actual.get("evento_hecho", false) or _panel.visible:
 				return
 			get_tree().paused = true
-			_panel.abrir(actual.evento)
+			_panel.abrir(actual.evento, Juego.azar_para(int(actual.semilla), "evento"))
 		Recogible.Clase.COFRE:
 			if actual.cofre_abierto:
 				return
 			actual.cofre_abierto = true
 			r.frame = 1
 			Sonido.tocar("carta_coger")
-			abrir_selector(Juego.robar_cartas(3, 1.5), Idioma.t("¡TESORO!"))
+			abrir_selector(Juego.robar_cartas(3, 1.5, Juego.azar_para(int(actual.semilla), "cofre")), Idioma.t("¡TESORO!"))
 		Recogible.Clase.OBJETO:
 			actual["premio_cogido"] = true
 			r.queue_free()
@@ -1506,5 +1537,10 @@ func _acabar(gano: bool) -> void:
 		Juego.novedades += Progreso.al_terminar_partida()
 	Juego.revisar_logros(gano)
 	if Juego.diario:
-		Progreso.registrar_reto(Juego.fecha_hoy(), Juego.puntos_reto(gano))
+		var resumen := Juego.resumen_reto(gano)
+		if Juego.reto_puntuable:
+			Progreso.registrar_reto_puntuable(resumen)
+			_online.enviar_reto(resumen)
+		else:
+			Progreso.registrar_practica(Juego.fecha_reto, int(resumen.puntos))
 	_pantalla.mostrar_final(gano)

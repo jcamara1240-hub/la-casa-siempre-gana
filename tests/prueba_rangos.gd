@@ -96,21 +96,29 @@ func _correr() -> void:
 		"no se dan modificadores sin sentido (bufón que ya salta, cámara quieta...)")
 
 	# ---- la oleada entera sale igual con la misma semilla (reto diario)
-	var grupo: Array = []
-	for i in 30:
-		grupo.append(["ficha", "dado", "maton", "botones", "crupier"][i % 5])
+	# Los rangos se deciden al planear la sala, con el azar de la sala.
 	J.piso = 3
+	var rng := RandomNumberGenerator.new()
+	rng.seed = 777
+	var oleadas_1: Array = m._planificar_oleadas(rng)
+	var rangos_1: Array = m._elites.duplicate(true)
+	rng.seed = 777
+	var oleadas_2: Array = m._planificar_oleadas(rng)
+	var rangos_2: Array = m._elites.duplicate(true)
+	_ok(oleadas_1 == oleadas_2 and rangos_1 == rangos_2 and not oleadas_1.is_empty(), "la misma semilla da las mismas oleadas con los mismos rangos")
+	var hubo_rango := false
+	for semilla in 20:
+		rng.seed = semilla
+		m._planificar_oleadas(rng)
+		for oleada in m._elites:
+			for r in oleada:
+				if int(r[0]) > 0:
+					hubo_rango = true
 	m._por_nacer.clear()
-	J.azar.seed = 777
-	m._soltar_oleada(grupo)
-	var primera: Array = m._por_nacer.map(func(p): return [p[1], p[4], p[5]])
+	m._soltar_oleada(oleadas_1[0], rangos_1[0])
+	var nacen: Array = m._por_nacer.map(func(p): return [p[4], p[5]])
 	m._por_nacer.clear()
-	J.azar.seed = 777
-	m._soltar_oleada(grupo)
-	var segunda: Array = m._por_nacer.map(func(p): return [p[1], p[4], p[5]])
-	m._por_nacer.clear()
-	_ok(primera == segunda and primera.size() == 30, "la misma semilla da la misma oleada con los mismos rangos")
-	var hubo_rango := primera.any(func(p): return int(p[1]) > 0)
+	_ok(nacen == rangos_1[0].slice(0, nacen.size()), "la oleada nace con los rangos que traía el plan")
 	_ok(hubo_rango, "y en el piso 3 trae algún raro o élite")
 
 	# ---- un raro
@@ -166,10 +174,11 @@ func _correr() -> void:
 	_ok(herido.vida > vida_herido, "Vampírico: cura a los que tiene cerca")
 
 	# ---- divisor y explosivo, al morir
-	for e in horda.enemigos.duplicate():
+	var viejos: Array = horda.enemigos.duplicate()
+	horda.crear("ficha", Sala.CENTRO + Vector2(200, 80), 1.0)  # que la sala no se quede vacía y acabe la pelea
+	for e in viejos:
 		e.muerto = true
 	await _esperar(2)
-	horda.crear("ficha", Sala.CENTRO + Vector2(200, 80), 1.0)  # que la sala no se quede vacía
 	var divisor = horda.crear("sota", Sala.CENTRO + Vector2(-150, -40), 1.0)
 	divisor.hacer_rango(RARO, ["divisor"])
 	divisor._nacer = 0.0

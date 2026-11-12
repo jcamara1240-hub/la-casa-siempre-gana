@@ -24,6 +24,11 @@ static var contadores: Dictionary = {}
 static var personajes_ganadores: Array = []
 static var reto_fecha := ""
 static var reto_mejor := 0
+# Un intento puntuable por día: el primero que empiezas. Los demás son de práctica.
+static var reto_empezado := ""  # fecha del último intento puntuable empezado
+static var reto_detalle: Dictionary = {}  # resumen del intento puntuable de reto_fecha
+static var reto_practica_fecha := ""
+static var reto_practica := 0  # mejor marca de práctica de reto_practica_fecha
 
 
 static func cargar() -> void:
@@ -45,6 +50,10 @@ static func cargar() -> void:
 	personajes_ganadores = cfg.get_value("progreso", "personajes_ganadores", [])
 	reto_fecha = cfg.get_value("progreso", "reto_fecha", "")
 	reto_mejor = cfg.get_value("progreso", "reto_mejor", 0)
+	reto_empezado = cfg.get_value("progreso", "reto_empezado", "")
+	reto_detalle = cfg.get_value("progreso", "reto_detalle", {})
+	reto_practica_fecha = cfg.get_value("progreso", "reto_practica_fecha", "")
+	reto_practica = cfg.get_value("progreso", "reto_practica", 0)
 
 
 static func guardar() -> void:
@@ -64,6 +73,10 @@ static func guardar() -> void:
 	cfg.set_value("progreso", "personajes_ganadores", personajes_ganadores)
 	cfg.set_value("progreso", "reto_fecha", reto_fecha)
 	cfg.set_value("progreso", "reto_mejor", reto_mejor)
+	cfg.set_value("progreso", "reto_empezado", reto_empezado)
+	cfg.set_value("progreso", "reto_detalle", reto_detalle)
+	cfg.set_value("progreso", "reto_practica_fecha", reto_practica_fecha)
+	cfg.set_value("progreso", "reto_practica", reto_practica)
 	cfg.save(RUTA)
 
 
@@ -159,6 +172,41 @@ static func registrar_reto(fecha: String, puntos: int) -> void:
 	else:
 		reto_mejor = maxi(reto_mejor, puntos)
 	guardar()
+
+
+## ¿El próximo intento de esa fecha cuenta? Solo si aún no has empezado ninguno puntuable.
+static func reto_puntuable(fecha: String) -> bool:
+	return reto_empezado != fecha
+
+
+## Al empezar el intento puntuable ya queda gastado, aunque lo abandones: así no se puede
+## reiniciar hasta que salga una buena partida.
+static func empezar_reto_puntuable(fecha: String) -> void:
+	reto_empezado = fecha
+	guardar()
+
+
+## El intento puntuable terminado: su marca y su resumen (piso, tiempo...) para enseñarlo.
+static func registrar_reto_puntuable(resumen: Dictionary) -> void:
+	var fecha := String(resumen.get("fecha", ""))
+	var antes := reto_mejor_hoy(fecha)
+	registrar_reto(fecha, int(resumen.get("puntos", 0)))
+	if int(resumen.get("puntos", 0)) >= antes:
+		reto_detalle = resumen.duplicate()
+	guardar()
+
+
+static func registrar_practica(fecha: String, puntos: int) -> void:
+	if reto_practica_fecha != fecha:
+		reto_practica_fecha = fecha
+		reto_practica = puntos
+	else:
+		reto_practica = maxi(reto_practica, puntos)
+	guardar()
+
+
+static func practica_hoy(fecha: String) -> int:
+	return reto_practica if reto_practica_fecha == fecha else 0
 
 
 static func anotar_transformacion(id: String) -> Array:

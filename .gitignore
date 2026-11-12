@@ -4,3 +4,6 @@
 __pycache__/
 /builds/
 *.keystore
+
+# Configuración de la tabla mundial (claves del dueño): nunca al repositorio
+/online.cfg
