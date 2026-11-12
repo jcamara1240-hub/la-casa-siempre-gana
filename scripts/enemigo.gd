@@ -332,7 +332,8 @@ func _tick_mods(delta: float, horda: Horda, dist: float) -> void:
 		if _vampiro_t <= 0.0:
 			_vampiro_t = VAMPIRO_SEG
 			for otro in horda.en_radio(position, VAMPIRO_RADIO):
-				if not (otro is Jefe) and otro.vida < otro.vida_max:
+				# Solo cura a la tropa normal: ni a sí mismo ni a otros raros o élites, o habría salas imposibles de limpiar.
+				if otro != self and otro.rango == Rango.NORMAL and not (otro is Jefe) and otro.vida < otro.vida_max:
 					otro.vida = minf(otro.vida + otro.vida_max * VAMPIRO_CURA, otro.vida_max)
 	if mods.has("salto"):
 		_salto_t -= delta

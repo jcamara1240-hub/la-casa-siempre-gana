@@ -28,6 +28,7 @@ Solo te mueves. Tu personaje ataca por su cuenta, y lo que hace depende de una f
 - Modo infinito: al ganar puedes seguir bajando con lo que llevas, y cada piso es peor que el anterior.
 - Se puede jugar en el móvil, con un joystick que aparece donde pones el dedo.
 - Se puede jugar con mando, con vibración y ayudas con los botones de cada marca.
+- Cooperativo local para dos jugadores en la misma pantalla: cada uno con sus corazones, una fila de cartas compartida y reanimaciones.
 - En español, inglés, portugués de Brasil, francés, alemán e italiano.
 
 | | |
@@ -84,6 +85,8 @@ La última ronda va de que ganar cueste de verdad, sin daño que no se pueda esq
 ## Controles
 
 Con mando: stick o cruceta para moverte, A/Cruz o RB para la voltereta, X/Cuadrado o LB para el órdago, Y/Triángulo para interactuar, Select para ordenar las cartas y Start para pausar.
+
+Cooperativo: en la selección de personaje, el segundo jugador se une con Start en otro mando o con Ctrl derecho en el teclado (flechas para moverse, Ctrl derecho o Intro para la voltereta, Mayús derecha para el órdago y Fin para interactuar).
 
 Con teclado: WASD o flechas para moverte, Espacio o Shift (o clic derecho) para la voltereta, Q o F para el órdago, E para volcar una mesa o comprar, ratón para arrastrar cartas cuando la sala está limpia y Esc para pausar. En el móvil, desliza el dedo por la sala para andar; la voltereta y el órdago tienen su propio botón y las cartas se arrastran igual.
 
