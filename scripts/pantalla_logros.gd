@@ -46,8 +46,7 @@ func _gui_input(evento: InputEvent) -> void:
 
 
 func _unhandled_input(evento: InputEvent) -> void:
-	if visible and evento is InputEventKey and evento.pressed and not evento.echo \
-			and evento.keycode in [KEY_ESCAPE, KEY_ENTER, KEY_KP_ENTER]:
+	if visible and Mando.tecla(evento) in [KEY_ESCAPE, KEY_ENTER, KEY_KP_ENTER]:
 		_volver()
 		get_viewport().set_input_as_handled()
 

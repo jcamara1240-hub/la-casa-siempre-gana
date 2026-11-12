@@ -88,6 +88,8 @@ func _unhandled_input(evento: InputEvent) -> void:
 		pide = evento.physical_keycode == KEY_SPACE or evento.physical_keycode == KEY_SHIFT
 	elif evento is InputEventMouseButton and evento.pressed:
 		pide = evento.button_index == MOUSE_BUTTON_RIGHT
+	elif Mando.es_mando(evento):
+		pide = Mando.accion(evento) == "voltereta"
 	if pide:
 		pedir_voltereta()
 		get_viewport().set_input_as_handled()
@@ -139,7 +141,7 @@ func voltereta_lista() -> bool:
 	return not rodando() and _enfriamiento <= 0.0
 
 
-## Teclado, ratón, botón táctil o el bot: se apunta y sale en cuanto se pueda.
+## Teclado, ratón, mando, botón táctil o el bot: se apunta y sale en cuanto se pueda.
 func pedir_voltereta() -> void:
 	_pedida = VOLTERETA_MEMORIA
 
@@ -253,6 +255,9 @@ func _leer_direccion() -> Vector2:
 	var y := _eje(KEY_W, KEY_UP, KEY_S, KEY_DOWN)
 	# normalized() evita que en diagonal se corra más que en línea recta.
 	var direccion := Vector2(x, y).normalized()
+	# El mando: stick analógico (con zona muerta) o cruceta. Salvo si está ordenando cartas.
+	if direccion == Vector2.ZERO and not Mando.bloqueado:
+		direccion = Mando.direccion()
 	if Juego.direccion_tactil != Vector2.ZERO:
 		direccion = Juego.direccion_tactil
 	if Juego.stat("tambaleo") > 0.0 and direccion != Vector2.ZERO:

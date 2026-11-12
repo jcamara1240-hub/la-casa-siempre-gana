@@ -96,9 +96,10 @@ func _gui_input(evento: InputEvent) -> void:
 
 
 func _unhandled_input(evento: InputEvent) -> void:
-	if not visible or not (evento is InputEventKey) or not evento.pressed or evento.echo:
+	if not visible:
 		return
-	match evento.keycode:
+	# Con el mando: cruceta o stick, A empieza, B vuelve y X cambia el modo.
+	match Mando.tecla(evento):
 		KEY_LEFT, KEY_A:
 			_indice = wrapi(_indice - 1, 0, _ids.size())
 			Sonido.tocar("mover")
@@ -138,6 +139,8 @@ func _draw() -> void:
 	draw_rect(CAJA_EXTREMO, Color8(143, 35, 64) if _modo > 0 else Color8(42, 31, 61))
 	draw_rect(CAJA_EXTREMO, COLOR_ROJO_CLARO, false, 1.0)
 	var estado := Idioma.t(["NORMAL", "EXTREMO", "IMPOSIBLE"][_modo])
+	if Mando.activo:
+		estado += "  [%s]" % Mando.nombre_boton(JOY_BUTTON_X)
 	_centrado(Juego.fuente, 8, Idioma.t("MODO: %s") % estado, CAJA_EXTREMO.position.x, CAJA_EXTREMO.size.x, 293, COLOR_CREMA)
 	var libre := Progreso.personaje_libre(_ids[_indice])
 	draw_rect(CAJA_EMPEZAR, Color8(122, 90, 160) if libre else Color8(42, 31, 61))

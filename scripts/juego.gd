@@ -132,6 +132,7 @@ func cargar_ajustes() -> void:
 		pantalla_completa = cfg.get_value("ajustes", "pantalla_completa", false)
 		volumen_musica = cfg.get_value("ajustes", "volumen_musica", 0.6)
 		volumen_efectos = cfg.get_value("ajustes", "volumen_efectos", 0.8)
+		Mando.vibracion = cfg.get_value("ajustes", "vibracion", true)
 	_aplicar_pantalla()
 
 
@@ -143,6 +144,7 @@ func guardar_ajustes() -> void:
 	cfg.set_value("ajustes", "pantalla_completa", pantalla_completa)
 	cfg.set_value("ajustes", "volumen_musica", volumen_musica)
 	cfg.set_value("ajustes", "volumen_efectos", volumen_efectos)
+	cfg.set_value("ajustes", "vibracion", Mando.vibracion)
 	cfg.save(RUTA_AJUSTES)
 
 

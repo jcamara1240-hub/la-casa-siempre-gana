@@ -1,6 +1,8 @@
 class_name BarraCartas
 extends Control
 ## La fila de cartas de abajo: arrastrar, ver el combo y leer cada carta.
+## Con el mando hay un "modo cartas" (botón Select/View/Share/-, con la sala limpia): la cruceta
+## elige carta, A la coge y la suelta en otro sitio, B o Select salen.
 
 signal sustitucion_elegida(ranura: int)
 signal sustitucion_cancelada
@@ -12,6 +14,7 @@ const ORIGEN := Vector2(6, 6)
 var en_combate := false
 var modo_sustituir := false
 var info_externa: Dictionary = {}  # lo que señalas fuera de la fila: objetos, artículos
+var modo_cartas := false  # ordenando la fila con el mando
 
 var _cartas_tex := {}
 var _hueco_tex: Texture2D = load("res://assets/cartas/_hueco.png")
@@ -34,6 +37,7 @@ var _paso_n := 0
 var _refresco_t := 0.0
 var _etiqueta_dur := 0.45
 var _t := 0.0
+var _cursor := 0  # la ranura señalada con el mando (modo cartas y fila llena)
 
 const COLOR_FONDO := Color8(20, 16, 30)
 const COLOR_CREMA := Color8(247, 236, 210)
@@ -156,7 +160,113 @@ func _process(delta: float) -> void:
 	if en_combate and _refresco_t <= 0.0 and not get_tree().paused:
 		_refresco_t = 0.25
 		_marcar_sin_efecto()
+	# Si empieza una pelea o se abre algo encima, el modo cartas se cierra solo.
+	if modo_cartas and (en_combate or get_tree().paused or modo_sustituir):
+		salir_modo_cartas()
 	queue_redraw()
+
+
+# ------------------------------------------------------------ mando
+## Con el mando, la fila se maneja aquí antes que nadie: así A no rueda mientras ordenas.
+func _input(evento: InputEvent) -> void:
+	if not Mando.es_mando(evento):
+		return
+	if modo_sustituir:
+		_mando_sustituir(evento)
+	elif modo_cartas:
+		_mando_cartas(evento)
+	elif Mando.accion(evento) == "cartas" and not get_tree().paused:  # en los menús, Select es "volver"
+		if puede_ordenar():
+			entrar_modo_cartas()
+		else:
+			Sonido.tocar("perder")
+		get_viewport().set_input_as_handled()
+
+
+func puede_ordenar() -> bool:
+	return not en_combate and not modo_sustituir and not get_tree().paused and not Juego.cartas.is_empty()
+
+
+func entrar_modo_cartas() -> void:
+	modo_cartas = true
+	Mando.bloqueado = true
+	_cursor = clampi(_cursor, 0, Juego.cartas.size() - 1)
+	_sobre = _cursor
+	Sonido.tocar("clic")
+	queue_redraw()
+
+
+## Sale del modo cartas; si llevabas una carta cogida, vuelve a su sitio.
+func salir_modo_cartas() -> void:
+	modo_cartas = false
+	Mando.bloqueado = false
+	_sobre = -1
+	if _arrastrando != -1:
+		_arrastrando = -1
+		_destino = -1
+		_recalcular()
+	queue_redraw()
+
+
+func _mando_cartas(evento: InputEvent) -> void:
+	# Start sale del modo y sigue su camino: pausa.
+	if Mando.accion(evento) == "pausa":
+		salir_modo_cartas()
+		return
+	var tecla := Mando.tecla_mando(evento)
+	get_viewport().set_input_as_handled()  # el stick tampoco mueve al jugador
+	match tecla:
+		KEY_LEFT, KEY_RIGHT:
+			_mover_cursor(-1 if tecla == KEY_LEFT else 1)
+			if _arrastrando != -1:
+				_destino = _cursor
+				_recalcular()
+		KEY_ENTER:
+			if _arrastrando == -1:
+				if Juego.cartas[_cursor] != "":
+					_arrastrando = _cursor
+					_destino = _cursor
+					Sonido.tocar("carta_coger")
+					_recalcular()
+			else:
+				Sonido.tocar("clic")
+				_soltar()
+		KEY_ESCAPE:
+			# B con una carta cogida la devuelve; sin carta (o con Select), se sale.
+			if _arrastrando != -1 and Mando.accion(evento) != "cartas":
+				_arrastrando = -1
+				_destino = -1
+				_recalcular()
+			else:
+				salir_modo_cartas()
+			Sonido.tocar("clic")
+
+
+## La fila está llena y llega una carta: la cruceta elige cuál se cambia, A la cambia, B cancela.
+func _mando_sustituir(evento: InputEvent) -> void:
+	var tecla := Mando.tecla_mando(evento)
+	if tecla == KEY_NONE:
+		return
+	get_viewport().set_input_as_handled()
+	match tecla:
+		KEY_LEFT, KEY_RIGHT:
+			_mover_cursor(-1 if tecla == KEY_LEFT else 1)
+		KEY_ENTER:
+			if _cursor < Juego.cartas.size() and Juego.cartas[_cursor] != "":
+				sustitucion_elegida.emit(_cursor)
+		KEY_ESCAPE:
+			sustitucion_cancelada.emit()
+
+
+func _mover_cursor(paso: int) -> void:
+	_cursor = wrapi(_cursor + paso, 0, maxi(Juego.cartas.size(), 1))
+	_sobre = _cursor
+	Sonido.tocar("mover")
+
+
+## Se ve el cursor del mando: en el modo cartas y cuando hay que elegir cuál cambiar.
+func _cursor_visible() -> bool:
+	return modo_cartas or (modo_sustituir and Mando.activo)
 
 
 func _ranura_en(p: Vector2) -> int:
@@ -248,7 +358,9 @@ func _draw() -> void:
 		_dibujar_multiplicador(i, carta)
 		if rebote > 0.0:
 			_dibujar_disparo(carta, rebote)
-	if _arrastrando != -1:
+	if _cursor_visible():
+		_dibujar_cursor()
+	elif _arrastrando != -1:
 		draw_texture(_textura(Juego.cartas[_arrastrando]), _raton - Vector2(16, 22))
 	_dibujar_combo()
 	_dibujar_info()
@@ -289,6 +401,28 @@ func _dibujar_disparo(carta: Rect2, rebote: float) -> void:
 
 
 ## La raya de arriba de la fila se calienta con la Fiebre y arde desatada.
+## El cursor del mando: marco dorado y una flecha encima. La carta cogida va levantada
+## sobre la ranura donde caería, y arriba se recuerda qué hace cada botón.
+func _dibujar_cursor() -> void:
+	_cursor = clampi(_cursor, 0, maxi(Juego.cartas.size() - 1, 0))
+	var p := ORIGEN + Vector2(_cursor * ANCHO_RANURA, 0)
+	var cogida := _arrastrando != -1 and modo_cartas
+	var subir := 5.0 if cogida else 0.0
+	var carta := Rect2(p + Vector2(0, -subir), Vector2(32, 44))
+	if cogida:
+		draw_texture(_textura(Juego.cartas[_arrastrando]), carta.position)
+	var brillo := 0.75 + 0.25 * sin(_t * 8.0)
+	draw_rect(carta.grow(2.0), Color(COLOR_ORO, brillo), false, 1.0)
+	var c := Vector2(carta.get_center().x, carta.position.y - 4.0).round()
+	draw_colored_polygon(PackedVector2Array([c + Vector2(-3, -3), c + Vector2(3, -3), c + Vector2(0, 0)]), COLOR_ORO)
+	if not modo_cartas:
+		return
+	var ayuda := Idioma.t("CRUCETA: ELEGIR   %s: COGER Y SOLTAR   %s: SALIR") % [Mando.nombre("aceptar"), Mando.nombre("volver")]
+	var ancho: float = Juego.fuente.get_string_size(ayuda, HORIZONTAL_ALIGNMENT_LEFT, -1, 8).x
+	draw_rect(Rect2(2, -15, ancho + 8, 11), Color(COLOR_FONDO, 0.85))
+	draw_string(Juego.fuente, Vector2(6, -7), ayuda, HORIZONTAL_ALIGNMENT_LEFT, -1, 8, COLOR_ORO)
+
+
 func _dibujar_borde() -> void:
 	var borde := COLOR_MARCO
 	var fiebre := clampf(Juego.fiebre / 3.0, 0.0, 1.0)
@@ -330,6 +464,10 @@ func _dibujar_info() -> void:
 	var ancho := 222.0
 	if modo_sustituir:
 		var aviso_fila := "FILA LLENA. TOCA LA CARTA QUE QUIERAS CAMBIAR O TOCA AQUÍ PARA CANCELAR." if Juego.tactil else "FILA LLENA. HAZ CLIC EN LA CARTA QUE QUIERAS CAMBIAR. CLIC DERECHO: CANCELAR."
+		if Mando.activo:
+			_parrafo(Idioma.t("FILA LLENA. ELIGE CON LA CRUCETA LA CARTA QUE QUIERAS CAMBIAR. %s: CAMBIAR. %s: CANCELAR.") % [
+					Mando.nombre("aceptar"), Mando.nombre("volver")], x, ancho, COLOR_ORO)
+			return
 		_parrafo(Idioma.t(aviso_fila), x, ancho, COLOR_ORO)
 		return
 	if not info_externa.is_empty():
@@ -349,6 +487,8 @@ func _dibujar_info() -> void:
 		_parrafo(CartasDB.descripcion(id), x, ancho, COLOR_CREMA, 27)
 	elif en_combate:
 		_parrafo(Idioma.t("LAS CARTAS SE COLOCAN CUANDO LA SALA ESTÉ LIMPIA."), x, ancho, COLOR_GRIS)
+	elif Mando.activo:
+		_parrafo(Idioma.t("%s: ORDENAR LAS CARTAS. SE EJECUTAN DE IZQUIERDA A DERECHA.") % Mando.nombre("cartas"), x, ancho, COLOR_GRIS)
 	else:
 		_parrafo(Idioma.t("ARRASTRA LAS CARTAS PARA CAMBIAR EL ORDEN. SE EJECUTAN DE IZQUIERDA A DERECHA."), x, ancho, COLOR_GRIS)
 

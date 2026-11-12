@@ -45,9 +45,9 @@ func _gui_input(evento: InputEvent) -> void:
 
 
 func _unhandled_input(evento: InputEvent) -> void:
-	if not visible or not (evento is InputEventKey) or not evento.pressed or evento.echo:
+	if not visible:
 		return
-	match evento.keycode:
+	match Mando.tecla(evento):
 		KEY_ENTER, KEY_KP_ENTER, KEY_SPACE: _jugar()
 		KEY_ESCAPE: _volver()
 		_: return

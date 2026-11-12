@@ -35,6 +35,8 @@ var _mezclas := 0
 var _ritmo := 0.3
 var _a := 0
 var _b := 1
+var _copa_mando := -1  # con el mando: el hueco (0, 1 o 2) de la copa señalada
+var _seguro := 0.0  # al abrirse, un instante sin aceptar con el mando (ver Selector)
 var _tex_copa: Texture2D = load("res://assets/objetos/copa_trile.png")
 var _tex_moneda: Texture2D = load("res://assets/objetos/moneda.png")
 
@@ -54,12 +56,16 @@ func abrir(tipo: String) -> void:
 	_dobles = 0
 	_revelar = -1
 	_copas = [0.0, 1.0, 2.0]
+	_seguro = Selector.SEGURO_MANDO
 	visible = true
 	_menu_inicial()
 
 
 func _boton(texto: String, accion: Callable, activo := true) -> void:
 	_botones.append({"texto": texto, "accion": accion, "activo": activo})
+	# Con el mando, el cursor empieza en el primer botón que se puede pulsar.
+	if Mando.activo and activo and (_sobre == -1 or not _botones[_sobre].activo):
+		_sobre = _botones.size() - 1
 
 
 func _salir() -> void:
@@ -77,6 +83,7 @@ func _ir_a(fase: Fase, texto: String) -> void:
 	_texto = texto
 	_botones.clear()
 	_sobre = -1
+	_copa_mando = -1
 
 
 func _titulo() -> String:
@@ -319,6 +326,7 @@ func _chupito() -> void:
 func _process(delta: float) -> void:
 	if not visible:
 		return
+	_seguro = maxf(_seguro - delta, 0.0)
 	queue_redraw()
 	if _fase not in [Fase.ENSENAR, Fase.MEZCLA, Fase.LANZANDO]:
 		return
@@ -333,7 +341,9 @@ func _process(delta: float) -> void:
 			if _mezclas > 0:
 				_siguiente_cruce()
 			else:
-				_ir_a(Fase.ELEGIR, Idioma.t("¿DÓNDE ESTÁ? HAZ CLIC EN UNA COPA."))
+				_ir_a(Fase.ELEGIR, Idioma.t("¿DÓNDE ESTÁ? ELIGE UNA COPA.") if Mando.activo else Idioma.t("¿DÓNDE ESTÁ? HAZ CLIC EN UNA COPA."))
+				if Mando.activo:
+					_copa_mando = 1
 		Fase.LANZANDO:
 			_resolver_lanzamiento()
 
@@ -374,6 +384,51 @@ func _gui_input(evento: InputEvent) -> void:
 		var b := _boton_en(evento.position)
 		if b != -1 and _botones[b].activo:
 			_botones[b].accion.call()
+
+
+## Con el mando: arriba y abajo recorren los botones (los que se pueden pulsar), A pulsa
+## y B lleva el cursor al último, que es el de marcharse (o el de cobrar). Con las copas,
+## izquierda y derecha eligen y A levanta la señalada.
+func _unhandled_input(evento: InputEvent) -> void:
+	if not visible or not Mando.es_mando(evento):
+		return
+	var tecla := Mando.tecla_mando(evento)
+	if tecla == KEY_NONE:
+		return
+	get_viewport().set_input_as_handled()
+	if _fase == Fase.ELEGIR:
+		match tecla:
+			KEY_LEFT, KEY_RIGHT:
+				_copa_mando = clampi((_copa_mando if _copa_mando >= 0 else 1) + (-1 if tecla == KEY_LEFT else 1), 0, 2)
+				Sonido.tocar("mover")
+			KEY_ENTER:
+				if _copa_mando < 0:
+					_copa_mando = 1
+				else:
+					_elegir(_copas.find(float(_copa_mando)))
+		return
+	var activos: Array = []
+	for i in _botones.size():
+		if _botones[i].activo:
+			activos.append(i)
+	if activos.is_empty():
+		return
+	match tecla:
+		KEY_UP, KEY_DOWN:
+			var k := activos.find(_sobre)
+			k = (0 if tecla == KEY_DOWN else activos.size() - 1) if k == -1 else wrapi(k + (1 if tecla == KEY_DOWN else -1), 0, activos.size())
+			_sobre = activos[k]
+			Sonido.tocar("mover")
+		KEY_ESCAPE:
+			_sobre = activos[-1]
+			Sonido.tocar("mover")
+		KEY_ENTER:
+			if _seguro > 0.0:
+				return
+			if _sobre in activos:
+				_botones[_sobre].accion.call()
+			else:
+				_sobre = activos[0]
 
 
 func _boton_en(p: Vector2) -> int:
@@ -422,7 +477,7 @@ func _dibujar_trileros() -> void:
 	for i in 3:
 		var subir := -26.0 if i == _revelar or (_fase == Fase.RESULTADO and i == _bola) else 0.0
 		var y := 124.0 + subir + _y_arco(i)
-		var resaltar := _fase == Fase.ELEGIR and _caja_copa(i).has_point(get_local_mouse_position())
+		var resaltar := _fase == Fase.ELEGIR and (_caja_copa(i).has_point(get_local_mouse_position()) or int(_copas[i]) == _copa_mando)
 		draw_texture(_tex_copa, Vector2(_x_copa(i) - 16.0, y), Color(1.25, 1.25, 1.25) if resaltar else Color.WHITE)
 
 

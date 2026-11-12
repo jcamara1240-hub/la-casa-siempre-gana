@@ -185,10 +185,16 @@ func _gui_input(evento: InputEvent) -> void:
 
 
 func _unhandled_input(evento: InputEvent) -> void:
-	if not visible or not (evento is InputEventKey) or not evento.pressed or evento.echo:
+	if not visible:
+		return
+	# Con el mando, medio segundo de respiro: si mueres aporreando A para rodar, no te saltas el final.
+	if Mando.es_mando(evento) and _t < 0.5:
+		return
+	var tecla := Mando.tecla(evento)  # el mando hace de teclas: A acepta, B sale
+	if tecla == KEY_NONE:
 		return
 	if _hay_oferta():
-		match evento.keycode:
+		match tecla:
 			KEY_LEFT, KEY_RIGHT, KEY_A, KEY_D:
 				_opcion = 1 - _opcion
 				Sonido.tocar("clic")
@@ -200,7 +206,7 @@ func _unhandled_input(evento: InputEvent) -> void:
 				return
 		get_viewport().set_input_as_handled()
 		return
-	if evento.keycode not in [KEY_ENTER, KEY_KP_ENTER, KEY_SPACE, KEY_ESCAPE]:
+	if tecla not in [KEY_ENTER, KEY_KP_ENTER, KEY_SPACE, KEY_ESCAPE]:
 		return
 	get_viewport().set_input_as_handled()
 	_avanzar()
@@ -238,7 +244,7 @@ func _draw() -> void:
 	if _hay_oferta():
 		_dibujar_oferta()
 	elif animacion_terminada() and fmod(_t, 1.0) < 0.65:
-		draw_string(Juego.fuente, Vector2(0, 352), Idioma.t("TOCA PARA CONTINUAR") if Juego.tactil else Idioma.t("PULSA ENTER"), HORIZONTAL_ALIGNMENT_CENTER, 640, 8, Color8(108, 207, 148))
+		draw_string(Juego.fuente, Vector2(0, 352), Idioma.t("TOCA PARA CONTINUAR") if Juego.tactil else (Idioma.t("PULSA %s") % Mando.nombre("aceptar")) if Mando.activo else Idioma.t("PULSA ENTER"), HORIZONTAL_ALIGNMENT_CENTER, 640, 8, Color8(108, 207, 148))
 
 
 func _dibujar_oferta() -> void:

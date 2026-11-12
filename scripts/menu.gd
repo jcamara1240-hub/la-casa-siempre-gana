@@ -1,6 +1,6 @@
 class_name Menu
 extends Control
-## Menú principal, opciones y pausa. Funciona con ratón y con teclado.
+## Menú principal, opciones y pausa. Funciona con ratón, teclado y mando.
 
 signal jugar
 signal continuar
@@ -68,7 +68,7 @@ func _ir_a(vista: Vista) -> void:
 		Vista.PAUSA:
 			_items = ["continuar", "opciones", "portada"]
 		Vista.OPCIONES:
-			_items = ["idioma", "musica", "efectos", "sacudida", "numeros", "volver"]
+			_items = ["idioma", "musica", "efectos", "sacudida", "numeros", "vibracion", "volver"]
 			if not web:
 				_items.insert(3, "pantalla")
 	queue_redraw()
@@ -125,9 +125,19 @@ func _gui_input(evento: InputEvent) -> void:
 
 
 func _unhandled_input(evento: InputEvent) -> void:
-	if not visible or not (evento is InputEventKey) or not evento.pressed or evento.echo:
+	if not visible:
 		return
-	match evento.keycode:
+	# Start en la pausa (o en las opciones abiertas desde ella) vuelve a la partida.
+	if Mando.accion(evento) == "pausa" and _vista != Vista.PRINCIPAL:
+		if _desde_pausa:
+			Sonido.tocar("clic")
+			cerrar()
+			continuar.emit()
+		else:
+			_atras()
+		get_viewport().set_input_as_handled()
+		return
+	match Mando.tecla(evento):
 		KEY_UP, KEY_W:
 			_indice = wrapi(_indice - 1, 0, _items.size())
 			Sonido.tocar("mover")
@@ -205,6 +215,10 @@ func _activar(id: String, sentido: int) -> void:
 		"numeros":
 			Juego.numeros_dano = not Juego.numeros_dano
 			Juego.guardar_ajustes()
+		"vibracion":
+			Mando.vibracion = not Mando.vibracion
+			Juego.guardar_ajustes()
+			Mando.vibrar(Mando.VIBRAR_GOLPE)  # para notar cómo es
 
 
 ## Va de diez en diez y da la vuelta: con Enter se puede llegar a cualquier valor.
@@ -235,6 +249,7 @@ func _texto(id: String) -> String:
 		"pantalla": return Idioma.t("PANTALLA COMPLETA: %s") % _si_no(Juego.pantalla_completa)
 		"sacudida": return Idioma.t("SACUDIDA DE PANTALLA: %s") % _si_no(Juego.sacudida)
 		"numeros": return Idioma.t("NÚMEROS DE DAÑO: %s") % _si_no(Juego.numeros_dano)
+		"vibracion": return Idioma.t("VIBRACIÓN DEL MANDO: %s") % _si_no(Mando.vibracion)
 	return id
 
 
@@ -286,12 +301,26 @@ func _dibujar_boton(i: int) -> void:
 
 
 func _dibujar_instrucciones() -> void:
+	var lineas := instrucciones()
+	for i in lineas.size():
+		draw_string(Juego.fuente, Vector2(0, 306 + i * 12), lineas[i], HORIZONTAL_ALIGNMENT_CENTER, 640, 8,
+				Color8(168, 154, 142))
+
+
+## Las cuatro líneas de abajo, ya traducidas: con el mando enseñan sus botones.
+func instrucciones() -> Array:
+	if Mando.activo:
+		return [
+			Idioma.t("MUÉVETE CON EL STICK O LA CRUCETA. TU PERSONAJE ATACA SOLO."),
+			Idioma.t("CADA CICLO, TUS CARTAS SE EJECUTAN DE IZQUIERDA A DERECHA."),
+			Idioma.t("EL ORDEN IMPORTA: ORDÉNALAS CON %s ENTRE SALA Y SALA.") % Mando.nombre("cartas"),
+			Idioma.t("%s: RODAR (ESQUIVAS TODO). %s: ÓRDAGO (BORRA LAS BALAS). %s: VOLCAR MESAS.") % [
+				Mando.nombre("voltereta"), Mando.nombre("ordago"), Mando.nombre("interactuar")],
+		]
 	var lineas := [
 		"DESLIZA EL DEDO POR LA SALA PARA ANDAR. TU PERSONAJE ATACA SOLO." if Juego.tactil else "MUÉVETE CON WASD O LAS FLECHAS. TU PERSONAJE ATACA SOLO.",
 		"CADA CICLO, TUS CARTAS SE EJECUTAN DE IZQUIERDA A DERECHA.",
 		"EL ORDEN IMPORTA: PONLAS BIEN ENTRE SALA Y SALA.",
 		"BOTONES DE LA DERECHA: RODAR (ESQUIVAS TODO) Y ÓRDAGO (BORRA LAS BALAS)." if Juego.tactil else "ESPACIO: RODAR (ESQUIVAS TODO). Q: ÓRDAGO (BORRA LAS BALAS). E: VOLCAR MESAS.",
 	]
-	for i in lineas.size():
-		draw_string(Juego.fuente, Vector2(0, 306 + i * 12), Idioma.t(lineas[i]), HORIZONTAL_ALIGNMENT_CENTER, 640, 8,
-				Color8(168, 154, 142))
+	return lineas.map(func(l): return Idioma.t(l))

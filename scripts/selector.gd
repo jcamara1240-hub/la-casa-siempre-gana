@@ -16,6 +16,11 @@ var _titulo := ""
 var _sobre := -2
 
 const SALTAR := -1
+# Al abrirse, un instante en el que el botón de aceptar del mando no elige: si vienes
+# aporreando A para rodar, no te llevas una carta sin mirarla.
+const SEGURO_MANDO := 0.25
+
+var _seguro := 0.0
 
 
 func _ready() -> void:
@@ -30,14 +35,16 @@ func abrir(ids: Array, titulo: String) -> void:
 	_titulo = titulo
 	# Se cargan aquí y no al pintar: una textura cargada durante _draw sale en blanco.
 	_texturas = ids.map(func(id): return CartasDB.textura(id))
-	_sobre = -2
+	_sobre = 0 if Mando.activo else -2
+	_seguro = SEGURO_MANDO
 	visible = true
 	mouse_filter = Control.MOUSE_FILTER_STOP
 	queue_redraw()
 
 
-func _process(_delta: float) -> void:
+func _process(delta: float) -> void:
 	if visible:
+		_seguro = maxf(_seguro - delta, 0.0)
 		queue_redraw()
 
 
@@ -76,6 +83,41 @@ func _gui_input(evento: InputEvent) -> void:
 			elegida.emit(_ids[e])
 
 
+## Con el mando: izquierda y derecha recorren las cartas, abajo va a "Saltar", A elige
+## y B lleva el cursor a "Saltar" (sin saltar: así no se pierde la carta sin querer).
+func _unhandled_input(evento: InputEvent) -> void:
+	if not visible or not Mando.es_mando(evento):
+		return
+	var tecla := Mando.tecla_mando(evento)
+	if tecla == KEY_NONE:
+		return
+	get_viewport().set_input_as_handled()
+	var n := _ids.size()
+	match tecla:
+		KEY_LEFT, KEY_RIGHT:
+			var paso := -1 if tecla == KEY_LEFT else 1
+			_sobre = wrapi(_sobre + paso, 0, n) if _sobre >= 0 else (0 if paso > 0 else n - 1)
+			Sonido.tocar("mover")
+		KEY_DOWN, KEY_ESCAPE:
+			if _sobre != SALTAR:
+				_sobre = SALTAR
+				Sonido.tocar("mover")
+		KEY_UP:
+			if _sobre < 0:
+				_sobre = (n - 1) / 2
+				Sonido.tocar("mover")
+		KEY_ENTER:
+			if _seguro > 0.0:
+				return
+			if _sobre == SALTAR:
+				saltada.emit()
+			elif _sobre >= 0 and _sobre < n:
+				elegida.emit(_ids[_sobre])
+			else:
+				_sobre = 0
+	queue_redraw()
+
+
 func _draw() -> void:
 	draw_rect(Rect2(0, 0, 640, 304), Color(0.06, 0.05, 0.1, 0.86))
 	var ancho_t := Juego.fuente_grande.get_string_size(_titulo, HORIZONTAL_ALIGNMENT_LEFT, -1, 16).x
@@ -88,6 +130,8 @@ func _draw() -> void:
 		var id: String = _ids[i]
 		var carta: Dictionary = CartasDB.CARTAS[id]
 		draw_texture_rect(_texturas[i], caja, false)
+		if i == _sobre and Mando.activo:
+			draw_rect(caja.grow(3.0), Color8(247, 198, 74), false, 2.0)
 		var y := 44 + ALTO + 14.0
 		var cx := caja.position.x - 20
 		var cw := caja.size.x + 40

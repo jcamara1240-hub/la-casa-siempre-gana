@@ -26,6 +26,7 @@ var _texto_info := ""
 var _cartas_por_fila := POR_FILA
 var _paso_cartas := 37.0
 var _y_transformaciones := 132.0
+var _cursor := -1  # con el mando: la casilla que miras (-1: ninguna)
 
 
 func _ready() -> void:
@@ -49,6 +50,7 @@ func _ready() -> void:
 func abrir() -> void:
 	_titulo_info = ""
 	_texto_info = ""
+	_cursor = -1
 	visible = true
 	queue_redraw()
 
@@ -85,11 +87,16 @@ func _cambiar_pagina(pagina: int) -> void:
 	_pagina = pagina
 	_titulo_info = ""
 	_texto_info = ""
+	_cursor = -1
 	Sonido.tocar("clic")
 	queue_redraw()
 
 
 func _unhandled_input(evento: InputEvent) -> void:
+	if visible and Mando.es_mando(evento):
+		_entrada_mando(Mando.tecla_mando(evento))
+		get_viewport().set_input_as_handled()
+		return
 	if visible and evento is InputEventKey and evento.pressed and evento.keycode in [KEY_LEFT, KEY_RIGHT, KEY_A, KEY_D]:
 		_cambiar_pagina(1 - _pagina)
 		get_viewport().set_input_as_handled()
@@ -98,6 +105,63 @@ func _unhandled_input(evento: InputEvent) -> void:
 			and evento.keycode in [KEY_ESCAPE, KEY_ENTER, KEY_KP_ENTER]:
 		_volver()
 		get_viewport().set_input_as_handled()
+
+
+## Con el mando: LB y RB cambian de pestaña, la cruceta o el stick recorren las casillas
+## (y se lee lo que es cada una) y B vuelve.
+func _entrada_mando(tecla: Key) -> void:
+	match tecla:
+		KEY_PAGEUP, KEY_PAGEDOWN:
+			_cambiar_pagina(1 - _pagina)
+			_mover_cursor(Vector2.ZERO)
+		KEY_LEFT: _mover_cursor(Vector2.LEFT)
+		KEY_RIGHT: _mover_cursor(Vector2.RIGHT)
+		KEY_UP: _mover_cursor(Vector2.UP)
+		KEY_DOWN: _mover_cursor(Vector2.DOWN)
+		KEY_ESCAPE: _volver()
+
+
+## Las casillas de la pestaña abierta, en orden: naipes, o bien objetos y transformaciones.
+func _casillas() -> Array:
+	var cajas: Array = []
+	if _pagina == 0:
+		for i in _cartas.size():
+			cajas.append(_caja_carta(i))
+		return cajas
+	for i in _objetos.size():
+		cajas.append(_caja_objeto(i))
+	for i in ObjetosDB.TRANSFORMACIONES.size():
+		cajas.append(_caja_transformacion(i))
+	return cajas
+
+
+## A izquierda y derecha va de una en una; arriba y abajo, a la más cercana en esa dirección.
+func _mover_cursor(hacia: Vector2) -> void:
+	var cajas := _casillas()
+	if cajas.is_empty():
+		return
+	if _cursor < 0 or _cursor >= cajas.size() or hacia == Vector2.ZERO:
+		_cursor = 0
+	elif hacia.x != 0.0:
+		_cursor = wrapi(_cursor + int(hacia.x), 0, cajas.size())
+	else:
+		var desde: Vector2 = cajas[_cursor].get_center()
+		var mejor := -1
+		var mejor_d := INF
+		for i in cajas.size():
+			var d: Vector2 = cajas[i].get_center() - desde
+			if d.y * hacia.y <= 2.0:
+				continue
+			var coste := absf(d.y) + absf(d.x) * 2.0
+			if coste < mejor_d:
+				mejor_d = coste
+				mejor = i
+		if mejor == -1:
+			return
+		_cursor = mejor
+	Sonido.tocar("mover")
+	_mirar(cajas[_cursor].get_center())
+	queue_redraw()
 
 
 func _volver() -> void:
@@ -167,3 +231,20 @@ func _draw() -> void:
 	draw_rect(CAJA_VOLVER, Color8(42, 31, 61))
 	draw_string(Juego.fuente, Vector2(CAJA_VOLVER.position.x, 350), Idioma.t("VOLVER"), HORIZONTAL_ALIGNMENT_CENTER,
 			CAJA_VOLVER.size.x, 8, COLOR_CREMA)
+	if Mando.activo:
+		_dibujar_mando()
+
+
+## Con el mando: los botones de las pestañas a los lados y un marco dorado en la casilla.
+func _dibujar_mando() -> void:
+	var izq: Rect2 = PESTANAS[0]
+	var der: Rect2 = PESTANAS[PESTANAS.size() - 1]
+	draw_string(Juego.fuente, Vector2(izq.position.x - 40, izq.position.y + 11), Mando.nombre("pestana_izq"),
+			HORIZONTAL_ALIGNMENT_RIGHT, 36, 8, COLOR_GRIS)
+	draw_string(Juego.fuente, Vector2(der.end.x + 4, der.position.y + 11), Mando.nombre("pestana_der"),
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 8, COLOR_GRIS)
+	draw_string(Juego.fuente, Vector2(CAJA_VOLVER.end.x + 6, 350), Mando.nombre("volver"),
+			HORIZONTAL_ALIGNMENT_LEFT, -1, 8, COLOR_GRIS)
+	var cajas := _casillas()
+	if _cursor >= 0 and _cursor < cajas.size():
+		draw_rect(cajas[_cursor].grow(2.0), COLOR_ORO, false, 1.0)

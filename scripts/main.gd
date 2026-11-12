@@ -170,6 +170,7 @@ func _ready() -> void:
 	_menu.continuar.connect(_reanudar)
 	_menu.ir_a_portada.connect(_ir_al_menu)
 	_crear_pantallas_extra()
+	Input.joy_connection_changed.connect(_al_cambiar_mando)
 	get_tree().paused = true
 	_menu.abrir_principal()
 	Sonido.musica("menu")
@@ -275,6 +276,19 @@ func _seguir_infinito() -> void:
 
 func _reanudar() -> void:
 	get_tree().paused = false
+
+
+## Cada evento pasa por el mando: así se sabe si lo último que se ha tocado es el mando
+## (las ayudas enseñan sus botones) o el teclado y el ratón.
+func _input(evento: InputEvent) -> void:
+	Mando.observar(evento)
+	if Juego.tactil and Mando.activo and Mando.es_mando(evento):
+		Juego.tactil = false  # un mando conectado al móvil: fuera los botones de la pantalla
+
+
+func _al_cambiar_mando(dispositivo: int, conectado: bool) -> void:
+	if not conectado:
+		Mando.olvidar(dispositivo)
 
 
 ## El botón "atrás" de Android hace de Esc.
@@ -797,6 +811,7 @@ func _al_golpear_jugador() -> void:
 	sacudir(6.0)
 	_jugo.destello(Color(0.84, 0.24, 0.31, 0.45), 0.2)
 	_jugo.parar(0.08, true)  # antes 0,1: se nota, pero no corta el ritmo
+	Mando.vibrar(Mando.VIBRAR_GOLPE)
 	if Juego.vida <= 0:
 		_perder()
 		return
@@ -835,6 +850,7 @@ func lanzar_ordago() -> void:
 	_jugo.destello(Color(1, 1, 1, 0.35), 0.25)
 	_jugo.parar(0.05, true)
 	sacudir(8.0)
+	Mando.vibrar(Mando.VIBRAR_ORDAGO)
 
 
 func _al_rozar_bala() -> void:
@@ -897,7 +913,7 @@ func _actualizar_hint_mesa() -> void:
 		return
 	var cerca := _sala.mesa_cerca(jugador.position, 12.0) != null
 	if cerca and _hint_mesa == "" and _aviso.text == "":
-		_hint_mesa = Idioma.t("E: VOLCAR LA MESA")
+		_hint_mesa = (Idioma.t("%s: VOLCAR LA MESA") % Mando.nombre("interactuar")) if Mando.activo else Idioma.t("E: VOLCAR LA MESA")
 		_aviso.text = _hint_mesa
 	elif not cerca and _hint_mesa != "":
 		if _aviso.text == _hint_mesa:
@@ -1093,7 +1109,7 @@ func _actualizar_hint_tienda() -> void:
 	var id: String = articulo.datos.id
 	if id != _articulo_mostrado:
 		_articulo_mostrado = id
-		_aviso.text = "" if Juego.tactil else Idioma.t("E: COMPRAR")
+		_aviso.text = "" if Juego.tactil else (Idioma.t("%s: COMPRAR") % Mando.nombre("interactuar")) if Mando.activo else Idioma.t("E: COMPRAR")
 		_barra.info_externa = _info_articulo(id)
 
 
@@ -1133,22 +1149,35 @@ func _info_articulo(id: String) -> Dictionary:
 
 
 func _unhandled_input(evento: InputEvent) -> void:
-	if evento is InputEventKey and evento.pressed and not evento.echo and evento.keycode == KEY_ESCAPE:
+	var del_mando: String = Mando.accion(evento)  # Start pausa, Y interactúa, X o LB órdago
+	if (evento is InputEventKey and evento.pressed and not evento.echo and evento.keycode == KEY_ESCAPE) or del_mando == "pausa":
 		quizas_pausar()
 		return
 	if get_tree().paused:
 		return
+	match del_mando:
+		"interactuar":
+			_interactuar()
+			return
+		"ordago":
+			lanzar_ordago()
+			return
 	if not (evento is InputEventKey) or not evento.pressed or evento.echo:
 		return
 	match evento.physical_keycode:
 		KEY_E:
-			var articulo := _articulo_cerca()
-			if articulo != null:
-				comprar(articulo)
-			else:
-				_sala.volcar_cerca(jugador.position, 12.0, _horda)
+			_interactuar()
 		KEY_Q, KEY_F:
 			lanzar_ordago()
+
+
+## La E (o el botón de interactuar del mando): comprar lo que tienes delante o volcar una mesa.
+func _interactuar() -> void:
+	var articulo := _articulo_cerca()
+	if articulo != null:
+		comprar(articulo)
+	else:
+		_sala.volcar_cerca(jugador.position, 12.0, _horda)
 
 
 func articulo_a_mano() -> Recogible:
