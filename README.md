@@ -86,7 +86,7 @@ La última ronda va de que ganar cueste de verdad, sin daño que no se pueda esq
 
 Con mando: stick o cruceta para moverte, A/Cruz o RB para la voltereta, X/Cuadrado o LB para el órdago, Y/Triángulo para interactuar, Select para ordenar las cartas y Start para pausar.
 
-Cooperativo: en la selección de personaje, el segundo jugador se une con Start en otro mando o con Ctrl derecho en el teclado (flechas para moverse, Ctrl derecho o Intro para la voltereta, Mayús derecha para el órdago y Fin para interactuar).
+Cooperativo: en la selección de personaje, el segundo jugador se une con Start en otro mando o con el 5 en el teclado (flechas para moverse, Intro para la voltereta, Mayús derecha para el órdago y Fin para interactuar).
 
 Con teclado: WASD o flechas para moverte, Espacio o Shift (o clic derecho) para la voltereta, Q o F para el órdago, E para volcar una mesa o comprar, ratón para arrastrar cartas cuando la sala está limpia y Esc para pausar. En el móvil, desliza el dedo por la sala para andar; la voltereta y el órdago tienen su propio botón y las cartas se arrastran igual.
 

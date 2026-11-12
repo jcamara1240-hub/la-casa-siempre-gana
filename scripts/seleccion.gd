@@ -536,7 +536,11 @@ func _mirar_union(evento: InputEvent) -> bool:
 		return false
 	if not (evento is InputEventKey) or not evento.pressed or evento.echo:
 		return false
-	if evento.physical_keycode == KEY_CTRL and evento.location == KEY_LOCATION_RIGHT:
+	var k: Key = evento.physical_keycode if evento.physical_keycode != KEY_NONE else evento.keycode
+	var union_teclado := k == KEY_5 or k == KEY_KP_5
+	if (k == KEY_CTRL or k == KEY_SHIFT) and evento.location == KEY_LOCATION_RIGHT:
+		union_teclado = true  # Ctrl o Mayús derecho siguen valiendo, por si alguien tiene mando tipo teclado numérico
+	if union_teclado:
 		if entrada_j1 >= 0:
 			_unir_j2(Mando.TECLADO)
 		else:
@@ -552,7 +556,7 @@ func _dibujar_coop() -> void:
 	if not hay_coop():
 		return
 	if _j2.is_empty():
-		var texto := Idioma.t("J2: PULSA %s EN OTRO MANDO O CTRL DCHO. PARA UNIRTE") % Mando.nombre("pausa")
+		var texto := Idioma.t("J2: PULSA %s EN OTRO MANDO O EL 5 PARA UNIRTE") % Mando.nombre("pausa")
 		_centrado(Juego.fuente, 8, texto, 0, 640, 10, COLOR_J2 if int(_t * 2.0) % 2 == 0 else COLOR_GRIS)
 		return
 	var e2 := int(_j2.entrada)
@@ -571,4 +575,4 @@ func _dibujar_coop() -> void:
 	draw_string(Juego.fuente, c1.position + Vector2(3, 9), Idioma.t("J1"), HORIZONTAL_ALIGNMENT_LEFT, -1, 8, COLOR_ORO)
 	draw_string(Juego.fuente, c2.position + Vector2(3, 18 if c1 == c2 else 9), Idioma.t("J2"), HORIZONTAL_ALIGNMENT_LEFT, -1, 8, COLOR_J2)
 	if e2 == Mando.TECLADO_DER:
-		_centrado(Juego.fuente, 8, Idioma.t("J1: WASD, ESPACIO, Q, E   J2: FLECHAS, CTRL DCHO., MAYÚS DCHA., FIN"), 0, 640, 236, COLOR_GRIS)
+		_centrado(Juego.fuente, 8, Idioma.t("J1: WASD, ESPACIO, Q, E   J2: FLECHAS, INTRO, MAYÚS DCHA., FIN"), 0, 640, 236, COLOR_GRIS)

@@ -1962,7 +1962,7 @@ func _empezar_espera_j2(datos: Dictionary, reto_caducado: bool) -> void:
 		_terminar_espera_j2({})  # en el móvil sin mandos no hay cooperativo
 		return
 	var solo := (Idioma.t("%s: SEGUIR EN SOLITARIO") % Mando.nombre("aceptar")) if e1 >= 0 else Idioma.t("ENTER: SEGUIR EN SOLITARIO")
-	var unirse := Idioma.t("J2: PULSA %s EN OTRO MANDO O CTRL DCHO. PARA UNIRTE") % Mando.nombre("pausa")
+	var unirse := Idioma.t("J2: PULSA %s EN OTRO MANDO O EL 5 PARA UNIRTE") % Mando.nombre("pausa")
 	_letrero_coop.text = Idioma.t("PARTIDA COOPERATIVA") + "\n" + unirse + "\n" + solo
 	_letrero_coop.visible = true
 	get_tree().paused = true
