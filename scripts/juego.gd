@@ -7,6 +7,8 @@ signal transformacion_obtenida(id: String)
 signal logro_obtenido(id: String)
 signal fiebre_cambiada(nivel: int)
 signal desatado_cambiado(activo: bool)
+## Te falta una pieza para esa transformación (ya filtrado por ObjetosDB.pista_permitida).
+signal a_un_paso(id: String)
 
 const VIDA_INICIAL := 8
 const RANURAS_INICIALES := 5
@@ -97,6 +99,9 @@ var fiebre := 0.0  # de 0 a 3: el nivel es la parte entera
 var ultima_voltereta := -100.0  # tiempo_partida de la última voltereta
 var desatado := false  # lo lee todo el mundo; solo lo cambia este archivo
 var en_combate := false  # lo mantiene main.gd: hay pelea en la sala
+## Lo último que te hizo daño, para que el Dueño lo comente al final:
+## {"tipo": "jefe"/"enemigo"/"bala", "id": ..., "rango": 0-2, "apuestas": true si fue en esa sala}.
+var ultima_causa: Dictionary = {}
 
 var _fiebre_espera := 0.0
 var _al_maximo_t := 0.0  # lo que lleva la fiebre al máximo, para el desatado
@@ -205,6 +210,7 @@ func nueva_partida(semilla := 0, id_personaje := "", id_mesa := -1, modo_extremo
 		fecha_reto = ""
 		reto_puntuable = false
 	golpes = 0
+	ultima_causa = {}
 	var datos: Dictionary = PersonajesDB.PERSONAJES[personaje]
 	# El contrato firmado en la selección; ni el reto, ni el extremo, ni el imposible lo llevan.
 	contrato = [] if reto_diario or extremo or not Progreso.contrato_disponible(personaje) else Progreso.contrato(personaje)
@@ -583,7 +589,10 @@ func tiene_objeto(id: String) -> bool:
 
 
 func dar_objeto(id: String) -> void:
+	var cerca_antes := ObjetosDB.a_un_paso(objetos, transformaciones)
 	objetos.append(id)
+	if Progreso.ver("objetos", id):
+		Progreso.guardar()
 	var efecto: Dictionary = ObjetosDB.OBJETOS[id].efecto
 	for clave in efecto:
 		match String(clave):
@@ -599,6 +608,9 @@ func dar_objeto(id: String) -> void:
 			_:
 				stats[clave] = float(stats.get(clave, 0.0)) + float(efecto[clave])
 	_comprobar_transformaciones()
+	for t in ObjetosDB.a_un_paso(objetos, transformaciones):
+		if not cerca_antes.has(t) and ObjetosDB.pista_permitida(t):
+			a_un_paso.emit(t)
 	estado_cambiado.emit()
 
 

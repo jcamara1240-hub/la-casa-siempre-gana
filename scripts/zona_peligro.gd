@@ -7,6 +7,7 @@ var _retardo := 1.0
 var _t := 0.0
 var _dueno: Ataques
 var _duracion := 0.0
+var causa: Dictionary = {}  # quién la soltó, ver Ataques.causa_en
 
 
 func iniciar(centro: Vector2, radio: float, retardo: float, dueno: Ataques, duracion := 0.0) -> void:
@@ -26,12 +27,12 @@ func _physics_process(delta: float) -> void:
 	if _duracion > 0.0:
 		# El charco sigue quemando hasta que se apaga.
 		if position.distance_to(_dueno.jugador.global_position) <= _radio:
-			_dueno.jugador.recibir_golpe(1)
+			_dueno.jugador.recibir_golpe(1, causa)
 		if _t >= _retardo + _duracion:
 			queue_free()
 		return
 	if position.distance_to(_dueno.jugador.global_position) <= _radio:
-		_dueno.jugador.recibir_golpe(1)
+		_dueno.jugador.recibir_golpe(1, causa)
 	Sonido.tocar("explosion", randf_range(1.1, 1.4), -8.0)
 	_dueno.explosion_hecha.emit()
 	queue_free()

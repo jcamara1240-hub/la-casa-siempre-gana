@@ -1074,6 +1074,19 @@ def dueno():
     guardar(hoja(frames), "personajes/dueno.png")
 
 
+def dueno_retrato():
+    """El Dueño en pequeño (16x16) para la pantalla final: chistera, gafas oscuras y puro."""
+    img = lienzo(16, 16)
+    rect(img, 2, 12, 12, 4, "p"); rect(img, 6, 12, 4, 4, "c"); rect(img, 7, 13, 2, 3, "R")  # traje, camisa, corbata
+    elipse(img, 7.5, 8, 4.5, 4, "o")  # la cara
+    rect(img, 4, 0, 8, 4, "k"); rect(img, 2, 4, 12, 1, "k"); rect(img, 4, 3, 8, 1, "R")  # chistera con cinta
+    rect(img, 4, 7, 3, 2, "k"); rect(img, 9, 7, 3, 2, "k"); pon(img, 7, 7, "k"); pon(img, 8, 7, "k")  # gafas
+    pon(img, 5, 7, "y"); pon(img, 10, 7, "y")
+    rect(img, 6, 10, 3, 1, "k")  # media sonrisa
+    rect(img, 9, 10, 4, 1, "c"); pon(img, 13, 10, "R")  # el puro
+    guardar(contorno(img), "personajes/dueno_retrato.png")
+
+
 def mosca():
     frames = []
     for f in range(3):
@@ -2356,7 +2369,7 @@ def main():
     crear_fuente("pixel2", 2)
     protagonista(); ficha(); dado(); sota(); naipe(); joker(); cubilete(); portero()
     ficha_oro_sprite(); camara(); ratero(); dado_bomba(); reina(); dado_jefe(); revolver(); bingo()
-    cajero(); coctelero(); poker(); dueno()
+    cajero(); coctelero(); poker(); dueno(); dueno_retrato()
     jefe(); pez_rojo(); ruleta(); mosca(); rey_blackjack()
     enemigo_crupier(); maton(); botones()
     proyectiles(); objetos(); baldosas(); cartas(); pasivos(); eventos(); icono_app()

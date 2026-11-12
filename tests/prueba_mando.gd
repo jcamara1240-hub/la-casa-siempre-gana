@@ -365,8 +365,11 @@ func _correr() -> void:
 	await _esperar(40)
 	await _pulsar(JOY_BUTTON_A)
 	_ok(m._pantalla.animacion_terminada() and m._pantalla._hay_oferta(), "A salta la animación y sale la oferta")
+	_ok(m._pantalla.opciones() == ["infinito", "otra", "menu"], "al ganar: infinito, otra mano y salir")
 	await _pulsar(JOY_BUTTON_DPAD_RIGHT)
-	_ok(m._pantalla._opcion == 1, "la cruceta elige Salir al menú")
+	_ok(m._pantalla._opcion == 1, "la cruceta pasa a OTRA MANO")
+	await _pulsar(JOY_BUTTON_DPAD_RIGHT)
+	_ok(m._pantalla._opcion == 2, "y luego a Salir al menú")
 	await _pulsar(JOY_BUTTON_A)
 	_ok(menu.visible and menu._items.has("jugar") and not m._pantalla.visible, "A vuelve al menú")
 

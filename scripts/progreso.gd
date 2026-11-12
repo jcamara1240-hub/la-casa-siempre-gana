@@ -24,6 +24,11 @@ static var contadores: Dictionary = {}
 static var personajes_ganadores: Array = []
 static var reto_fecha := ""
 static var reto_mejor := 0
+# Racha de días seguidos jugando el reto (sin castigo: si se corta, vuelve a empezar en 1).
+static var reto_racha := 0
+static var reto_ultimo := ""  # fecha del último reto puntuable terminado
+## Lo que ya has visto alguna vez: "objetos" (piezas de transformación) y "frases" del Dueño.
+static var vistos: Dictionary = {}
 # Un intento puntuable por día: el primero que empiezas. Los demás son de práctica.
 static var reto_empezado := ""  # fecha del último intento puntuable empezado
 static var reto_detalle: Dictionary = {}  # resumen del intento puntuable de reto_fecha
@@ -62,6 +67,9 @@ static func cargar() -> void:
 	personajes_ganadores = cfg.get_value("progreso", "personajes_ganadores", [])
 	reto_fecha = cfg.get_value("progreso", "reto_fecha", "")
 	reto_mejor = cfg.get_value("progreso", "reto_mejor", 0)
+	reto_racha = cfg.get_value("progreso", "reto_racha", 0)
+	reto_ultimo = cfg.get_value("progreso", "reto_ultimo", "")
+	vistos = cfg.get_value("progreso", "vistos", {})
 	reto_empezado = cfg.get_value("progreso", "reto_empezado", "")
 	reto_detalle = cfg.get_value("progreso", "reto_detalle", {})
 	reto_practica_fecha = cfg.get_value("progreso", "reto_practica_fecha", "")
@@ -108,6 +116,9 @@ static func guardar() -> void:
 	cfg.set_value("progreso", "personajes_ganadores", personajes_ganadores)
 	cfg.set_value("progreso", "reto_fecha", reto_fecha)
 	cfg.set_value("progreso", "reto_mejor", reto_mejor)
+	cfg.set_value("progreso", "reto_racha", reto_racha)
+	cfg.set_value("progreso", "reto_ultimo", reto_ultimo)
+	cfg.set_value("progreso", "vistos", vistos)
 	cfg.set_value("progreso", "reto_empezado", reto_empezado)
 	cfg.set_value("progreso", "reto_detalle", reto_detalle)
 	cfg.set_value("progreso", "reto_practica_fecha", reto_practica_fecha)
@@ -131,6 +142,54 @@ static func objeto_libre(id: String) -> bool:
 
 static func personaje_libre(id: String) -> bool:
 	return personajes.has(id)
+
+
+## Lo que llevas hacia el requisito de un personaje: x = actual, y = meta.
+static func progreso_personaje(id: String) -> Vector2i:
+	match id:
+		"borracho": return Vector2i(1 if jefes_vencidos.has("pez") else 0, 1)
+		"crupier": return Vector2i(mini(jefes_vencidos.size(), 3), 3)
+		"heredera": return Vector2i(mini(victorias, 1), 1)
+		"mago": return Vector2i(mini(transformaciones.size(), 1), 1)
+		"guarda": return Vector2i(mini(int(contadores.get("enemigos", 0)), 1000), 1000)
+	return Vector2i(1, 1)
+
+
+## El desbloqueo pendiente más cercano, para la pantalla final: {"texto", "actual", "meta"},
+## o vacío si ya está todo. Primero un contador que vaya por más de las tres cuartas partes;
+## si no, el siguiente personaje en el orden en que suelen abrirse; luego la mesa siguiente.
+static func siguiente_objetivo() -> Dictionary:
+	var orden := ["borracho", "crupier", "mago", "heredera", "guarda"]
+	var pendientes: Array = []
+	for id in orden:
+		if personajes.has(id) or not PersonajesDB.PERSONAJES.has(id):
+			continue
+		var p := progreso_personaje(id)
+		pendientes.append({"texto": "%s: %s" % [PersonajesDB.nombre(id).to_upper(), Idioma.t(PersonajesDB.PERSONAJES[id].requisito).to_upper().trim_suffix(".")],
+			"actual": p.x, "meta": p.y})
+	for p in pendientes:
+		if int(p.meta) > 1 and float(p.actual) >= float(p.meta) * 0.75:
+			return p
+	if not pendientes.is_empty():
+		return pendientes[0]
+	if mesa_max < PersonajesDB.MESAS.size() - 1:
+		return {"texto": Idioma.t("%s: GANA EN LA %s") % [Idioma.t(PersonajesDB.MESAS[mesa_max + 1].nombre).to_upper(),
+			Idioma.t(PersonajesDB.MESAS[mesa_max].nombre).to_upper()], "actual": 0, "meta": 1}
+	return {}
+
+
+## Anota algo como visto (ver "vistos"). Devuelve true si es la primera vez.
+static func ver(tipo: String, id: String) -> bool:
+	var lista: Array = vistos.get(tipo, [])
+	if lista.has(id):
+		return false
+	lista.append(id)
+	vistos[tipo] = lista
+	return true
+
+
+static func visto(tipo: String, id: String) -> bool:
+	return (vistos.get(tipo, []) as Array).has(id)
 
 
 static func cartas_libres() -> int:
@@ -275,12 +334,36 @@ static func reto_mejor_hoy(fecha: String) -> int:
 
 ## Anota la marca del reto: se queda la mejor de cada día.
 static func registrar_reto(fecha: String, puntos: int) -> void:
+	_sumar_racha(fecha)
 	if reto_fecha != fecha:
 		reto_fecha = fecha
 		reto_mejor = puntos
 	else:
 		reto_mejor = maxi(reto_mejor, puntos)
 	guardar()
+
+
+## Si el último reto fue ayer, la racha sube; si fue hoy, se queda; si no, vuelve a 1.
+static func _sumar_racha(fecha: String) -> void:
+	if reto_ultimo == fecha:
+		return
+	reto_racha = reto_racha + 1 if dias_entre(reto_ultimo, fecha) == 1 else 1
+	reto_ultimo = fecha
+
+
+## La racha que sigue viva en esa fecha (jugaste hoy o ayer); si no, 0. No se castiga perderla.
+static func racha_viva(fecha: String) -> int:
+	var d := dias_entre(reto_ultimo, fecha)
+	return reto_racha if d == 0 or d == 1 else 0
+
+
+## Días de una fecha (AAAA-MM-DD) a otra. Un número muy grande si alguna no vale.
+static func dias_entre(desde: String, hasta: String) -> int:
+	if desde.length() != 10 or hasta.length() != 10:
+		return 99999
+	var a := Time.get_unix_time_from_datetime_string(desde + "T00:00:00")
+	var b := Time.get_unix_time_from_datetime_string(hasta + "T00:00:00")
+	return roundi((b - a) / 86400.0)
 
 
 ## ¿El próximo intento de esa fecha cuenta? Solo si aún no has empezado ninguno puntuable.

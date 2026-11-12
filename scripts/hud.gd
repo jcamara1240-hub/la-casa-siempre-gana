@@ -62,6 +62,16 @@ func avisar_logro(id: String) -> void:
 		_logro_t = 2.6
 
 
+## "A UN PASO DE: ...": va en la misma cola que los logros, para que no se pisen.
+func avisar_paso(id_transformacion: String) -> void:
+	avisar_logro("paso:" + id_transformacion)
+
+
+## Lo que enseña ahora la caja de avisos (para las pruebas): id de logro o "paso:<id>".
+func aviso_actual() -> String:
+	return "" if _cola_logros.is_empty() else String(_cola_logros[0])
+
+
 func _process(delta: float) -> void:
 	queue_redraw()
 	_mirar_raton()
@@ -83,6 +93,15 @@ func _dibujar_logro() -> void:
 		return
 	var caja := Rect2(404, 36, 232, 22)
 	draw_rect(caja, Color8(20, 16, 30))
+	var actual := String(_cola_logros[0])
+	if actual.begins_with("paso:"):
+		var datos: Dictionary = ObjetosDB.TRANSFORMACIONES[actual.trim_prefix("paso:")]
+		var color := Color.html(datos.color)
+		_marco(caja, color)
+		draw_rect(Rect2(caja.position + Vector2(6, 6), Vector2(10, 10)), color)
+		draw_string(Juego.fuente, caja.position + Vector2(22, 9), Idioma.t("A UN PASO DE:"), HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color8(168, 154, 142))
+		draw_string(Juego.fuente, caja.position + Vector2(22, 18), Idioma.t(datos.nombre).to_upper(), HORIZONTAL_ALIGNMENT_LEFT, -1, 8, color)
+		return
 	_marco(caja, Color8(247, 198, 74))
 	draw_texture(_trofeo, caja.position + Vector2(5, 5))
 	draw_string(Juego.fuente, caja.position + Vector2(22, 9), Idioma.t("LOGRO"), HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color8(168, 154, 142))

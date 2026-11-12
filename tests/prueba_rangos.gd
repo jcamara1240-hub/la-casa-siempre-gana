@@ -31,6 +31,7 @@ func _correr() -> void:
 	var E = load("res://scripts/enemigo.gd")
 	var P = load("res://scripts/progreso.gd")
 	var I = load("res://scripts/idioma.gd")
+	I.actual = "es"
 	var m = load("res://scenes/main.tscn").instantiate()
 	root.add_child(m)
 	await physics_frame
@@ -170,7 +171,10 @@ func _correr() -> void:
 	vampiro.hacer_rango(RARO, ["vampirico"])
 	herido.vida = herido.vida_max * 0.3
 	var vida_herido: float = herido.vida
-	await _esperar(int(E.VAMPIRO_SEG * 60.0) + 30)
+	for _i in int(E.VAMPIRO_SEG * 60.0) + 30:
+		await physics_frame
+		herido.position = Sala.CENTRO + Vector2(-40, 60)  # que no se separen persiguiendo al jugador
+		vampiro.position = Sala.CENTRO + Vector2(-30, 60)
 	_ok(herido.vida > vida_herido, "Vampírico: cura a los que tiene cerca")
 
 	# ---- divisor y explosivo, al morir
@@ -178,7 +182,10 @@ func _correr() -> void:
 	horda.crear("ficha", Sala.CENTRO + Vector2(200, 80), 1.0)  # que la sala no se quede vacía y acabe la pelea
 	for e in viejos:
 		e.muerto = true
-	await _esperar(2)
+	for _i in 2:
+		await physics_frame
+		for r in m._recogibles.get_children():  # el botín del élite no debe abrir el selector de cartas
+			r.queue_free()
 	var divisor = horda.crear("sota", Sala.CENTRO + Vector2(-150, -40), 1.0)
 	divisor.hacer_rango(RARO, ["divisor"])
 	divisor._nacer = 0.0
