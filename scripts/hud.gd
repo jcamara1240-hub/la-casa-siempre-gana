@@ -140,6 +140,10 @@ func _draw() -> void:
 	draw_rect(Rect2(2, 2, 92, 25), placa)
 	draw_rect(Rect2(640 - 58, 1, 56, 28), placa)
 	_dibujar_corazones()
+	var y_extra := 0.0  # en cooperativo, los corazones del J2 van debajo y lo demás baja
+	if Juego.coop:
+		y_extra = 13.0
+		_dibujar_corazones_j2()
 	draw_texture_rect_region(_moneda, Rect2(6, 15, 8, 8), Rect2(0, 0, 8, 8))
 	draw_string(Juego.fuente, Vector2(17, 23), str(Juego.oro), HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color8(247, 236, 210))
 	draw_string(Juego.fuente, Vector2(50, 23), (Idioma.t("PISO %d INF") % Juego.piso) if Juego.infinito else (Idioma.t("PISO %d/%d") % [Juego.piso, Juego.PISOS_TOTALES]), HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color8(168, 154, 142))
@@ -147,16 +151,16 @@ func _draw() -> void:
 	_dibujar_logro()
 	_dibujar_transformaciones()
 	if Juego.diario:
-		draw_rect(Rect2(2, 28, 76, 11), Color(0.08, 0.06, 0.12, 0.8))
-		draw_string(Juego.fuente, Vector2(6, 37), Idioma.t("RETO DIARIO"), HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color8(108, 207, 148))
+		draw_rect(Rect2(2, 28 + y_extra, 76, 11), Color(0.08, 0.06, 0.12, 0.8))
+		draw_string(Juego.fuente, Vector2(6, 37 + y_extra), Idioma.t("RETO DIARIO"), HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color8(108, 207, 148))
 	if Juego.extremo:
-		draw_rect(Rect2(2, 28, 72 if Juego.imposible else 58, 11), Color(0.08, 0.06, 0.12, 0.8))
-		draw_string(Juego.fuente, Vector2(6, 37), Idioma.t("IMPOSIBLE") if Juego.imposible else Idioma.t("EXTREMO"), HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color8(214, 61, 79))
+		draw_rect(Rect2(2, 28 + y_extra, 72 if Juego.imposible else 58, 11), Color(0.08, 0.06, 0.12, 0.8))
+		draw_string(Juego.fuente, Vector2(6, 37 + y_extra), Idioma.t("IMPOSIBLE") if Juego.imposible else Idioma.t("EXTREMO"), HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color8(214, 61, 79))
 	if Juego.deuda > 0:
-		draw_rect(Rect2(2, 28, 70, 11), Color(0.08, 0.06, 0.12, 0.8))
-		draw_string(Juego.fuente, Vector2(6, 37), Idioma.t("DEUDA %d") % Juego.deuda, HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color8(214, 61, 79))
+		draw_rect(Rect2(2, 28 + y_extra, 70, 11), Color(0.08, 0.06, 0.12, 0.8))
+		draw_string(Juego.fuente, Vector2(6, 37 + y_extra), Idioma.t("DEUDA %d") % Juego.deuda, HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color8(214, 61, 79))
 	if Juego.calor() > 0:
-		_dibujar_calor(40.0 if Juego.deuda > 0 else 28.0)
+		_dibujar_calor((40.0 if Juego.deuda > 0 else 28.0) + y_extra)
 	_dibujar_mapa()
 	_dibujar_reservas()
 	if horda != null and is_instance_valid(horda.jefe):
@@ -464,3 +468,29 @@ func _dibujar_jefe() -> void:
 	if k < 0.34:
 		borde = COLOR_MARCO.lerp(COLOR_ROJO, 0.5 + 0.5 * sin(_pulso * 10.0))
 	_marco(marco, borde)
+
+
+
+# ------------------------------------------------------------ cooperativo
+const COLORES_JUGADOR := [Color8(247, 198, 74), Color8(111, 195, 232)]  # como la marca bajo los pies
+
+
+## Los corazones del J2, en una placa debajo de la del J1 (no tapa ni el mapa ni los rótulos).
+## A la izquierda de cada placa, una franja del color de su jugador.
+func _dibujar_corazones_j2() -> void:
+	draw_rect(Rect2(2, 28, 92, 12), Color(0.08, 0.06, 0.12, 0.8))
+	draw_rect(Rect2(2, 2, 2, 25), COLORES_JUGADOR[0])
+	draw_rect(Rect2(2, 28, 2, 12), COLORES_JUGADOR[1])
+	var caido := Juego.vida2 <= 0
+	if caido:
+		draw_string(Juego.fuente, Vector2(7, 37), Idioma.t("J2 FUERA DE JUEGO"), HORIZONTAL_ALIGNMENT_LEFT, -1, 8, COLOR_ROJO)
+		return
+	var limite: bool = Juego.al_limite(1)
+	var golpe := Ambiente.latido() if limite else 0.0
+	for i in Juego.vida_max2 / 2:
+		var puntos := Juego.vida2 - i * 2
+		var columna := 0 if puntos >= 2 else (1 if puntos == 1 else 2)
+		var p := Vector2(6 + i * 11, 30)
+		if limite and puntos > 0 and puntos <= 2:
+			p.y -= roundf(golpe * 2.0)
+		draw_texture_rect_region(_corazon, Rect2(p, Vector2(9, 7)), Rect2(columna * 9, 0, 9, 7))

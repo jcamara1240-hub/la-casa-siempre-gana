@@ -33,7 +33,7 @@ func _comportamiento(delta: float, horda: Horda) -> void:
 	match _estado:
 		Estado.ANDAR:
 			frame = int(_t * 4.0) % 2
-			position += (horda.jugador.global_position - position).normalized() * vel * delta
+			position += (_blanco(horda).global_position - position).normalized() * vel * delta
 			if _reloj <= 0.0:
 				_estado = Estado.ATAQUE
 				_turno = (_turno + 1) % ATAQUES
@@ -61,7 +61,7 @@ func _golpear(horda: Horda) -> void:
 		3:
 			var zona := Sala.INTERIOR.grow(-30.0)
 			for i in 3:
-				var p: Vector2 = horda.jugador.global_position + Vector2.RIGHT.rotated(randf() * TAU) * randf_range(0.0, 90.0)
+				var p: Vector2 = horda.objetivo_por_turno(i).global_position + Vector2.RIGHT.rotated(randf() * TAU) * randf_range(0.0, 90.0)
 				horda.ataques.zona_peligro(p.clamp(zona.position, zona.end), 32.0, 0.9)
 		4:
 			_invocar(horda, ["dado_bomba", "ficha"])

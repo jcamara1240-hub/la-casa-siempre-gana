@@ -36,6 +36,7 @@ func _ready() -> void:
 
 
 func abrir() -> void:
+	_abrir_coop()
 	_mesa_deseada = maxi(_mesa_deseada, _mesa)
 	_mesa = mini(_mesa_deseada, Progreso.mesa_elegible(_ids[_indice]))
 	_contrato = false
@@ -113,6 +114,9 @@ func _gui_input(evento: InputEvent) -> void:
 func _unhandled_input(evento: InputEvent) -> void:
 	if not visible:
 		return
+	if _evento_coop(evento):
+		get_viewport().set_input_as_handled()
+		return
 	if _contrato:
 		if _contrato_tecla(Mando.tecla(evento)):
 			get_viewport().set_input_as_handled()
@@ -167,6 +171,7 @@ func _draw() -> void:
 	draw_rect(CAJA_VOLVER, Color8(42, 31, 61))
 	_centrado(Juego.fuente, 8, Idioma.t("VOLVER"), CAJA_VOLVER.position.x, CAJA_VOLVER.size.x, 339, COLOR_CREMA)
 	_dibujar_caja_contrato()
+	_dibujar_coop()
 	if _contrato:
 		_dibujar_contrato()
 
@@ -178,9 +183,14 @@ func _dibujar_personaje(i: int) -> void:
 	var libre := Progreso.personaje_libre(id)
 	draw_rect(caja, Color8(42, 31, 61))
 	draw_rect(caja, COLOR_ORO if i == _indice else Color8(74, 52, 102), false, 1.0)
+	if not _j2.is_empty() and i == int(_j2.indice):
+		draw_rect(caja.grow(-2.0), COLOR_J2, false, 1.0)
 	_dibujar_pegatina(caja, id)
-	var columna := int(_t * 2.5) % 2 if i != _indice else 2 + int(_t * 8.0) % 4
+	var con_j2 := not _j2.is_empty() and i == int(_j2.indice)
+	var columna := int(_t * 2.5) % 2 if i != _indice and not con_j2 else 2 + int(_t * 8.0) % 4
 	var tinte := Color.WHITE if libre else Color(0.08, 0.06, 0.12)
+	if con_j2 and i == _indice:
+		tinte = TINTE_J2  # los dos con el mismo: el J2 irá teñido
 	draw_texture_rect_region(_texturas[id], Rect2(caja.position.x + 26, caja.position.y + 10, 48, 48),
 			Rect2(columna * 16, 0, 16, 16), tinte)
 	var x := caja.position.x + 4
@@ -410,3 +420,155 @@ func _dibujar_requisito(id: String, x: float, ancho: float, y: float) -> void:
 	draw_rect(barra, Color8(20, 16, 30))
 	draw_rect(Rect2(barra.position, Vector2(barra.size.x * clampf(float(p.x) / maxi(p.y, 1), 0.0, 1.0), barra.size.y)), COLOR_ORO)
 	_centrado(Juego.fuente, 8, "%d/%d" % [p.x, p.y], x, ancho, y + 16, COLOR_GRIS)
+
+
+# ---------------------------------------------------------------- cooperativo local
+## Un segundo jugador se une pulsando en OTRO dispositivo: START en otro mando, o Ctrl derecho
+## en el teclado (si el J1 va con mando, el J2 se queda el teclado entero; si no, se lo reparten:
+## J1 WASD y J2 flechas). Cualquier otra tecla o botón de otro dispositivo es el J1 que cambia
+## de mando a teclado o al revés: así nadie se une sin querer.
+## Cada uno elige su personaje; la mesa, el modo y el contrato los elige el J1.
+const COLOR_J2 := Color8(111, 195, 232)
+const TINTE_J2 := Color(0.72, 0.9, 1.3)
+
+var entrada_j1 := Mando.TECLADO
+var _j2: Dictionary = {}  # {} o {"entrada": de Mando, "indice": su personaje}
+
+
+## Lo que necesita main para empezar en cooperativo ({} si el J2 no está).
+func config_coop() -> Dictionary:
+	if _j2.is_empty() or not hay_coop():
+		return {}
+	return {"personaje2": _ids[int(_j2.indice)], "entrada1": entrada_j1, "entrada2": int(_j2.entrada)}
+
+
+## En el móvil sin mandos no se ofrece: hace falta un mando o un teclado.
+func hay_coop() -> bool:
+	return not (Juego.tactil and Input.get_connected_joypads().is_empty())
+
+
+func j2_unido() -> bool:
+	return not _j2.is_empty()
+
+
+func _abrir_coop() -> void:
+	if not Input.joy_connection_changed.is_connected(_al_cambiar_mando):
+		Input.joy_connection_changed.connect(_al_cambiar_mando)
+	var e1 := Mando.dispositivo if Mando.activo else Mando.TECLADO
+	if _j2.is_empty():
+		entrada_j1 = e1
+		return
+	# El J2 sigue unido de la partida anterior, salvo que ya no esté su mando.
+	var e2 := int(_j2.entrada)
+	if e2 >= 0 and not Input.get_connected_joypads().has(e2):
+		_j2 = {}
+		entrada_j1 = e1
+	elif e2 == Mando.TECLADO_DER:
+		entrada_j1 = Mando.TECLADO_IZQ
+	elif e1 != e2:
+		entrada_j1 = e1
+
+
+func _al_cambiar_mando(disp: int, conectado: bool) -> void:
+	if not conectado and not _j2.is_empty() and int(_j2.entrada) == disp:
+		_salir_j2()
+
+
+func _unir_j2(entrada: int) -> void:
+	var i := _indice
+	_j2 = {"entrada": entrada, "indice": i}
+	if not Progreso.personaje_libre(_ids[i]):
+		_mover_j2(1)
+	Sonido.tocar("mult", 1.2)
+
+
+func _salir_j2() -> void:
+	if _j2.is_empty():
+		return
+	if int(_j2.entrada) == Mando.TECLADO_DER:
+		entrada_j1 = Mando.TECLADO
+	_j2 = {}
+	Sonido.tocar("clic")
+
+
+## El J2 solo puede elegir personajes desbloqueados.
+func _mover_j2(sentido: int) -> void:
+	var i := int(_j2.indice)
+	for _k in _ids.size():
+		i = wrapi(i + sentido, 0, _ids.size())
+		if Progreso.personaje_libre(_ids[i]):
+			break
+	_j2.indice = i
+	Sonido.tocar("mover")
+
+
+## Devuelve true si el evento era del J2 (o para unirse) y ya está atendido.
+func _evento_coop(evento: InputEvent) -> bool:
+	if not hay_coop():
+		return false
+	if _j2.is_empty():
+		return _mirar_union(evento)
+	var e2 := int(_j2.entrada)
+	if Mando.es_de(e2, evento):
+		var tecla := Mando.tecla(evento)
+		if evento is InputEventKey and evento.pressed and not evento.echo:
+			tecla = evento.physical_keycode
+		match tecla:
+			KEY_LEFT, KEY_A:
+				_mover_j2(-1)
+			KEY_RIGHT, KEY_D:
+				_mover_j2(1)
+			KEY_ESCAPE, KEY_BACKSPACE:
+				_salir_j2()
+		return true  # lo del J2 no lo ve el J1
+	# Un tercer mando no maneja el menú del J1 (el teclado sí, si no es del J2).
+	if Mando.es_mando(evento) and evento.device != entrada_j1:
+		return true
+	return false
+
+
+func _mirar_union(evento: InputEvent) -> bool:
+	if evento is InputEventJoypadButton and evento.pressed and evento.device != entrada_j1:
+		if Mando.PAUSA.has(evento.button_index):
+			_unir_j2(evento.device)
+			return true
+		entrada_j1 = evento.device  # el J1 ha cogido el mando
+		return false
+	if not (evento is InputEventKey) or not evento.pressed or evento.echo:
+		return false
+	if evento.physical_keycode == KEY_CTRL and evento.location == KEY_LOCATION_RIGHT:
+		if entrada_j1 >= 0:
+			_unir_j2(Mando.TECLADO)
+		else:
+			entrada_j1 = Mando.TECLADO_IZQ
+			_unir_j2(Mando.TECLADO_DER)
+		return true
+	entrada_j1 = Mando.TECLADO  # el J1 ha vuelto al teclado
+	return false
+
+
+## Arriba, encima del título: cómo unirse, o quién es el J2 y cómo salirse.
+func _dibujar_coop() -> void:
+	if not hay_coop():
+		return
+	if _j2.is_empty():
+		var texto := Idioma.t("J2: PULSA %s EN OTRO MANDO O CTRL DCHO. PARA UNIRTE") % Mando.nombre("pausa")
+		_centrado(Juego.fuente, 8, texto, 0, 640, 10, COLOR_J2 if int(_t * 2.0) % 2 == 0 else COLOR_GRIS)
+		return
+	var e2 := int(_j2.entrada)
+	var salir: String
+	if e2 >= 0:
+		salir = Mando.nombre("volver")
+	elif e2 == Mando.TECLADO_DER:
+		salir = Idioma.t("RETROCESO")
+	else:
+		salir = "ESC"
+	var texto := Idioma.t("J2: %s  (%s: SALIRSE)") % [PersonajesDB.nombre(_ids[int(_j2.indice)]).to_upper(), salir]
+	_centrado(Juego.fuente, 8, texto, 0, 640, 10, COLOR_J2)
+	# Las etiquetas encima de cada caja elegida.
+	var c1 := _caja(_indice)
+	var c2 := _caja(int(_j2.indice))
+	draw_string(Juego.fuente, c1.position + Vector2(3, 9), Idioma.t("J1"), HORIZONTAL_ALIGNMENT_LEFT, -1, 8, COLOR_ORO)
+	draw_string(Juego.fuente, c2.position + Vector2(3, 18 if c1 == c2 else 9), Idioma.t("J2"), HORIZONTAL_ALIGNMENT_LEFT, -1, 8, COLOR_J2)
+	if e2 == Mando.TECLADO_DER:
+		_centrado(Juego.fuente, 8, Idioma.t("J1: WASD, ESPACIO, Q, E   J2: FLECHAS, CTRL DCHO., MAYÚS DCHA., FIN"), 0, 640, 236, COLOR_GRIS)

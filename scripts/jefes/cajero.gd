@@ -21,7 +21,7 @@ func _configurar() -> void:
 func _comportamiento(delta: float, horda: Horda) -> void:
 	var ritmo := 1.3 if enfadado() else 1.0
 	_reloj -= delta * ritmo
-	var jugador: Node2D = horda.jugador
+	var jugador: Node2D = _blanco(horda)
 	var hacia: Vector2 = (jugador.global_position - position).normalized()
 	match _estado:
 		Estado.ANDAR:
@@ -33,7 +33,9 @@ func _comportamiento(delta: float, horda: Horda) -> void:
 				_letrero.text = Idioma.t("¡A CAJA!")
 		Estado.ASPIRAR:
 			frame = 2
-			jugador.arrastre = -hacia * 85.0
+			# Aspira a todos los que sigan en pie, cada uno hacia la caja.
+			for j in horda.vivos():
+				j.arrastre = -(j.global_position - position).normalized() * 85.0
 			if int(_t * 10.0) % 3 == 0:
 				var a := randf() * TAU
 				horda.ataques.bala_enemiga(position + Vector2.RIGHT.rotated(a) * 170.0, Vector2.LEFT.rotated(a) * 120.0, "moneda")

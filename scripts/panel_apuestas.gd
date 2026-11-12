@@ -194,8 +194,8 @@ func _oro() -> int:
 # ---------------------------------------------------------------- tragaperras
 func _tirar() -> void:
 	var oro_antes: int = Juego.oro
-	var vida_antes: int = Juego.vida
-	var vida_max_antes: int = Juego.vida_max
+	var vida_antes: int = Juego.vida_titular()
+	var vida_max_antes: int = Juego.vida_max_titular()
 	var r := Apuestas.tirar_tragaperras(_sala)
 	if not r.get("ok", false):
 		return
@@ -257,8 +257,8 @@ func _elegir_ficha(f: int) -> void:
 
 func _apostar(apuesta: String, con_corazon: bool) -> void:
 	var oro_antes: int = Juego.oro
-	var vida_antes: int = Juego.vida
-	var vida_max_antes: int = Juego.vida_max
+	var vida_antes: int = Juego.vida_titular()
+	var vida_max_antes: int = Juego.vida_max_titular()
 	var r := Apuestas.jugar_ruleta(_sala, apuesta, _cantidad(), con_corazon)
 	if not r.get("ok", false):
 		return
@@ -516,8 +516,8 @@ func _draw() -> void:
 func _dibujar_bolsa() -> void:
 	var texto := str(_oro())
 	var ancho := Juego.fuente.get_string_size(texto, HORIZONTAL_ALIGNMENT_LEFT, -1, 8).x
-	var vida_max: int = Juego.vida_max if _vida_max_visto < 0 else _vida_max_visto
-	var vida: int = Juego.vida if _vida_visto < 0 else _vida_visto
+	var vida_max: int = Juego.vida_max_titular() if _vida_max_visto < 0 else _vida_max_visto
+	var vida: int = Juego.vida_titular() if _vida_visto < 0 else _vida_visto
 	var corazones := vida_max / 2
 	var total := 10.0 + ancho + 10.0 + corazones * 10.0
 	var x := roundf(320.0 - total * 0.5)

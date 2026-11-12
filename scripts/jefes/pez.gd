@@ -23,7 +23,7 @@ func _configurar() -> void:
 func _comportamiento(delta: float, horda: Horda) -> void:
 	var ritmo := 1.3 if enfadado() else 1.0
 	_reloj -= delta * ritmo
-	var hacia: Vector2 = (horda.jugador.global_position - position).normalized()
+	var hacia: Vector2 = (_blanco(horda).global_position - position).normalized()
 	match _estado:
 		Modo.NADAR:
 			frame = int(_t * 5.0) % 2

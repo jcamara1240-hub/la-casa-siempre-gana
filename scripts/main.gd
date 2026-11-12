@@ -75,8 +75,23 @@ const CATALOGO := [
 const PRECIO_CORAZON := 18
 const PRECIO_RANURA := 25
 const MAX_ENEMIGOS := 105  # antes 90; los que esperan a nacer también cuentan
+# Cooperativo local: dos jugadores en la misma sala.
+const COOP_PRESUPUESTO := 1.5  # enemigos por sala
+const COOP_VIDA_JEFE := 1.6
+const REANIMAR_SEG := 3.0  # lo que hay que quedarse al lado del caído para levantarlo
+const REANIMAR_RADIO := 24.0
+const REANIMAR_VIDA := 2  # se levanta con un corazón
+const VIDA_AL_LIMPIAR := 1  # y si nadie lo levanta, vuelve con medio al limpiar la sala
 
 var jugador: CharacterBody2D
+## Todos los jugadores: [jugador] o, en cooperativo, [jugador, jugador2]. Horda y Ataques
+## comparten esta misma lista.
+var jugadores: Array = []
+var jugador2: CharacterBody2D = null
+var _coop_cfg: Dictionary = {}  # lo que eligió la selección: personaje2, entrada1, entrada2
+var _dueno_panel: Node2D = null  # en cooperativo, quién maneja el panel abierto
+var _espera_j2: Dictionary = {}  # al continuar una partida cooperativa, esperando al J2
+var _letrero_coop: Label
 var salas: Dictionary = {}
 var actual: Dictionary = {}
 ## Se copia en Juego.en_combate para que la música y los efectos lo sepan.
@@ -145,10 +160,13 @@ var _hint_maquina := ""
 
 func _ready() -> void:
 	jugador = $Mundo/Player
+	jugadores.append(jugador)
 	process_mode = Node.PROCESS_MODE_ALWAYS
 	$Mundo.process_mode = Node.PROCESS_MODE_PAUSABLE
 	_motor.process_mode = Node.PROCESS_MODE_PAUSABLE
 	_horda.jugador = jugador
+	_horda.jugadores = jugadores
+	_ataques.jugadores = jugadores
 	_horda.ataques = _ataques
 	_horda.sala = _sala
 	_ataques.horda = _horda
@@ -167,7 +185,7 @@ func _ready() -> void:
 	_horda.rango_muerto.connect(_al_morir_rango)
 	_horda.danio_hecho.connect(_texto_danio)
 	_ataques.explosion_hecha.connect(sacudir.bind(2.0))
-	jugador.golpeado.connect(_al_golpear_jugador)
+	jugador.golpeado.connect(_al_golpear_jugador.bind(jugador))
 	_selector.elegida.connect(_al_elegir_carta)
 	_selector.saltada.connect(_cerrar_selector)
 	_barra.sustitucion_elegida.connect(_al_sustituir)
@@ -203,7 +221,7 @@ func _crear_pantallas_extra() -> void:
 	$UI.move_child(_tactiles, _menu.get_index())
 	_menu.jugar.connect(_seleccion.abrir)
 	_menu.ver_coleccion.connect(_coleccion.abrir)
-	_seleccion.elegido.connect(empezar_partida)
+	_seleccion.elegido.connect(_al_elegir_personaje)
 	_seleccion.atras.connect(_menu.abrir_principal)
 	_coleccion.atras.connect(_menu.abrir_principal)
 	_panel.cerrado.connect(_al_cerrar_evento)
@@ -221,6 +239,7 @@ func _crear_pantallas_extra() -> void:
 	$UI.add_child(_panel_apuestas)
 	_panel_apuestas.cerrado.connect(_al_cerrar_apuestas)
 	_panel_apuestas.jugada.connect(_guardar_punto)
+	_crear_letrero_coop()
 
 
 ## La sensación de cada golpe y las mecánicas nuevas (voltereta, órdago, mesas, fiebre).
@@ -231,7 +250,7 @@ func _crear_jugo() -> void:
 	_ataques.disparo.connect(_jugo.al_disparar)
 	_ataques.impacto.connect(_jugo.al_impactar)
 	_ataques.explosion_en.connect(_jugo.al_explotar)
-	jugador.voltereta.connect(_jugo.al_rodar)
+	jugador.voltereta.connect(_jugo.al_rodar.bind(jugador))
 	jugador.por_los_pelos.connect(_al_rozar_bala)
 	jugador.roce.connect(_al_rozar_sin_rodar)
 	_sala.mesa_volcada.connect(_al_volcar_mesa)
@@ -288,6 +307,8 @@ func _otra_mano() -> void:
 	var mesa: int = Juego.mesa
 	var extremo: bool = Juego.extremo and not Juego.imposible
 	var imposible: bool = Juego.imposible
+	if not Juego.coop:
+		_coop_cfg = {}  # se acabó en solitario: la otra mano también
 	_ir_al_menu()
 	_menu.cerrar()
 	empezar_partida(personaje, mesa, extremo, imposible)
@@ -303,6 +324,7 @@ func _seguir_infinito() -> void:
 
 
 func _reanudar() -> void:
+	_letrero_coop.visible = false
 	get_tree().paused = false
 
 
@@ -312,11 +334,17 @@ func _input(evento: InputEvent) -> void:
 	Mando.observar(evento)
 	if Juego.tactil and Mando.activo and Mando.es_mando(evento):
 		Juego.tactil = false  # un mando conectado al móvil: fuera los botones de la pantalla
+	if not _espera_j2.is_empty():
+		_mirar_espera_j2(evento)
+		return
+	if Juego.coop:
+		_filtrar_panel(evento)
 
 
 func _al_cambiar_mando(dispositivo: int, conectado: bool) -> void:
 	if not conectado:
 		Mando.olvidar(dispositivo)
+		_mando_perdido(dispositivo)
 
 
 ## El botón "atrás" de Android hace de Esc.
@@ -341,7 +369,15 @@ func empezar_reto() -> void:
 
 func empezar_partida(personaje := "", mesa := -1, extremo := false, imposible := false) -> void:
 	Juego.nueva_partida(0, personaje, mesa, extremo, false, imposible)
+	if not _coop_cfg.is_empty():
+		Juego.activar_coop(String(_coop_cfg.personaje2))
 	_arrancar()
+
+
+## Desde la selección de personaje: con el J2 unido, la partida es cooperativa.
+func _al_elegir_personaje(personaje: String, mesa: int, extremo: bool, imposible: bool) -> void:
+	_coop_cfg = _seleccion.config_coop()
+	empezar_partida(personaje, mesa, extremo, imposible)
 
 
 func continuar_partida() -> void:
@@ -359,7 +395,15 @@ func continuar_partida() -> void:
 	_prob_carta = datos.prob_carta
 	_hud.salas = salas
 	_pintar_piso()
-	jugador.aplicar_personaje()
+	if Juego.coop:
+		# Era cooperativa: el J2 tiene que volver a unirse (o se sigue en solitario).
+		_empezar_espera_j2(datos, reto_caducado)
+		return
+	_seguir_continuar(datos, reto_caducado)
+
+
+func _seguir_continuar(datos: Dictionary, reto_caducado: bool) -> void:
+	_preparar_jugadores()
 	if not Juego.transformaciones.is_empty():
 		_al_tenir(Juego.transformaciones[-1])
 	Sonido.musica("piso")
@@ -379,11 +423,12 @@ func _pintar_piso() -> void:
 
 
 func _al_tenir(id: String) -> void:
-	jugador.teñir(Color.html(ObjetosDB.TRANSFORMACIONES[id].color).lerp(Color.WHITE, 0.45))
+	for j in jugadores:
+		j.teñir(Color.html(ObjetosDB.TRANSFORMACIONES[id].color).lerp(Color.WHITE, 0.45))
 
 
 func _arrancar() -> void:
-	jugador.aplicar_personaje()
+	_preparar_jugadores()
 	Sonido.musica("piso")
 	_prob_carta = 0.55
 	_generar_piso()
@@ -468,12 +513,19 @@ func entrar_sala(c: Vector2i, venimos: Vector2i) -> void:
 		f.queue_free()
 	_ajustar_mesas()
 	_sala.construir(actual, salas)
+	_soltar_panel()
+	for j in jugadores:
+		if j.caido:
+			_levantar(j, VIDA_AL_LIMPIAR)
 	_colocar_jugador(venimos)
 	_hint_tienda = ""
 	_hint_maquina = ""
 	_aviso.text = ""
 	_barra.info_externa = {}
-	jugador.seguro_listo = Juego.stat("seguro") > 0.0
+	for j in jugadores:
+		j.seguro_listo = Juego.stat("seguro") > 0.0
+		if Juego.coop:
+			j.mostrar_etiqueta()
 	_sin_golpes = true
 	_ordago_en_sala = false
 	if _jugo.has_method("al_entrar_sala"):
@@ -507,6 +559,11 @@ func _colocar_jugador(venimos: Vector2i) -> void:
 		Vector2i.LEFT: jugador.position = Vector2(606, 160)
 		Vector2i.RIGHT: jugador.position = Vector2(34, 160)
 		_: jugador.position = Sala.CENTRO
+	if jugador2 != null:
+		# El J2 entra al lado del J1, hacia dentro de la sala.
+		jugador2.velocity = Vector2.ZERO
+		var lado := Vector2(18, 0) if venimos == Vector2i.UP or venimos == Vector2i.DOWN or venimos == Vector2i.ZERO else Vector2(0, 18)
+		jugador2.position = (jugador.position + lado).clamp(Sala.INTERIOR.position + Vector2(10, 10), Sala.INTERIOR.end - Vector2(10, 10))
 
 
 func _physics_process(delta: float) -> void:
@@ -514,6 +571,8 @@ func _physics_process(delta: float) -> void:
 		return
 	Juego.tiempo_partida += delta
 	Juego.enfriar_fiebre(delta)
+	if Juego.coop:
+		_actualizar_reanimacion(delta)
 	if en_combate:
 		_actualizar_combate(delta)
 	else:
@@ -561,6 +620,8 @@ func _planificar_oleadas(rng: RandomNumberGenerator) -> Array:
 	var presupuesto := mini(roundi(bruto * float(_plan.get("presupuesto", 1.0))), PRESUPUESTO_MAX)
 	if Juego.mesa >= 2:
 		presupuesto = int(presupuesto * 1.3)
+	if Juego.coop:
+		presupuesto = int(presupuesto * COOP_PRESUPUESTO)
 	# Cada sala tiene un enemigo de la casa, que sale el triple: así no se parecen entre sí.
 	_favorito = ""
 	_favorito = String(_elegir_enemigo(presupuesto, rng)[0])
@@ -672,6 +733,10 @@ func _nacer_pendientes(delta: float) -> void:
 func _punto_de_nacimiento(azar: RandomNumberGenerator) -> Vector2:
 	var zona := Sala.INTERIOR.grow(-14.0)
 	var centro: Vector2 = jugador.position
+	if Juego.coop:
+		# Cerca de uno o del otro, a suertes (entre los que sigan en pie).
+		var vivos := _horda.vivos()
+		centro = vivos[azar.randi() % vivos.size()].position
 	var cerca := NACER_CERCA_EXTREMO if Juego.extremo else NACER_CERCA
 	var p := Vector2.ZERO
 	for _i in 30:
@@ -726,6 +791,8 @@ func _empezar_jefe() -> void:
 		vida_jefe *= 1.4
 	vida_jefe *= VIDA_JEFE_EXTREMO if Juego.extremo else VIDA_JEFE_NORMAL
 	vida_jefe *= Juego.refuerzo_jefe()
+	if Juego.coop:
+		vida_jefe *= COOP_VIDA_JEFE
 	jefe.preparar(vida_jefe)
 	mostrar_cartel(Idioma.t(jefe.nombre), "")
 	# La entrada del jefe, de cine: franjas, la cámara se le acerca y el tiempo se frena.
@@ -747,6 +814,10 @@ func _terminar_combate() -> void:
 	actual.limpia = true
 	Juego.progreso_sala = -1.0
 	Juego.balas_sala = 1.0
+	# El que estaba fuera de juego vuelve con medio corazón.
+	for j in jugadores:
+		if j.caido:
+			_levantar(j, VIDA_AL_LIMPIAR)
 	if actual.get("tipo") == TIPO.NORMAL and not Juego.diario:
 		Juego.presion = Director.ajustar(Juego.presion, _golpes_sala, _propina_t > 0.0 and _sala_t <= _propina_t)
 	_cobrar_propina()
@@ -784,14 +855,14 @@ func _al_morir_enemigo(posicion: Vector2, oro_prob: float, tipo: String, monedas
 	if tipo != "jefe":
 		_sala_bajas += 1
 	if elite and Juego.stat("elite_cura") > 0.0:
-		Juego.curar(1)
+		Juego.curar_equipo(1)
 	for _i in monedas:
 		_soltar_moneda(posicion)
 	if Juego.azar_combate.randf() < oro_prob:
 		_soltar_moneda(posicion)
 	if tipo == "jefe":
 		sacudir(8.0)
-		Juego.curar(1)  # hardcore: un jefe ya solo devuelve medio corazón
+		Juego.curar_equipo(1)  # hardcore: un jefe ya solo devuelve medio corazón
 		Sonido.tocar("jefe_muere")
 		Juego.novedades += Progreso.al_vencer_jefe(Juego.jefe_del_piso(), Juego.azar_combate)
 		if _sin_golpes:
@@ -806,7 +877,8 @@ func _al_morir_enemigo(posicion: Vector2, oro_prob: float, tipo: String, monedas
 		_jugo.cine(1.8, posicion, 0.1)
 	Juego.subir_fiebre(Juego.FIEBRE_POR_JEFE if tipo == "jefe" else Juego.FIEBRE_POR_BAJA)
 	Juego.alargar_desatado()
-	jugador.remate()
+	for j in jugadores:
+		j.remate()
 	_efecto_muerte(posicion, tipo == "jefe")
 	_jugo.trozos(posicion, 20 if tipo == "jefe" else (9 if ENEMIGOS_GORDOS.has(tipo) else 5), 1.6 if tipo == "jefe" else 1.0)
 	# Las bajas normales no paran nada; los gordos, un pelín; los élite, un remate.
@@ -896,26 +968,40 @@ func _texto_danio(posicion: Vector2, cantidad: float, color: Color) -> void:
 	_jugo.numero_dano(posicion, cantidad, color, critico)
 
 
-func _al_golpear_jugador() -> void:
+func _al_golpear_jugador(quien: Node2D = null) -> void:
+	if quien == null:
+		quien = jugador
 	if actual.get("tipo") == TIPO.APUESTAS:
 		Juego.ultima_causa["apuestas"] = true
-	_sin_golpes = false
+	_sin_golpes = false  # cooperativo: los logros "sin que te toquen" son de equipo
 	_golpes_sala += 1
 	Juego.golpes += 1
+	var vida: int = Juego.vida_de(quien.indice) if Juego.coop else Juego.vida
+	var todos_fuera := vida <= 0 and (not Juego.coop or _vivos_salvo(quien) == 0)
 	_jugo.golpe_jugador()
-	if Juego.vida <= 0:
-		_jugo.cine(2.5, jugador.position, 0.1)
+	if todos_fuera:
+		_jugo.cine(2.5, quien.position, 0.1)
 	sacudir(6.0)
 	_jugo.destello(Color(0.84, 0.24, 0.31, 0.45), 0.2)
 	_jugo.parar(0.08, true)  # antes 0,1: se nota, pero no corta el ritmo
-	Mando.vibrar(Mando.VIBRAR_GOLPE)
-	if Juego.vida <= 0:
+	if not Juego.coop:
+		Mando.vibrar(Mando.VIBRAR_GOLPE)
+	elif quien.entrada >= 0:
+		Mando.vibrar(Mando.VIBRAR_GOLPE, quien.entrada)  # vibra el mando de quien recibe
+	if Juego.coop:
+		# Un golpe al que está reanimando corta la reanimación.
+		for j in jugadores:
+			j.reanimar = 0.0
+	if todos_fuera:
 		_perder()
+		return
+	if vida <= 0:
+		_caer(quien)
 		return
 	# Al límite: corres más y la fiebre sube antes. Se avisa una vez cada vez que entras.
 	if Juego.al_limite() and not _limite_avisado:
 		_limite_avisado = true
-		_jugo.texto(jugador.position + Vector2(0, -24), Idioma.t("¡AL LÍMITE!"), COLOR_LIMITE, true)
+		_jugo.texto(quien.position + Vector2(0, -24), Idioma.t("¡AL LÍMITE!"), COLOR_LIMITE, true)
 
 
 ## La sacudida la lleva el jugo; aquí se queda el nombre de siempre.
@@ -925,14 +1011,16 @@ func sacudir(fuerza: float, direccion := Vector2.ZERO) -> void:
 
 # ------------------------------------------------------------ voltereta, órdago, mesas y fiebre
 ## Q o F (o el botón táctil): borra las balas enemigas y aparta a todos. Solo en combate.
-func lanzar_ordago() -> void:
-	if get_tree().paused or not en_combate:
+func lanzar_ordago(quien: Node2D = null) -> void:
+	if quien == null:
+		quien = jugador
+	if get_tree().paused or not en_combate or quien.caido:
 		return
 	if not Juego.gastar_ordago():
-		_jugo.texto(jugador.position + Vector2(0, -18), Idioma.t("SIN ÓRDAGOS"), Color8(168, 154, 142))
+		_jugo.texto(quien.position + Vector2(0, -18), Idioma.t("SIN ÓRDAGOS"), Color8(168, 154, 142))
 		return
 	_ordago_en_sala = true
-	var centro: Vector2 = jugador.position
+	var centro: Vector2 = quien.position
 	_ataques.borrar_balas_enemigas()
 	_horda.empujar_todos(centro, ORDAGO_EMPUJE, ORDAGO_ATURDIR)
 	# Pitillera de Plata: además hace daño a todos.
@@ -941,18 +1029,22 @@ func lanzar_ordago() -> void:
 		for e in _horda.enemigos.duplicate():
 			if e.activo():
 				_horda.danar(e, dano, Vector2.ZERO, COLOR_FIEBRE)
-	jugador.proteger(ORDAGO_RESPIRO)
+	for j in jugadores:  # la reserva es de los dos, y el respiro también
+		j.proteger(ORDAGO_RESPIRO)
 	Sonido.tocar("ordago")
 	_jugo.onda(centro)
 	_jugo.destello(Color(1, 1, 1, 0.35), 0.25)
 	_jugo.parar(0.05, true)
 	sacudir(8.0)
-	Mando.vibrar(Mando.VIBRAR_ORDAGO)
+	if not Juego.coop:
+		Mando.vibrar(Mando.VIBRAR_ORDAGO)
+	elif quien.entrada >= 0:
+		Mando.vibrar(Mando.VIBRAR_ORDAGO, quien.entrada)
 
 
-func _al_rozar_bala() -> void:
+func _al_rozar_bala(quien: Node2D = null) -> void:
 	Progreso.sumar("por_los_pelos", 1)
-	_jugo.texto(jugador.position + Vector2(0, -16), Idioma.t("¡POR LOS PELOS!"))
+	_jugo.texto((quien if quien != null else jugador).position + Vector2(0, -16), Idioma.t("¡POR LOS PELOS!"))
 
 
 ## Una bala te ha pasado rozando sin rodar: la fiebre ya la ha subido el jugador.
@@ -1008,7 +1100,10 @@ func _ajustar_mesas() -> void:
 func _actualizar_hint_mesa() -> void:
 	if Juego.tactil or _sala.mesas.is_empty():
 		return
-	var cerca := _sala.mesa_cerca(jugador.position, 12.0) != null
+	var cerca := false
+	for j in jugadores:
+		if not j.caido and _sala.mesa_cerca(j.position, 12.0) != null:
+			cerca = true
 	if cerca and _hint_mesa == "" and _aviso.text == "":
 		_hint_mesa = (Idioma.t("%s: VOLCAR LA MESA") % Mando.nombre("interactuar")) if Mando.activo else Idioma.t("E: VOLCAR LA MESA")
 		_aviso.text = _hint_mesa
@@ -1022,7 +1117,13 @@ func _actualizar_hint_mesa() -> void:
 func _mirar_puertas() -> void:
 	if _cambiando_sala:
 		return
-	var p := jugador.position
+	# En cooperativo, cualquiera de los dos que llegue a una puerta abierta se lleva al otro.
+	for j in jugadores:
+		if not j.caido and _mirar_puerta(j.position):
+			return
+
+
+func _mirar_puerta(p: Vector2) -> bool:
 	var d := Vector2i.ZERO
 	if p.y < 18.0:
 		d = Vector2i.UP
@@ -1034,6 +1135,8 @@ func _mirar_puertas() -> void:
 		d = Vector2i.RIGHT
 	if d != Vector2i.ZERO and _sala.puerta_abierta(d):
 		_cruzar_puerta(d)
+		return true
+	return false
 
 
 func _cruzar_puerta(d: Vector2i) -> void:
@@ -1099,18 +1202,20 @@ func _crear_apuestas() -> void:
 
 
 ## La máquina que tienes al lado (para E y el botón táctil), o null.
-func maquina_a_mano() -> Recogible:
+## En cooperativo, la que tiene al lado ese jugador (sin decir quién, cualquiera de los dos).
+func maquina_a_mano(quien: Node2D = null) -> Recogible:
 	if actual.get("tipo") != TIPO.APUESTAS or en_combate or get_tree().paused:
 		return null
 	for r in _recogibles.get_children():
-		if not r.is_queued_for_deletion() and r.clase == Recogible.Clase.MAQUINA and r.tocando():
+		if not r.is_queued_for_deletion() and r.clase == Recogible.Clase.MAQUINA and _toca(r, quien):
 			return r
 	return null
 
 
-func jugar_maquina(r: Recogible) -> void:
+func jugar_maquina(r: Recogible, quien: Node2D = null) -> void:
 	if r == null or _panel_apuestas.visible or en_combate:
 		return
+	_tomar_panel(quien if quien != null else r.quien_toca())
 	_hint_maquina = ""
 	_aviso.text = ""
 	get_tree().paused = true
@@ -1299,13 +1404,20 @@ func _actualizar_hint_tienda() -> void:
 		_barra.info_externa = _info_articulo(id)
 
 
-func _articulo_cerca() -> Recogible:
+func _articulo_cerca(quien: Node2D = null) -> Recogible:
 	for r in _recogibles.get_children():
 		if r.is_queued_for_deletion():
 			continue
-		if r.clase == Recogible.Clase.ARTICULO and r.tocando():
+		if r.clase == Recogible.Clase.ARTICULO and _toca(r, quien):
 			return r
 	return null
+
+
+## ¿Toca ese jugador el recogible? Sin decir cuál, cualquiera de los que sigan en pie.
+func _toca(r: Recogible, quien: Node2D) -> bool:
+	if quien == null:
+		return r.tocando()
+	return not quien.caido and r.position.distance_to(quien.position) <= Recogible.RADIO[r.clase]
 
 
 func _info_articulo(id: String) -> Dictionary:
@@ -1341,6 +1453,9 @@ func _unhandled_input(evento: InputEvent) -> void:
 		return
 	if get_tree().paused:
 		return
+	if Juego.coop:
+		_acciones_coop(evento, del_mando)
+		return
 	match del_mando:
 		"interactuar":
 			_interactuar()
@@ -1358,14 +1473,17 @@ func _unhandled_input(evento: InputEvent) -> void:
 
 
 ## La E (o el botón de interactuar del mando): comprar lo que tienes delante o volcar una mesa.
-func _interactuar() -> void:
-	var articulo := _articulo_cerca()
-	if maquina_a_mano() != null:
-		jugar_maquina(maquina_a_mano())
+func _interactuar(quien: Node2D = null) -> void:
+	if quien != null and quien.caido:
+		return
+	var articulo := _articulo_cerca(quien)
+	var maquina := maquina_a_mano(quien)
+	if maquina != null:
+		jugar_maquina(maquina, quien)
 	elif articulo != null:
-		comprar(articulo)
+		comprar(articulo, quien)
 	else:
-		_sala.volcar_cerca(jugador.position, 12.0, _horda)
+		_sala.volcar_cerca((quien if quien != null else jugador).position, 12.0, _horda)
 
 
 func articulo_a_mano() -> Recogible:
@@ -1382,11 +1500,16 @@ func quizas_pausar() -> void:
 	_menu.abrir_pausa()
 
 
-func comprar(r: Recogible) -> void:
+func comprar(r: Recogible, quien: Node2D = null) -> void:
+	if quien == null:
+		quien = r.quien_toca() if Juego.coop else jugador
+	if quien == null:
+		quien = jugador
+	var i: int = quien.indice if Juego.coop else 0
 	var id: String = r.datos.id
 	if int(r.datos.precio) <= Juego.oro:
 		Sonido.tocar("comprar")
-	if id == ARTICULO_CORAZON and Juego.vida >= Juego.vida_max:
+	if id == ARTICULO_CORAZON and Juego.vida_de(i) >= Juego.vida_max_de(i):
 		_aviso.text = Idioma.t("YA TIENES LA VIDA LLENA")
 		return
 	if id == ARTICULO_RANURA and Juego.cartas.size() >= Juego.RANURAS_MAX:
@@ -1400,6 +1523,7 @@ func comprar(r: Recogible) -> void:
 		return
 	r.datos["vendido"] = true
 	r.queue_free()
+	_tomar_panel(quien)  # si la carta no cabe, elige quien la ha comprado
 	_articulo_mostrado = ""
 	_aviso.text = ""
 	_barra.info_externa = {}
@@ -1407,7 +1531,7 @@ func comprar(r: Recogible) -> void:
 		_recoger_objeto(id.trim_prefix(PREFIJO_OBJETO))
 		return
 	match id:
-		ARTICULO_CORAZON: Juego.curar(2)
+		ARTICULO_CORAZON: Juego.curar(2, i)  # para quien lo compra
 		ARTICULO_RANURA: Juego.anadir_ranura()
 		ARTICULO_ORDAGO: Juego.ganar_ordagos(1)
 		_: _dar_carta(id)
@@ -1453,10 +1577,13 @@ func _al_transformarse(id: String) -> void:
 	_al_tenir(id)
 
 
-func recogido(r: Recogible) -> void:
+func recogido(r: Recogible, quien: Node2D = null) -> void:
 	# Lo de la sala que acabas de dejar se borra al final del fotograma: ya no se coge.
 	if r.is_queued_for_deletion():
 		return
+	if quien == null:
+		quien = jugador
+	var i: int = quien.indice if Juego.coop else 0
 	match r.clase:
 		Recogible.Clase.MONEDA:
 			Juego.ganar_oro(1 + int(Juego.stat("moneda_extra")))
@@ -1465,24 +1592,27 @@ func recogido(r: Recogible) -> void:
 			r.queue_free()
 		Recogible.Clase.CORAZON:
 			# El medio corazón que suelta un élite: si vas lleno, se queda en el suelo.
-			if Juego.vida >= Juego.vida_max:
+			if Juego.vida_de(i) >= Juego.vida_max_de(i):
 				return
 			r.queue_free()
-			Juego.curar(1)
+			Juego.curar(1, i)  # para quien lo coge
 			Sonido.tocar("objeto", 1.2)
 		Recogible.Clase.CARTA:
 			r.queue_free()
+			_tomar_panel(quien)
 			Sonido.tocar("carta_coger")
 			abrir_selector(Juego.robar_cartas(2, 0.0, Juego.azar_para(int(actual.semilla), "eleccion")), Idioma.t("ELIGE UNA CARTA"))
 		Recogible.Clase.EVENTO:
 			if actual.get("evento_hecho", false) or _panel.visible:
 				return
+			_tomar_panel(quien)
 			get_tree().paused = true
 			_panel.abrir(actual.evento, Juego.azar_para(int(actual.semilla), "evento"))
 		Recogible.Clase.COFRE:
 			if actual.cofre_abierto:
 				return
 			actual.cofre_abierto = true
+			_tomar_panel(quien)
 			r.frame = 1
 			Sonido.tocar("carta_coger")
 			abrir_selector(Juego.robar_cartas(3, 1.5, Juego.azar_para(int(actual.semilla), "cofre")), Idioma.t("¡TESORO!"))
@@ -1623,3 +1753,258 @@ class Brillo extends Node2D:
 		for i in 3:
 			draw_circle(centro, radio * (1.0 + i * 0.4 + pulso * 0.3),
 					Color(0.97, 0.78, 0.29, (0.24 - i * 0.07) * (0.6 + 0.4 * pulso)))
+
+
+# ------------------------------------------------------------ cooperativo local
+## Un letrero encima de todo (también del menú de pausa): esperar al J2 o el mando perdido.
+func _crear_letrero_coop() -> void:
+	_letrero_coop = Label.new()
+	_letrero_coop.position = Vector2(0, 140)
+	_letrero_coop.size = Vector2(640, 44)
+	_letrero_coop.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	_letrero_coop.vertical_alignment = VERTICAL_ALIGNMENT_CENTER
+	_letrero_coop.add_theme_color_override("font_color", Color8(247, 236, 210))
+	var fondo := StyleBoxFlat.new()
+	fondo.bg_color = Color(0.08, 0.06, 0.12, 0.94)
+	fondo.border_color = Color8(111, 195, 232)
+	fondo.set_border_width_all(1)
+	_letrero_coop.add_theme_stylebox_override("normal", fondo)
+	_letrero_coop.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_letrero_coop.visible = false
+	$UI.add_child(_letrero_coop)
+
+
+## Pone a cada jugador en su sitio según la partida: uno solo (como siempre) o dos.
+func _preparar_jugadores() -> void:
+	if Juego.coop and jugador2 == null:
+		_crear_j2()
+	elif not Juego.coop and jugador2 != null:
+		jugadores.erase(jugador2)
+		jugador2.queue_free()
+		jugador2 = null
+		_jugo.poner_segundo(null)
+	jugador.indice = 0
+	jugador.en_coop = Juego.coop
+	jugador.entrada = int(_coop_cfg.get("entrada1", Mando.TECLADO)) if Juego.coop else Mando.TODO
+	jugador.tambien_teclado = false
+	# Los dos cuerpos no chocan entre sí (sí con las paredes): así no se tapan una puerta.
+	jugador.collision_layer = 0 if Juego.coop else 1
+	if jugador2 != null:
+		jugador2.indice = 1
+		jugador2.en_coop = true
+		jugador2.entrada = int(_coop_cfg.get("entrada2", Mando.TECLADO_DER))
+		jugador2.collision_layer = 0
+		jugador.tambien_teclado = jugador.entrada >= 0 and not Mando.es_teclado(jugador2.entrada)
+	for j in jugadores:
+		j.caido = false
+		j.reanimar = 0.0
+		j.aplicar_personaje()
+		j.queue_redraw()
+
+
+func _crear_j2() -> void:
+	jugador2 = load("res://scenes/player.tscn").instantiate()
+	jugador2.name = "Player2"
+	_mundo.add_child(jugador2)
+	_mundo.move_child(jugador2, jugador.get_index() + 1)
+	jugador2.sala = _sala
+	jugador2.horda = _horda
+	jugador2.ataques = _ataques
+	jugador2.golpeado.connect(_al_golpear_jugador.bind(jugador2))
+	jugador2.voltereta.connect(_jugo.al_rodar.bind(jugador2))
+	jugador2.por_los_pelos.connect(_al_rozar_bala.bind(jugador2))
+	jugador2.roce.connect(_al_rozar_sin_rodar)
+	jugadores.append(jugador2)
+	_jugo.poner_segundo(jugador2)
+
+
+## Cuántos siguen en pie, sin contar a ese.
+func _vivos_salvo(quien: Node2D) -> int:
+	var n := 0
+	for j in jugadores:
+		if j != quien and not j.caido:
+			n += 1
+	return n
+
+
+## Fuera de juego: se queda en el suelo hasta que el otro lo levante o se limpie la sala.
+func _caer(quien: Node2D) -> void:
+	quien.caer()
+	Sonido.tocar("perder")
+	_jugo.texto(quien.position + Vector2(0, -26), Idioma.t("¡J1 FUERA DE JUEGO!") if quien.indice == 0 else Idioma.t("¡J2 FUERA DE JUEGO!"), COLOR_LIMITE, true)
+
+
+func _levantar(quien: Node2D, vida: int) -> void:
+	var i: int = quien.indice
+	Juego.poner_vida(i, clampi(vida, 1, Juego.vida_max_de(i)), Juego.vida_max_de(i))
+	quien.levantar()
+	if not Juego.transformaciones.is_empty():
+		_al_tenir(Juego.transformaciones[-1])
+
+
+## Quedarse al lado del caído llena su barra; un golpe la corta y alejarse la vacía poco a poco.
+func _actualizar_reanimacion(delta: float) -> void:
+	for j in jugadores:
+		if not j.caido:
+			continue
+		var al_lado := false
+		for otro in jugadores:
+			if otro != j and not otro.caido and otro.position.distance_to(j.position) <= REANIMAR_RADIO:
+				al_lado = true
+		if al_lado:
+			j.reanimar += delta / REANIMAR_SEG
+		else:
+			j.reanimar = maxf(j.reanimar - delta / REANIMAR_SEG, 0.0)
+		if j.reanimar >= 1.0:
+			_levantar(j, REANIMAR_VIDA)
+			Sonido.tocar("objeto", 1.2)
+			_jugo.texto(j.position + Vector2(0, -24), Idioma.t("¡REANIMADO!"), Color8(108, 207, 148), true)
+
+
+## Adónde vuelan las monedas: al jugador en pie más cercano.
+func objetivo_moneda(pos: Vector2) -> Node2D:
+	return _horda.objetivo_para(pos)
+
+
+## El que abre un panel (carta, cofre, evento, apuestas, sustituir) lo maneja hasta cerrarlo:
+## lo que pulse el otro mientras tanto no cuenta. Y es el "titular" de las vidas del panel.
+func _tomar_panel(quien: Node2D) -> void:
+	if not Juego.coop or quien == null:
+		return
+	_dueno_panel = quien
+	Juego.titular = quien.indice
+
+
+func _soltar_panel() -> void:
+	_dueno_panel = null
+	Juego.titular = 0
+
+
+func _panel_abierto() -> bool:
+	return _selector.visible or _barra.modo_sustituir or _panel.visible or _panel_apuestas.visible
+
+
+func _filtrar_panel(evento: InputEvent) -> void:
+	if not _panel_abierto():
+		if _dueno_panel != null:
+			_soltar_panel()
+		return
+	if _dueno_panel == null or _menu.visible:
+		return
+	if not (evento is InputEventKey or evento is InputEventMouse or Mando.es_mando(evento)):
+		return
+	if _jugador_de_evento(evento) != _dueno_panel:
+		get_viewport().set_input_as_handled()
+
+
+## De qué jugador es un evento (en cooperativo): el de su mando o su trozo de teclado.
+func _jugador_de_evento(evento: InputEvent) -> Node2D:
+	for j in jugadores:
+		if Mando.es_de(j.entrada, evento):
+			return j
+	if evento is InputEventKey or evento is InputEventMouse:
+		for j in jugadores:
+			if j.tambien_teclado:
+				return j
+	return null
+
+
+## Interactuar y el órdago, cada uno con lo suyo. J2 con el teclado compartido: Fin (o Supr,
+## o el 0 del teclado numérico) interactúa y Mayús derecha lanza el órdago.
+func _acciones_coop(evento: InputEvent, del_mando: String) -> void:
+	var quien := _jugador_de_evento(evento)
+	if quien == null:
+		return
+	match del_mando:
+		"interactuar":
+			_interactuar(quien)
+			return
+		"ordago":
+			lanzar_ordago(quien)
+			return
+	if not (evento is InputEventKey) or not evento.pressed or evento.echo:
+		return
+	var k: Key = evento.physical_keycode
+	if quien.entrada == Mando.TECLADO_DER:
+		if Mando.J2_INTERACTUAR.has(k):
+			_interactuar(quien)
+		elif k == KEY_SHIFT and evento.location == KEY_LOCATION_RIGHT:
+			lanzar_ordago(quien)
+		return
+	match k:
+		KEY_E:
+			_interactuar(quien)
+		KEY_Q, KEY_F:
+			lanzar_ordago(quien)
+
+
+## Un mando de la partida cooperativa se ha desconectado: pausa y aviso.
+func _mando_perdido(disp: int) -> void:
+	if not Juego.coop or not _espera_j2.is_empty():
+		return
+	for j in jugadores:
+		if j.entrada != disp:
+			continue
+		if not get_tree().paused:
+			quizas_pausar()
+		_letrero_coop.text = (Idioma.t("MANDO DEL J1 DESCONECTADO") if j.indice == 0 else Idioma.t("MANDO DEL J2 DESCONECTADO")) \
+				+ "\n" + Idioma.t("VUELVE A CONECTARLO Y SIGUE")
+		_letrero_coop.visible = true
+		return
+
+
+## Al continuar una partida cooperativa: el J2 pulsa en su mando (o en el teclado) para volver.
+## Si el J1 acepta sin él, se sigue en solitario.
+func _empezar_espera_j2(datos: Dictionary, reto_caducado: bool) -> void:
+	var e1 := Mando.dispositivo if Mando.activo else Mando.TECLADO
+	_espera_j2 = {"datos": datos, "caducado": reto_caducado, "entrada1": e1}
+	if Juego.tactil and Input.get_connected_joypads().is_empty():
+		_terminar_espera_j2({})  # en el móvil sin mandos no hay cooperativo
+		return
+	var solo := (Idioma.t("%s: SEGUIR EN SOLITARIO") % Mando.nombre("aceptar")) if e1 >= 0 else Idioma.t("ENTER: SEGUIR EN SOLITARIO")
+	var unirse := Idioma.t("J2: PULSA %s EN OTRO MANDO O CTRL DCHO. PARA UNIRTE") % Mando.nombre("pausa")
+	_letrero_coop.text = Idioma.t("PARTIDA COOPERATIVA") + "\n" + unirse + "\n" + solo
+	_letrero_coop.visible = true
+	get_tree().paused = true
+
+
+func _mirar_espera_j2(evento: InputEvent) -> void:
+	var e1: int = _espera_j2.entrada1
+	var cfg := {}
+	var pulsado: bool = (evento is InputEventJoypadButton or evento is InputEventKey) and evento.pressed \
+			and not (evento is InputEventKey and evento.echo)
+	if not pulsado:
+		return
+	get_viewport().set_input_as_handled()
+	# Como en la selección: START en otro mando o Ctrl derecho para unirse; lo demás es del J1.
+	if evento is InputEventJoypadButton and evento.device != e1 and Mando.PAUSA.has(evento.button_index):
+		cfg = {"entrada1": e1, "entrada2": evento.device}
+	elif evento is InputEventKey and evento.physical_keycode == KEY_CTRL and evento.location == KEY_LOCATION_RIGHT:
+		if e1 >= 0:
+			cfg = {"entrada1": e1, "entrada2": Mando.TECLADO}
+		else:
+			cfg = {"entrada1": Mando.TECLADO_IZQ, "entrada2": Mando.TECLADO_DER}
+	elif Mando.tecla(evento) in [KEY_ENTER, KEY_KP_ENTER, KEY_SPACE]:
+		_terminar_espera_j2({})
+		return
+	else:
+		if evento is InputEventJoypadButton:
+			_espera_j2.entrada1 = evento.device  # el J1 ha cogido el mando
+		elif evento is InputEventKey:
+			_espera_j2.entrada1 = Mando.TECLADO
+		return
+	cfg["personaje2"] = Juego.personaje2
+	_terminar_espera_j2(cfg)
+
+
+func _terminar_espera_j2(cfg: Dictionary) -> void:
+	var datos: Dictionary = _espera_j2.datos
+	var caducado: bool = _espera_j2.caducado
+	_espera_j2 = {}
+	_letrero_coop.visible = false
+	_coop_cfg = cfg
+	if cfg.is_empty():
+		Juego.quitar_coop()
+	_seguir_continuar(datos, caducado)
+	if cfg.is_empty():
+		_aviso.text = Idioma.t("EL J2 NO HA VUELTO: SIGUES EN SOLITARIO")

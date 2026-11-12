@@ -20,6 +20,13 @@ const COLOR_LASER := Color8(214, 61, 79)
 
 var horda: Horda
 var jugador: Node2D
+## En cooperativo, los dos (lo pone main). Cada carta de ataque sale de cada uno que siga en pie.
+var jugadores: Array = []
+## De quién sale el ataque que se está lanzando: la navaja gira a su alrededor y el
+## boomerang vuelve a él. Fuera del lanzamiento, el J1.
+var origen_nodo: Node2D
+## Lo que hace cada copia de una carta en cooperativo (las dos juntas, el 120 %).
+const COOP_DANO := 0.6
 
 var _tex_bala: Texture2D = load("res://assets/efectos/bala.png")
 var _tex_enemigas := {
@@ -56,7 +63,36 @@ func limpiar() -> void:
 
 
 func lanzar(a: Dictionary) -> void:
-	_lanzar_desde(a, jugador.global_position, true)
+	if jugadores.size() <= 1:
+		origen_nodo = jugador
+		_lanzar_desde(a, jugador.global_position, true)
+		return
+	# Cooperativo: la carta sale de cada uno, al 60 %, apuntando desde donde está cada cual.
+	for j in jugadores:
+		if j.caido:
+			continue
+		var copia := a.duplicate()
+		copia["dano"] = float(a.dano) * COOP_DANO
+		origen_nodo = j
+		_lanzar_desde(copia, j.global_position, true)
+	origen_nodo = jugador
+
+
+## El jugador al que toca una bala enemiga (o null): el que esté en pie, cerca y sin rodar.
+func jugador_tocado(pos: Vector2, radio: float) -> Node2D:
+	if jugadores.size() <= 1:
+		if pos.distance_to(jugador.global_position) < radio and not jugador.rodando():
+			return jugador
+		return null
+	for j in jugadores:
+		if not j.caido and pos.distance_to(j.global_position) < radio and not j.rodando():
+			return j
+	return null
+
+
+## El nodo del que sale el ataque en marcha (si ya no existe, el J1).
+func centro_ataque() -> Node2D:
+	return origen_nodo if is_instance_valid(origen_nodo) else jugador
 
 
 ## Un ataque fuera del combo (lo usan los objetos, p. ej. los naipes al rodar).
@@ -95,7 +131,7 @@ func _lanzar_desde(a: Dictionary, origen: Vector2, del_jugador: bool) -> void:
 		"recortada":
 			_recortada(a, origen, hacia)
 		"tommy":
-			_rafaga(a, origen, hacia, del_jugador)
+			_rafaga(a, origen, hacia, del_jugador, centro_ataque())
 		"corcho":
 			_corcho(a, origen, hacia)
 		"nova":
@@ -203,6 +239,7 @@ func _preparar_bala(a: Dictionary, origen: Vector2, direccion: Vector2, vida: fl
 	p.empuje = empuje
 	p.fuerte = calibre > 0 or bool(a.get("premio", false)) or float(a.dano) >= 12.0
 	p.iniciar_jugador(direccion * vel, a, vida, self)
+	p.casa = centro_ataque()  # adonde vuelve el boomerang
 	return p
 
 
@@ -216,19 +253,19 @@ func _recortada(a: Dictionary, origen: Vector2, hacia: Vector2) -> void:
 
 
 ## La metralleta suelta sus balas de una en una; si la lanzas tú, apunta cada vez.
-func _rafaga(a: Dictionary, origen: Vector2, hacia: Vector2, del_jugador: bool) -> void:
+func _rafaga(a: Dictionary, origen: Vector2, hacia: Vector2, del_jugador: bool, quien: Node2D = null) -> void:
 	var tanda := Node.new()  # al limpiar la sala se va con ella y la ráfaga se corta
 	add_child(tanda)
 	var tw := tanda.create_tween()
 	for _i in a.n:
-		tw.tween_callback(_bala_rafaga.bind(a, origen, hacia, del_jugador))
+		tw.tween_callback(_bala_rafaga.bind(a, origen, hacia, del_jugador, quien))
 		tw.tween_interval(0.055)
 	tw.tween_callback(tanda.queue_free)
 
 
-func _bala_rafaga(a: Dictionary, origen: Vector2, hacia: Vector2, del_jugador: bool) -> void:
+func _bala_rafaga(a: Dictionary, origen: Vector2, hacia: Vector2, del_jugador: bool, quien: Node2D = null) -> void:
 	if del_jugador:
-		origen = jugador.global_position
+		origen = (quien if is_instance_valid(quien) else jugador).global_position
 		var cerca: Array = horda.mas_cercanos(origen, 1)
 		if not cerca.is_empty() and cerca[0].position != origen:
 			hacia = (cerca[0].position - origen).normalized()
@@ -344,7 +381,7 @@ func golpear(e: Enemigo, a: Dictionary, retroceso: Vector2) -> void:
 		e.oro_prob = 1.0
 	var direccion := retroceso.normalized()
 	if direccion == Vector2.ZERO:
-		direccion = (e.position - jugador.global_position).normalized()
+		direccion = (e.position - centro_ataque().global_position).normalized()
 	var empujon := int(a.get("empuje", 0))
 	if empujon > 0:
 		# Empujón: el triple de retroceso (aunque el ataque no empujara) y un momento aturdido.

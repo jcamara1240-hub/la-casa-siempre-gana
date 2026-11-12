@@ -20,6 +20,7 @@ var _busca_t := 0.0
 var _foco := Vector2.ZERO
 var _foco_deseado := Vector2.ZERO
 var _metralla := false
+var _eje: Node2D  # el jugador alrededor del que gira (en cooperativo, el que la lanzó)
 
 
 func iniciar(ataque: Dictionary, angulo: float, dueno: Ataques) -> void:
@@ -32,7 +33,8 @@ func iniciar(ataque: Dictionary, angulo: float, dueno: Ataques) -> void:
 	scale = Vector2.ONE * (1.0 + 0.4 * calibre)
 	_busca = int(ataque.get("busca", 0)) > 0
 	_metralla = int(ataque.get("metralla", 0)) > 0
-	position = _dueno.jugador.global_position + Vector2.RIGHT.rotated(angulo) * RADIO
+	_eje = _dueno.centro_ataque()
+	position = _centro() + Vector2.RIGHT.rotated(angulo) * RADIO
 
 
 func _physics_process(delta: float) -> void:
@@ -44,14 +46,14 @@ func _physics_process(delta: float) -> void:
 	_angulo += GIRO * delta
 	if _busca:
 		_buscar(delta)
-	var centro: Vector2 = _dueno.jugador.global_position + _foco
+	var centro: Vector2 = _centro() + _foco
 	var radio_actual := RADIO + sin(_t * 9.0) * VAIVEN
 	position = centro + Vector2.RIGHT.rotated(_angulo) * radio_actual
 	rotation += 14.0 * delta
 	for e in _dueno.horda.en_radio(position, _radio_golpe):
 		if _t - float(_ultimos.get(e, -1.0)) >= REPETIR_SEG:
 			_ultimos[e] = _t
-			_dueno.golpear(e, _ataque, (e.position - _dueno.jugador.global_position).normalized() * 75.0)
+			_dueno.golpear(e, _ataque, (e.position - _centro()).normalized() * 75.0)
 			if _metralla:
 				_metralla = false
 				_dueno.soltar_metralla(_ataque, e.position, (e.position - centro).normalized(), e)
@@ -62,7 +64,7 @@ func _buscar(delta: float) -> void:
 	_busca_t -= delta
 	if _busca_t <= 0.0:
 		_busca_t = 0.2
-		var jugador: Vector2 = _dueno.jugador.global_position
+		var jugador: Vector2 = _centro()
 		var mejor := 90.0 * 90.0
 		_foco_deseado = Vector2.ZERO
 		for e in _dueno.horda.en_radio(jugador, 90.0):
@@ -71,3 +73,7 @@ func _buscar(delta: float) -> void:
 				mejor = d
 				_foco_deseado = (e.position - jugador).limit_length(ACERCA)
 	_foco = _foco.lerp(_foco_deseado, clampf(delta * 8.0, 0.0, 1.0))
+
+
+func _centro() -> Vector2:
+	return (_eje if is_instance_valid(_eje) else _dueno.jugador).global_position

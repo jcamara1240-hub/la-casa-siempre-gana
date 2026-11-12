@@ -31,6 +31,7 @@ var _metralla := false
 var _anulada := false
 var _t := 0.0
 var causa: Dictionary = {}  # quién la disparó (solo las enemigas), ver Ataques.causa_en
+var casa: Node2D  # adonde vuelve un boomerang (el jugador que lo lanzó)
 
 
 func iniciar_jugador(velocidad: Vector2, ataque: Dictionary, vida: float, dueno: Ataques) -> void:
@@ -145,8 +146,9 @@ func _actuar_enemiga() -> void:
 	if _dueno.horda.sala.bloquea_bala(position):
 		queue_free()
 		return
-	if position.distance_to(_dueno.jugador.global_position) < 7.0 and not _dueno.jugador.rodando():
-		_dueno.jugador.recibir_golpe(1, causa)
+	var tocado := _dueno.jugador_tocado(position, 7.0)
+	if tocado != null:
+		tocado.recibir_golpe(1, causa)
 		queue_free()
 
 
@@ -208,7 +210,7 @@ func _mover_boomerang(delta: float) -> void:
 		_de_vuelta = true
 		_golpeados.clear()  # a la vuelta puede volver a golpear
 		_vida = 2.0
-	var hacia: Vector2 = _dueno.jugador.global_position - position
+	var hacia: Vector2 = (casa if is_instance_valid(casa) else _dueno.jugador).global_position - position
 	if hacia.length() < 10.0:
 		queue_free()
 		return

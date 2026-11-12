@@ -11,6 +11,8 @@ signal rango_muerto(enemigo: Enemigo)
 const CELDA := 32.0
 
 var jugador: Node2D
+## Todos los jugadores (en cooperativo, dos; el primero es "jugador"). Lo pone main.
+var jugadores: Array = []
 var ataques: Ataques
 var sala: Sala
 var enemigos: Array = []
@@ -151,10 +153,49 @@ func empujar_todos(centro: Vector2, fuerza: float, aturdir_seg := 0.0) -> void:
 ## Con position y no global_position: el temblor de pantalla mueve el Mundo entero
 ## (jugador y enemigos a la vez) y no debe cambiar quién toca a quién.
 func _comprobar_contacto() -> void:
-	for e in en_radio(jugador.position, 5.0):
+	if jugadores.size() > 1:
+		for j in jugadores:
+			if not j.caido:
+				_contacto_con(j)
+		return
+	_contacto_con(jugador)
+
+
+func _contacto_con(j: Node2D) -> void:
+	for e in en_radio(j.position, 5.0):
 		if e.hace_contacto:
-			jugador.recibir_golpe(1, causa_de(e))
+			j.recibir_golpe(1, causa_de(e))
 			break
+
+
+## A quién va a por un enemigo (o apunta una bala) que está en "pos": al jugador en pie más
+## cercano. Con uno solo, siempre a él. Son dos distancias: nada que ordenar.
+func objetivo_para(pos: Vector2) -> Node2D:
+	if jugadores.size() <= 1:
+		return jugador
+	var mejor: Node2D = null
+	var mejor_d := INF
+	for j in jugadores:
+		if j.caido:
+			continue
+		var d: float = pos.distance_squared_to(j.position)
+		if d < mejor_d:
+			mejor_d = d
+			mejor = j
+	return mejor if mejor != null else jugador
+
+
+## Los jugadores en pie (en solitario, el de siempre).
+func vivos() -> Array:
+	if jugadores.size() <= 1:
+		return [jugador]
+	return jugadores.filter(func(j): return not j.caido)
+
+
+## Para los ataques que se reparten (las botellas del Coctelero): uno y otro, por turnos.
+func objetivo_por_turno(turno: int) -> Node2D:
+	var lista := vivos()
+	return lista[posmod(turno, lista.size())] if not lista.is_empty() else jugador
 
 
 ## Lo que se apunta como causa del golpe que da este enemigo (o el jefe de la sala).
@@ -171,8 +212,9 @@ func _humo_del_puro(delta: float) -> void:
 	if _puro_t > 0.0:
 		return
 	_puro_t = 0.5
-	for e in en_radio(jugador.position, 42.0):
-		e.aplicar_quemadura(3.0)
+	for j in vivos():
+		for e in en_radio(j.position, 42.0):
+			e.aplicar_quemadura(3.0)
 
 
 func _retirar_muertos() -> void:

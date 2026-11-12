@@ -25,7 +25,7 @@ func _comportamiento(delta: float, horda: Horda) -> void:
 	match _estado:
 		Estado.VOLAR:
 			frame = int(_t * 14.0) % 2
-			var hacia: Vector2 = (horda.jugador.global_position - position).normalized()
+			var hacia: Vector2 = (_blanco(horda).global_position - position).normalized()
 			position += hacia.rotated(sin(_t * 2.6) * 1.3) * vel * delta
 			if _reloj <= 0.0:
 				_estado = Estado.REPARTO

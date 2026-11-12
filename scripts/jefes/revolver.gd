@@ -25,7 +25,7 @@ func _comportamiento(delta: float, horda: Horda) -> void:
 	match _estado:
 		Estado.GIRAR:
 			frame = int(_t * 18.0) % 6
-			position += (horda.jugador.global_position - position).normalized() * vel * delta
+			position += (_blanco(horda).global_position - position).normalized() * vel * delta
 			if _reloj <= 0.0:
 				_estado = Estado.GATILLO
 				_reloj = 0.55

@@ -211,6 +211,7 @@ func nueva_partida(semilla := 0, id_personaje := "", id_mesa := -1, modo_extremo
 		reto_puntuable = false
 	golpes = 0
 	ultima_causa = {}
+	_sin_coop()
 	var datos: Dictionary = PersonajesDB.PERSONAJES[personaje]
 	# El contrato firmado en la selección; ni el reto, ni el extremo, ni el imposible lo llevan.
 	contrato = [] if reto_diario or extremo or not Progreso.contrato_disponible(personaje) else Progreso.contrato(personaje)
@@ -344,7 +345,8 @@ func resumen_reto(gano: bool) -> Dictionary:
 # ---------------------------------------------------------------- guardado
 const CAMPOS_PARTIDA := ["vida", "vida_max", "oro", "piso", "enemigos_eliminados", "racha", "personaje", "mesa", "extremo",
 	"diario", "imposible", "infinito", "deuda", "orden_jefes", "cartas", "objetos", "stats", "transformaciones", "novedades", "tiempo_partida",
-	"mejor_combo", "oro_total", "ordagos", "presion", "fecha_reto", "reto_puntuable", "golpes", "contrato"]
+	"mejor_combo", "oro_total", "ordagos", "presion", "fecha_reto", "reto_puntuable", "golpes", "contrato",
+	"coop", "personaje2", "vida2", "vida_max2"]
 
 
 func volcar() -> Dictionary:
@@ -358,6 +360,7 @@ func restaurar(datos: Dictionary) -> void:
 	# Las partidas guardadas antes de que existieran los órdagos empiezan con los de siempre.
 	ordagos = ORDAGOS_BASE
 	contrato = []  # las guardadas antes del Contrato de la Casa no traen ninguno
+	_sin_coop()  # ni las de antes del cooperativo traen segundo jugador
 	_reiniciar_ritmo()
 	for campo in CAMPOS_PARTIDA:
 		if datos.has(campo):
@@ -444,8 +447,14 @@ func factor_fiebre() -> float:
 
 
 ## Te queda un corazón o menos. En extremo siempre es así, y por eso no cuenta.
-func al_limite() -> bool:
-	return vida > 0 and vida <= 2 and not extremo
+## En cooperativo, sin decir quién: si alguno de los dos que siguen en pie lo está.
+func al_limite(i := -1) -> bool:
+	if extremo:
+		return false
+	if i < 0 and coop:
+		return al_limite(0) or al_limite(1)
+	var v := vida_de(maxi(i, 0))
+	return v > 0 and v <= 2
 
 
 ## Lo que queda de desatado, de 1.0 (recién empezado) a 0.0.
@@ -454,8 +463,8 @@ func desatado_resto() -> float:
 
 
 ## Lo que multiplica la velocidad del jugador ahora mismo (al límite, desatado).
-func factor_velocidad() -> float:
-	return (VELOCIDAD_AL_LIMITE if al_limite() else 1.0) * (DESATADO_VELOCIDAD if desatado else 1.0)
+func factor_velocidad(i := -1) -> float:
+	return (VELOCIDAD_AL_LIMITE if al_limite(i) else 1.0) * (DESATADO_VELOCIDAD if desatado else 1.0)
 
 
 ## Cuánto aprieta la partida ahora mismo, de 0.0 a 1.0: para la música y los efectos.
@@ -599,6 +608,10 @@ func dar_objeto(id: String) -> void:
 			"vida_max":
 				vida_max += int(efecto[clave])
 				vida = vida_max
+				if coop:  # los corazones de un objeto son para los dos
+					vida_max2 += int(efecto[clave])
+					if vida2 > 0:
+						vida2 = vida_max2
 			"ranura":
 				anadir_ranura()
 			"monedas":
@@ -634,8 +647,7 @@ func _comprobar_transformaciones() -> void:
 
 
 func vender_corazon() -> void:
-	vida_max -= 2
-	vida = mini(vida, vida_max)
+	poner_vida(titular, mini(vida_titular(), vida_max_titular() - 2), vida_max_titular() - 2)
 	ganar_oro(30)
 
 
@@ -779,13 +791,17 @@ func gastar_oro(cantidad: int) -> bool:
 	return true
 
 
-func curar(cantidad: int) -> void:
-	vida = mini(vida + cantidad, vida_max)
-	estado_cambiado.emit()
+## "i": de qué jugador (0 J1, 1 J2); sin decirlo, el titular (en solitario, siempre J1).
+func curar(cantidad: int, i := -1) -> void:
+	if i < 0:
+		i = titular
+	poner_vida(i, mini(vida_de(i) + cantidad, vida_max_de(i)), vida_max_de(i))
 
 
-func herir(cantidad: int) -> void:
-	vida = 0 if extremo else maxi(vida - cantidad, 0)
+func herir(cantidad: int, i := -1) -> void:
+	if i < 0:
+		i = titular
+	poner_vida(i, 0 if extremo else maxi(vida_de(i) - cantidad, 0), vida_max_de(i))
 	racha = 0
 	estado_cambiado.emit()
 
@@ -814,3 +830,76 @@ func robar_cartas(cuantas: int, suerte := 0.0, rng: RandomNumberGenerator = null
 				bolsa.remove_at(j)
 				break
 	return elegidas
+
+
+# ---------------------------------------------------------------- cooperativo
+## Dos jugadores en la misma sala. Lo de la partida (cartas, oro, objetos, Fiebre, órdagos)
+## es de los dos; cada uno tiene sus corazones: los del J1 son vida y vida_max (como siempre)
+## y los del J2, vida2 y vida_max2. El J2 elige su personaje solo por su aspecto y su vida.
+var coop := false
+var personaje2 := ""
+var vida2 := 0
+var vida_max2 := 0
+## Quién maneja lo que se abra (tienda, evento, apuestas): 0 el J1, 1 el J2. Lo pone main.
+var titular := 0
+
+
+func _sin_coop() -> void:
+	coop = false
+	personaje2 = ""
+	vida2 = 0
+	vida_max2 = 0
+	titular = 0
+
+
+## Tras nueva_partida: entra el J2 con su personaje (mismas reglas de vida que el J1).
+func activar_coop(id2: String) -> void:
+	coop = true
+	personaje2 = id2 if PersonajesDB.PERSONAJES.has(id2) else personaje
+	var datos: Dictionary = PersonajesDB.PERSONAJES[personaje2]
+	vida_max2 = 2 if extremo else int(datos.vida) - (2 if mesa >= 4 else 0)
+	if clausula("corazon"):
+		vida_max2 = maxi(vida_max2 - 2, 2)
+	vida2 = vida_max2
+	titular = 0
+	estado_cambiado.emit()
+
+
+## Se sigue en solitario (el J2 no ha vuelto a unirse al continuar).
+func quitar_coop() -> void:
+	_sin_coop()
+	estado_cambiado.emit()
+
+
+func vida_de(i: int) -> int:
+	return vida2 if i == 1 and coop else vida
+
+
+func vida_max_de(i: int) -> int:
+	return vida_max2 if i == 1 and coop else vida_max
+
+
+func vida_titular() -> int:
+	return vida_de(titular)
+
+
+func vida_max_titular() -> int:
+	return vida_max_de(titular)
+
+
+func poner_vida(i: int, nueva: int, nueva_max: int) -> void:
+	if i == 1 and coop:
+		vida2 = nueva
+		vida_max2 = nueva_max
+	else:
+		vida = nueva
+		vida_max = nueva_max
+	estado_cambiado.emit()
+
+
+## Una cura para el equipo (el jefe vencido, el élite con el Collar): a los que sigan en pie.
+func curar_equipo(cantidad: int) -> void:
+	if vida > 0:
+		curar(cantidad, 0)
+	if coop and vida2 > 0:
+		curar(cantidad, 1)

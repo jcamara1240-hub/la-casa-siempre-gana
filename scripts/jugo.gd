@@ -98,6 +98,9 @@ var _destello_color := Color.TRANSPARENT
 var _chispas_fotograma := 0
 var _fantasma_t := 0.0
 var _rodaba := false
+var _otro  # cooperativo: el J2 (o null). Su estela, su luz y su sombra, como las del J1.
+var _otro_fantasma_t := 0.0
+var _otro_rodaba := false
 var _critico_fotograma := -1
 var _critico_pos := Vector2.ZERO
 var _ultimo_casquillo := 0
@@ -324,7 +327,10 @@ func al_disparar(origen: Vector2, direccion: Vector2, fuerza: float) -> void:
 		sacudir(1.5 * fuerza, -dir)
 	empujar_camara(dir, 0.8 * fuerza)
 	if _jugador != null:
-		_jugador.patada(dir, 1.0 + fuerza * 0.5)
+		var quien = _jugador
+		if _otro != null and is_instance_valid(_otro) and _otro.position.distance_squared_to(origen) < _jugador.position.distance_squared_to(origen):
+			quien = _otro
+		quien.patada(dir, 1.0 + fuerza * 0.5)
 	if fuerza >= 3.0:
 		parar(0.03)
 
@@ -361,9 +367,18 @@ func al_explotar(centro: Vector2, radio: float) -> void:
 			_amb.golpe_zoom(0.015, centro)
 
 
-func al_rodar(direccion: Vector2) -> void:
-	if _jugador != null:
-		polvo(_jugador.position + Vector2(0, 6), 4, direccion)
+func al_rodar(direccion: Vector2, quien = null) -> void:
+	if quien == null:
+		quien = _jugador
+	if quien != null:
+		polvo(quien.position + Vector2(0, 6), 4, direccion)
+
+
+## Cooperativo: el segundo jugador también deja estela, tiene luz y sombra (null lo quita).
+func poner_segundo(j2) -> void:
+	_otro = j2
+	if _amb != null:
+		_amb.otros = [] if j2 == null else [j2]
 
 
 ## Para los números de daño: ¿acaba de haber un golpe doble aquí mismo?
@@ -388,6 +403,17 @@ func _seguir_voltereta(delta: float) -> void:
 	if not rueda and _rodaba:
 		polvo(_jugador.position + Vector2(0, 6), 3)
 	_rodaba = rueda
+	if _otro == null or not is_instance_valid(_otro):
+		return
+	var rueda2: bool = _otro.rodando()
+	if rueda2 or (desatado and not _otro.caido):
+		_otro_fantasma_t -= delta
+		if _otro_fantasma_t <= 0.0:
+			_otro_fantasma_t = 0.035 if rueda2 else FANTASMA_DESATADO
+			fantasma(_otro.get_node("Sprite"), Color(0.75, 0.85, 1.0, 0.45) if rueda2 else Color(1.0, 0.7, 0.35, 0.5), _otro)
+	if not rueda2 and _otro_rodaba:
+		polvo(_otro.position + Vector2(0, 6), 3)
+	_otro_rodaba = rueda2
 
 
 # ------------------------------------------------------------ lo nuevo que llama main
@@ -661,13 +687,13 @@ func _disco(pos: Vector2, escala: float, vida: float, color: Color) -> void:
 
 
 ## Una copia del jugador que se desvanece: la estela de la voltereta (y del desatado).
-func fantasma(sprite: Sprite2D, color := Color(0.75, 0.85, 1.0, 0.45)) -> void:
+func fantasma(sprite: Sprite2D, color := Color(0.75, 0.85, 1.0, 0.45), quien = null) -> void:
 	if sprite == null or sprite.texture == null or _suelo == null or _suelo.particulas.size() >= TOPE_SUELO:
 		return
 	var tex := sprite.texture
 	var w := float(tex.get_width()) / sprite.hframes
 	var h := float(tex.get_height()) / sprite.vframes
-	var p := _nueva(tex, 1, _jugador.position + sprite.position, 0.16 if color.a < 0.5 else 0.22)
+	var p := _nueva(tex, 1, (quien if quien != null else _jugador).position + sprite.position, 0.16 if color.a < 0.5 else 0.22)
 	p.region = Rect2(sprite.frame_coords.x * w, sprite.frame_coords.y * h, w, h)
 	p.rot = sprite.rotation
 	p.escala = sprite.scale.y

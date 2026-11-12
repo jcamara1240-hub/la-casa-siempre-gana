@@ -29,7 +29,16 @@ func iniciar(nueva_clase: int, principal: Node) -> void:
 
 
 func tocando() -> bool:
-	return position.distance_to(_principal.jugador.position) <= RADIO[clase]
+	return quien_toca() != null
+
+
+## El jugador que lo está tocando (en cooperativo, el primero de los dos que esté en pie), o null.
+func quien_toca() -> Node2D:
+	var lista: Array = _principal.jugadores if _principal.jugadores.size() > 1 else [_principal.jugador]
+	for j in lista:
+		if not j.caido and position.distance_to(j.position) <= RADIO[clase]:
+			return j
+	return null
 
 
 func _physics_process(delta: float) -> void:
@@ -39,13 +48,15 @@ func _physics_process(delta: float) -> void:
 	if clase == Clase.TRAMPILLA and not _armada:
 		_armada = not tocando()
 		return
-	if clase != Clase.ARTICULO and clase != Clase.MAQUINA and tocando():
-		_principal.recogido(self)
+	if clase != Clase.ARTICULO and clase != Clase.MAQUINA:
+		var quien := quien_toca()
+		if quien != null:
+			_principal.recogido(self, quien)
 
 
 func _mover_moneda(delta: float) -> void:
 	frame = int(_t * 10.0) % 4
-	var hacia: Vector2 = _principal.jugador.position - position
+	var hacia: Vector2 = _principal.objetivo_moneda(position).position - position
 	var alcance := 150.0 if Juego.stat("iman") > 0.0 else 42.0
 	if iman or hacia.length() < alcance:
 		position += hacia.normalized() * (260.0 if iman else 170.0) * delta

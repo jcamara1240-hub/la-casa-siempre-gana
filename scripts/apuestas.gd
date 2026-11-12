@@ -73,9 +73,8 @@ static func _contar_tirada(sala: Dictionary, maquina: String) -> void:
 
 ## Quita vida sin matar nunca: como mucho te deja en medio corazón. Devuelve lo quitado.
 static func _quitar_vida(cantidad: int) -> int:
-	var quitada := clampi(cantidad, 0, Juego.vida - 1)
-	Juego.vida -= quitada
-	Juego.estado_cambiado.emit()
+	var quitada := clampi(cantidad, 0, Juego.vida_titular() - 1)
+	Juego.poner_vida(Juego.titular, Juego.vida_titular() - quitada, Juego.vida_max_titular())
 	return quitada
 
 
@@ -181,7 +180,7 @@ static func aplicar_tragaperras(id: String, precio: int, sala: Dictionary, azar:
 			Juego.ganar_oro(precio)
 			r["texto"] = Idioma.t("DOS MONEDAS: RECUPERAS LO PUESTO.")
 		"corazon":
-			if Juego.vida < Juego.vida_max:
+			if Juego.vida_titular() < Juego.vida_max_titular():
 				Juego.curar(2)
 				r["texto"] = Idioma.t("TRES CORAZONES: RECUPERAS UNO.")
 			else:
@@ -293,7 +292,7 @@ static func mesa_abierta(sala: Dictionary) -> bool:
 
 ## Sin monedas para la ficha más pequeña puedes jugarte un corazón (si te queda más de uno).
 static func puede_apostar_corazon() -> bool:
-	return Juego.oro < FICHAS[0] and Juego.vida > 2
+	return Juego.oro < FICHAS[0] and Juego.vida_titular() > 2
 
 
 ## apuesta: "rojo", "negro" o "cero". cantidad: monedas; con_corazon: te juegas un corazón.
@@ -318,9 +317,7 @@ static func jugar_ruleta(sala: Dictionary, apuesta: String, cantidad: int, con_c
 	var r := {"ok": true, "numero": numero, "gana": gana, "apuesta": apuesta, "cantidad": cantidad, "corazon": con_corazon}
 	if con_corazon:
 		if gana:
-			Juego.vida_max += 2
-			Juego.vida += 2
-			Juego.estado_cambiado.emit()
+			Juego.poner_vida(Juego.titular, Juego.vida_titular() + 2, Juego.vida_max_titular() + 2)
 			r["texto"] = Idioma.t("¡%d! GANAS UN CORAZÓN MÁS.") % numero
 		else:
 			_quitar_vida(2)

@@ -27,7 +27,7 @@ func _comportamiento(delta: float, horda: Horda) -> void:
 	match _estado:
 		Estado.PEDIR:
 			frame = 1 if _reloj < 0.3 else 0
-			position += (horda.jugador.global_position - position).normalized() * vel * delta
+			position += (_blanco(horda).global_position - position).normalized() * vel * delta
 			if _reloj <= 0.0:
 				_pedir_carta(horda)
 		Estado.ATURDIDO:

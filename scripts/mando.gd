@@ -97,24 +97,33 @@ static func es_mando(evento: InputEvent) -> bool:
 
 
 ## Hacia dónde empuja el mando: el stick izquierdo (analógico, con zona muerta) o la cruceta.
-static func direccion() -> Vector2:
-	var stick := Vector2(_eje(JOY_AXIS_LEFT_X), _eje(JOY_AXIS_LEFT_Y))
+## Sin decir cuál, el último que se ha tocado; en cooperativo, cada jugador mira el suyo.
+static func direccion(disp := -1) -> Vector2:
+	if disp < 0:
+		disp = dispositivo
+	var stick := Vector2(_eje(JOY_AXIS_LEFT_X, disp), _eje(JOY_AXIS_LEFT_Y, disp))
 	var largo := stick.length()
 	if largo > ZONA_MUERTA:
 		# Lo que sobra de la zona muerta se reparte de 0 a 1: sin saltos al salir de ella.
 		return stick / largo * clampf((largo - ZONA_MUERTA) / (1.0 - ZONA_MUERTA), 0.0, 1.0)
 	var cruceta := Vector2(
-		float(_pulsado(JOY_BUTTON_DPAD_RIGHT)) - float(_pulsado(JOY_BUTTON_DPAD_LEFT)),
-		float(_pulsado(JOY_BUTTON_DPAD_DOWN)) - float(_pulsado(JOY_BUTTON_DPAD_UP)))
+		float(_pulsado(JOY_BUTTON_DPAD_RIGHT, disp)) - float(_pulsado(JOY_BUTTON_DPAD_LEFT, disp)),
+		float(_pulsado(JOY_BUTTON_DPAD_DOWN, disp)) - float(_pulsado(JOY_BUTTON_DPAD_UP, disp)))
 	return cruceta.normalized()
 
 
 ## Una vibración suave, si hay mando en uso y no está desactivada en Opciones.
-static func vibrar(datos: Array) -> void:
-	if not activo or not vibracion:
+## Con "disp" vibra ese mando en concreto (cooperativo: el de quien recibe el golpe).
+static func vibrar(datos: Array, disp := -1) -> void:
+	if not vibracion:
 		return
+	if disp < 0:
+		if not activo:
+			return
+		disp = dispositivo
 	vibraciones += 1
-	Input.start_joy_vibration(dispositivo, datos[0], datos[1], datos[2])
+	ultimo_vibrado = disp
+	Input.start_joy_vibration(disp, datos[0], datos[1], datos[2])
 
 
 ## Al desconectarse un mando se olvida lo que tenía pulsado (si no, el jugador seguiría andando).
@@ -164,13 +173,59 @@ static func familia_de(nombre_mando: String) -> String:
 	return "xbox"
 
 
+# ------------------------------------------------------------ cooperativo: de quién es cada evento
+# Lo que maneja cada jugador ("entrada"): un mando (su número, 0 o más) o un trozo del teclado.
+const TODO := -10  # un solo jugador: teclado, ratón, cualquier mando y la pantalla táctil
+const TECLADO := -1  # el teclado entero y el ratón
+const TECLADO_IZQ := -2  # teclado compartido, J1: WASD, Espacio, Mayús izq., Q, E (y el ratón)
+const TECLADO_DER := -3  # teclado compartido, J2: flechas, Ctrl dcho./Intro, Mayús dcha., Fin
+## Las teclas de la mitad derecha (J2 con el teclado compartido). Las demás son de la izquierda.
+const TECLAS_DERECHA := [KEY_UP, KEY_DOWN, KEY_LEFT, KEY_RIGHT, KEY_ENTER, KEY_KP_ENTER, KEY_END,
+	KEY_DELETE, KEY_KP_0, KEY_BACKSPACE]
+const J2_VOLTERETA := [KEY_ENTER, KEY_KP_ENTER]  # y Ctrl derecho
+const J2_INTERACTUAR := [KEY_END, KEY_DELETE, KEY_KP_0]
+static var ultimo_vibrado := -1  # el mando de la última vibración (lo miran las pruebas)
+
+
+## La entrada de la que viene un evento: el número del mando, o el trozo de teclado.
+static func entrada_de(evento: InputEvent) -> int:
+	if es_mando(evento):
+		return evento.device
+	if evento is InputEventKey:
+		var k: Key = evento.physical_keycode if evento.physical_keycode != KEY_NONE else evento.keycode
+		if TECLAS_DERECHA.has(k):
+			return TECLADO_DER
+		if (k == KEY_CTRL or k == KEY_SHIFT) and evento.location == KEY_LOCATION_RIGHT:
+			return TECLADO_DER
+		return TECLADO_IZQ
+	if evento is InputEventMouse:
+		return TECLADO_IZQ
+	return TODO
+
+
+## ¿Es este evento de esa entrada?
+static func es_de(entrada: int, evento: InputEvent) -> bool:
+	match entrada:
+		TODO:
+			return true
+		TECLADO:
+			return evento is InputEventKey or evento is InputEventMouse
+		TECLADO_IZQ, TECLADO_DER:
+			return (evento is InputEventKey or evento is InputEventMouse) and entrada_de(evento) == entrada
+	return es_mando(evento) and evento.device == entrada
+
+
+static func es_teclado(entrada: int) -> bool:
+	return entrada == TECLADO or entrada == TECLADO_IZQ or entrada == TECLADO_DER
+
+
 # ------------------------------------------------------------ por dentro
-static func _eje(eje: int) -> float:
-	return float(_ejes.get(Vector2i(dispositivo, eje), 0.0))
+static func _eje(eje: int, disp := -1) -> float:
+	return float(_ejes.get(Vector2i(dispositivo if disp < 0 else disp, eje), 0.0))
 
 
-static func _pulsado(boton: int) -> bool:
-	return _botones.has(Vector2i(dispositivo, boton))
+static func _pulsado(boton: int, disp := -1) -> bool:
+	return _botones.has(Vector2i(dispositivo if disp < 0 else disp, boton))
 
 
 ## Apunta el estado del mando y traduce el evento una sola vez (el mismo evento lo miran

@@ -51,7 +51,8 @@ func _comportamiento(delta: float, horda: Horda) -> void:
 
 func _lanzar(horda: Horda) -> void:
 	var zona := Sala.INTERIOR.grow(-28.0)
-	var punto: Vector2 = horda.jugador.global_position
+	# En cooperativo, una botella para cada uno por turnos.
+	var punto: Vector2 = horda.objetivo_por_turno(_botellas / 2).global_position
 	if _botellas % 2 == 1:
 		punto += Vector2.RIGHT.rotated(randf() * TAU) * randf_range(60.0, 120.0)
 	horda.ataques.zona_peligro(punto.clamp(zona.position, zona.end), 30.0, 0.8, 2.6)

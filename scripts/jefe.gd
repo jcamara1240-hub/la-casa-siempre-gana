@@ -152,7 +152,7 @@ func _anillo(horda: Horda, cuantas: int, velocidad: float, giro: float, clase: S
 
 
 func _abanico(horda: Horda, cuantas: int, apertura: float, velocidad: float, clase: String) -> void:
-	var hacia: Vector2 = (horda.jugador.global_position - position).normalized()
+	var hacia: Vector2 = (_blanco(horda).global_position - position).normalized()
 	for i in cuantas:
 		horda.ataques.bala_enemiga(position, hacia.rotated((i - (cuantas - 1) * 0.5) * apertura) * velocidad * ritmo_balas(), clase)
 

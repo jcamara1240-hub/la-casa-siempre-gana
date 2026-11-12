@@ -380,7 +380,7 @@ func actualizar(delta: float, horda: Horda) -> void:
 	if elite:
 		_animar_vecinos(delta, horda)
 	var factor := (0.45 if _frio_t > 0.0 else 1.0) * _prisa()
-	var hacia := horda.jugador.global_position - position
+	var hacia := _blanco(horda).global_position - position
 	var dist := hacia.length()
 	var direccion: Vector2 = hacia / maxf(dist, 0.001)
 	var movimiento := _decidir(direccion, dist, delta * factor * _furia, horda)
@@ -493,10 +493,16 @@ func al_morir(horda: Horda) -> void:
 
 ## Adónde apuntar para dar a alguien que se mueve.
 func _adelantar(horda: Horda, segundos: float) -> Vector2:
-	var destino: Vector2 = horda.jugador.global_position
-	if horda.jugador is CharacterBody2D:
-		destino += (horda.jugador as CharacterBody2D).velocity * segundos
+	var blanco := _blanco(horda)
+	var destino: Vector2 = blanco.global_position
+	if blanco is CharacterBody2D:
+		destino += (blanco as CharacterBody2D).velocity * segundos
 	return destino
+
+
+## A quién va: el jugador (en cooperativo, el que esté en pie más cerca).
+func _blanco(horda: Horda) -> Node2D:
+	return horda.objetivo_para(position)
 
 
 ## La mitad de las fichas no te persigue: va a donde vas a estar, y te cierra la salida.
@@ -598,9 +604,10 @@ func _botones(direccion: Vector2, dist: float, delta: float, horda: Horda) -> Ve
 		if _accion <= 0.0:
 			_modo = 0
 			_accion = randf_range(3.2, 4.2) * CADENCIA
-			var destino: Vector2 = horda.jugador.position
-			if horda.jugador is CharacterBody2D:
-				destino += (horda.jugador as CharacterBody2D).velocity * 0.35
+			var blanco := _blanco(horda)
+			var destino: Vector2 = blanco.position
+			if blanco is CharacterBody2D:
+				destino += (blanco as CharacterBody2D).velocity * 0.35
 			var zona := Sala.INTERIOR.grow(-20.0)
 			horda.ataques.zona_peligro(destino.clamp(zona.position, zona.end), 24.0, 1.0)
 		return Vector2.ZERO
@@ -621,7 +628,7 @@ func _camara(direccion: Vector2, delta: float, horda: Horda) -> void:
 		_accion = randf_range(1.5, 2.1) * CADENCIA
 		# Hardcore: la cámara ya no dispara a donde estás, sino a donde vas.
 		var rapidez := 120.0 * ritmo_balas()
-		var hacia := _adelantar(horda, position.distance_to(horda.jugador.global_position) / rapidez * 0.8) - position
+		var hacia := _adelantar(horda, position.distance_to(_blanco(horda).global_position) / rapidez * 0.8) - position
 		horda.ataques.bala_enemiga(position, (hacia.normalized() if hacia.length() > 1.0 else direccion) * rapidez, "moneda")
 
 
@@ -694,9 +701,10 @@ func _joker(direccion: Vector2, delta: float, horda: Horda) -> void:
 		return
 	_accion = randf_range(2.2, 3.0) * CADENCIA
 	var zona := Sala.INTERIOR.grow(-16.0)
-	var objetivo: Vector2 = horda.jugador.global_position + Vector2.RIGHT.rotated(randf() * TAU) * randf_range(85.0, 130.0)
+	var blanco := _blanco(horda)
+	var objetivo: Vector2 = blanco.global_position + Vector2.RIGHT.rotated(randf() * TAU) * randf_range(85.0, 130.0)
 	position = objetivo.clamp(zona.position, zona.end)
-	var hacia: Vector2 = (horda.jugador.global_position - position).normalized()
+	var hacia: Vector2 = (blanco.global_position - position).normalized()
 	if hacia == Vector2.ZERO:
 		hacia = direccion
 	for i in 5:

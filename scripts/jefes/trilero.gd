@@ -103,12 +103,19 @@ func _animar_cruce() -> void:
 
 
 func _disparar_desde(horda: Horda, origen: Vector2) -> void:
-	var hacia: Vector2 = (horda.jugador.global_position - origen).normalized()
+	var hacia: Vector2 = (_blanco(horda).global_position - origen).normalized()
 	horda.ataques.bala_enemiga(origen, hacia * 105.0, "moneda")
 
 
+## En cooperativo vale cualquiera de los dos: la buena la pisa uno, las malas cualquiera.
 func _mirar_pisada(horda: Horda) -> void:
-	var yo: Vector2 = horda.jugador.global_position
+	for j in horda.vivos():
+		_mirar_pisada_de(horda, j.global_position)
+		if _estado != Estado.ELEGIR:
+			return
+
+
+func _mirar_pisada_de(horda: Horda, yo: Vector2) -> void:
 	if yo.distance_to(_pos(0)) < RADIO_PISAR:
 		_estado = Estado.VULNERABLE
 		_reloj = 4.0

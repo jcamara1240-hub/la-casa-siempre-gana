@@ -48,10 +48,34 @@ var _rodados := {}  # enemigos ya atropellados en esta voltereta
 var _aterrizaje := 0.0
 var _patada := Vector2.ZERO  # el dibujo retrocede un poco al disparar
 
+# ------------------------------------------------------------ cooperativo
+const COLORES_JUGADOR := [Color8(247, 198, 74), Color8(111, 195, 232)]  # J1 oro, J2 celeste
+const TINTE_J2 := Color(0.72, 0.9, 1.3)  # si los dos llevan el mismo personaje
+const ETIQUETA_SEG := 1.8
+## 0 el J1, 1 el J2. Con un solo jugador, 0 y entrada TODO: todo como siempre.
+var indice := 0
+## Lo que le mueve (ver Mando: TODO, TECLADO, TECLADO_IZQ, TECLADO_DER o el número del mando).
+var entrada := Mando.TODO
+## El J1 con mando también usa el teclado si nadie más lo tiene.
+var tambien_teclado := false
+var en_coop := false  # se dibuja su marca de color y su etiqueta
+## Fuera de juego: tumbado, ni se mueve ni dispara ni le pegan. Lo levanta el otro o el final de la sala.
+var caido := false
+var reanimar := 0.0  # de 0 a 1: la barra de reanimación (la lleva main)
+var _etiqueta_t := 0.0
+var _tinte := Color.WHITE
+
 @onready var _sprite: Sprite2D = $Sprite
 
 
 func _physics_process(delta: float) -> void:
+	if en_coop:
+		_etiqueta_t = maxf(_etiqueta_t - delta, 0.0)
+		queue_redraw()
+	if caido:
+		velocity = Vector2.ZERO
+		arrastre = Vector2.ZERO
+		return
 	var direccion := _leer_direccion()
 	if direccion != Vector2.ZERO:
 		_ultima_direccion = direccion
@@ -62,7 +86,7 @@ func _physics_process(delta: float) -> void:
 	if rodando():
 		_rodar(delta)
 	else:
-		var tope := velocidad * (1.0 + Juego.stat("velocidad")) * Juego.factor_velocidad()
+		var tope := velocidad * (1.0 + Juego.stat("velocidad")) * Juego.factor_velocidad(indice if en_coop else -1)
 		if Juego.rodo_hace_poco():
 			tope *= 1.0 + Juego.stat("espuelas")
 		velocity = velocity.move_toward(direccion * tope, aceleracion * delta)
@@ -83,6 +107,11 @@ func _physics_process(delta: float) -> void:
 
 
 func _unhandled_input(evento: InputEvent) -> void:
+	if entrada != Mando.TODO:
+		if _pide_voltereta_coop(evento):
+			pedir_voltereta()
+			get_viewport().set_input_as_handled()
+		return
 	var pide := false
 	if evento is InputEventKey and evento.pressed and not evento.echo:
 		pide = evento.physical_keycode == KEY_SPACE or evento.physical_keycode == KEY_SHIFT
@@ -96,7 +125,7 @@ func _unhandled_input(evento: InputEvent) -> void:
 
 
 func recibir_golpe(cantidad := 1, causa: Dictionary = {}) -> void:
-	if _invulnerable_t > 0.0 or invulnerable or rodando():
+	if _invulnerable_t > 0.0 or invulnerable or rodando() or caido:
 		return
 	_invulnerable_t = INVULNERABLE_SEG + Juego.stat("invulnerable")
 	if seguro_listo:
@@ -110,7 +139,7 @@ func recibir_golpe(cantidad := 1, causa: Dictionary = {}) -> void:
 	# En el modo infinito, cada cuatro pisos extra los golpes quitan un corazón más.
 	# Hardcore: desde el piso 3 cada golpe se lleva un corazón entero.
 	Juego.ultima_causa = causa.duplicate()
-	Juego.herir(cantidad + Juego.pisos_extra() / 4 + (1 if Juego.piso >= GOLPE_DOBLE_PISO and Juego.stat("chaleco") <= 0.0 else 0))
+	Juego.herir(cantidad + Juego.pisos_extra() / 4 + (1 if Juego.piso >= GOLPE_DOBLE_PISO and Juego.stat("chaleco") <= 0.0 else 0), indice)
 	# El Espejo de Mano: el golpe te lo llevas, pero la sala se queda sin balas.
 	if Juego.stat("espejo") > 0.0 and ataques != null:
 		ataques.borrar_balas_enemigas()
@@ -124,12 +153,14 @@ func proteger(seg: float) -> void:
 
 
 func aplicar_personaje() -> void:
-	_sprite.texture = PersonajesDB.textura(Juego.personaje)
-	_sprite.modulate = Color.WHITE
+	_sprite.texture = PersonajesDB.textura(Juego.personaje2 if indice == 1 and Juego.coop else Juego.personaje)
+	# El J2 con el mismo personaje que el J1 va teñido, para no confundirlos.
+	_tinte = TINTE_J2 if indice == 1 and Juego.personaje2 == Juego.personaje else Color.WHITE
+	_sprite.modulate = _tinte
 
 
 func teñir(color: Color) -> void:
-	_sprite.modulate = color
+	_sprite.modulate = color * _tinte
 
 
 # ------------------------------------------------------------ voltereta
@@ -252,6 +283,8 @@ func patada(direccion: Vector2, fuerza: float) -> void:
 
 # ------------------------------------------------------------ dibujo
 func _leer_direccion() -> Vector2:
+	if entrada != Mando.TODO:
+		return _direccion_coop()
 	var x := _eje(KEY_A, KEY_LEFT, KEY_D, KEY_RIGHT)
 	var y := _eje(KEY_W, KEY_UP, KEY_S, KEY_DOWN)
 	# normalized() evita que en diagonal se corra más que en línea recta.
@@ -305,3 +338,98 @@ func _animar_cuerpo(delta: float) -> void:
 		_aterrizaje = maxf(_aterrizaje - delta * 6.0, 0.0)
 		_sprite.scale = Vector2(1.0 + 0.2 * _aterrizaje, 1.0 - 0.15 * _aterrizaje)
 	_sprite.position = _patada.round()
+
+
+# ------------------------------------------------------------ cooperativo
+## Lo que mueve a este jugador cuando hay dos: solo su mando o su trozo de teclado.
+func _direccion_coop() -> Vector2:
+	var direccion := Vector2.ZERO
+	var teclado := Mando.es_teclado(entrada) or tambien_teclado
+	if teclado:
+		var izq := entrada != Mando.TECLADO_DER
+		var der := entrada != Mando.TECLADO_IZQ
+		var x := float((der and Input.is_physical_key_pressed(KEY_RIGHT)) or (izq and Input.is_physical_key_pressed(KEY_D))) \
+				- float((der and Input.is_physical_key_pressed(KEY_LEFT)) or (izq and Input.is_physical_key_pressed(KEY_A)))
+		var y := float((der and Input.is_physical_key_pressed(KEY_DOWN)) or (izq and Input.is_physical_key_pressed(KEY_S))) \
+				- float((der and Input.is_physical_key_pressed(KEY_UP)) or (izq and Input.is_physical_key_pressed(KEY_W)))
+		direccion = Vector2(x, y).normalized()
+	if direccion == Vector2.ZERO and entrada >= 0 and not Mando.bloqueado:
+		direccion = Mando.direccion(entrada)
+	if Juego.stat("tambaleo") > 0.0 and direccion != Vector2.ZERO:
+		direccion = direccion.rotated(sin(_anim_t * 3.2) * 0.55)
+	return direccion
+
+
+## Las teclas y botones de rodar de cada uno (J2 con teclado compartido: Ctrl dcho. o Intro).
+func _pide_voltereta_coop(evento: InputEvent) -> bool:
+	if Mando.es_mando(evento):
+		return evento.device == entrada and Mando.accion(evento) == "voltereta"
+	if not (Mando.es_teclado(entrada) or tambien_teclado) or not Mando.es_de(Mando.TECLADO if tambien_teclado else entrada, evento):
+		return false
+	if evento is InputEventMouseButton:
+		return evento.pressed and evento.button_index == MOUSE_BUTTON_RIGHT and entrada != Mando.TECLADO_DER
+	if not (evento is InputEventKey) or not evento.pressed or evento.echo:
+		return false
+	var k: Key = evento.physical_keycode
+	if entrada == Mando.TECLADO_DER:
+		return Mando.J2_VOLTERETA.has(k) or (k == KEY_CTRL and evento.location == KEY_LOCATION_RIGHT)
+	if entrada == Mando.TECLADO_IZQ:
+		return k == KEY_SPACE or (k == KEY_SHIFT and evento.location != KEY_LOCATION_RIGHT)
+	return k == KEY_SPACE or k == KEY_SHIFT
+
+
+## Al empezar cada sala: "J1"/"J2" encima de la cabeza un momento.
+func mostrar_etiqueta() -> void:
+	_etiqueta_t = ETIQUETA_SEG
+	queue_redraw()
+
+
+func color_jugador() -> Color:
+	return COLORES_JUGADOR[clampi(indice, 0, 1)]
+
+
+## Fuera de juego: al suelo, gris y quieto.
+func caer() -> void:
+	caido = true
+	reanimar = 0.0
+	_rodar_t = 0.0
+	_pedida = 0.0
+	velocity = Vector2.ZERO
+	_sprite.rotation = PI * 0.5
+	_sprite.scale = Vector2.ONE
+	_sprite.visible = true
+	_sprite.modulate = Color(0.45, 0.42, 0.5) * _tinte
+	queue_redraw()
+
+
+## De pie otra vez, con un respiro para no caer en el acto.
+func levantar() -> void:
+	caido = false
+	reanimar = 0.0
+	_sprite.rotation = 0.0
+	_sprite.modulate = _tinte
+	proteger(1.2)
+	queue_redraw()
+
+
+func _draw() -> void:
+	if not en_coop:
+		return
+	var color := color_jugador()
+	# La marca bajo los pies: un aro del color del jugador.
+	draw_arc(CENTRO_CUERPO + Vector2(0, 6), 7.0, 0.0, TAU, 16, Color(color, 0.85 if not caido else 0.4), 1.0)
+	var nombre := Idioma.t("J1") if indice == 0 else Idioma.t("J2")
+	if caido:
+		_texto_centrado(Idioma.t("FUERA DE JUEGO"), Vector2(0, -15), Color8(214, 61, 79))
+		# La barra de reanimación: se llena mientras el otro está al lado.
+		var barra := Rect2(-12, -12, 24, 4)
+		draw_rect(barra, Color8(20, 16, 30))
+		draw_rect(Rect2(barra.position + Vector2(1, 1), Vector2(22.0 * clampf(reanimar, 0.0, 1.0), 2)), Color8(108, 207, 148))
+	elif _etiqueta_t > 0.0:
+		_texto_centrado(nombre, Vector2(0, -12), Color(color, clampf(_etiqueta_t / 0.4, 0.0, 1.0)))
+
+
+func _texto_centrado(texto: String, p: Vector2, color: Color) -> void:
+	var ancho := Juego.fuente.get_string_size(texto, HORIZONTAL_ALIGNMENT_LEFT, -1, 8).x
+	draw_string(Juego.fuente, (p - Vector2(ancho * 0.5, 0)).round() + Vector2(1, 1), texto, HORIZONTAL_ALIGNMENT_LEFT, -1, 8, Color8(20, 16, 30))
+	draw_string(Juego.fuente, (p - Vector2(ancho * 0.5, 0)).round(), texto, HORIZONTAL_ALIGNMENT_LEFT, -1, 8, color)

@@ -45,7 +45,8 @@ func _comportamiento(delta: float, horda: Horda) -> void:
 
 func _cantar_bola(horda: Horda) -> void:
 	var zona := Sala.INTERIOR.grow(-30.0)
-	var jugador: Vector2 = horda.jugador.global_position
+	# En cooperativo las bolas van a uno y a otro por turnos.
+	var jugador: Vector2 = horda.objetivo_por_turno(_bolas / 2).global_position
 	# Una de cada dos va a por ti; las otras te cierran el paso.
 	var punto := jugador if _bolas % 2 == 0 else jugador + Vector2.RIGHT.rotated(randf() * TAU) * randf_range(50.0, 110.0)
 	horda.ataques.zona_peligro(punto.clamp(zona.position, zona.end), 34.0, 1.0)

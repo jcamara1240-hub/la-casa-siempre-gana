@@ -234,7 +234,7 @@ func _cobrar() -> void:
 # ---------------------------------------------------------------- prestamista
 func _menu_prestamista() -> void:
 	_ir_a(Fase.MENU, Idioma.t("YO SIEMPRE TENGO DINERO. OTRA COSA ES LO QUE ME DES A CAMBIO."))
-	_boton(Idioma.t("VENDER UN CORAZÓN: +30 MONEDAS"), _vender_corazon, Juego.vida_max > 2)
+	_boton(Idioma.t("VENDER UN CORAZÓN: +30 MONEDAS"), _vender_corazon, Juego.vida_max_titular() > 2)
 	_boton(Idioma.t("PRÉSTAMO: +40 AHORA, DEBES 60 AL BAJAR DE PISO"), _prestamo, Juego.deuda == 0)
 	_salir()
 
@@ -290,7 +290,7 @@ func _abrir_caja() -> void:
 # ---------------------------------------------------------------- barra
 func _menu_barra() -> void:
 	_ir_a(Fase.MENU, Idioma.t("¿QUÉ TE PONGO?"))
-	_boton(Idioma.t("COPA DE LA CASA (8): CURA UN CORAZÓN"), _copa, Juego.oro >= 8 and Juego.vida < Juego.vida_max and _usos < 2)
+	_boton(Idioma.t("COPA DE LA CASA (8): CURA UN CORAZÓN"), _copa, Juego.oro >= 8 and Juego.vida_titular() < Juego.vida_max_titular() and _usos < 2)
 	_boton(Idioma.t("CHUPITO MISTERIOSO (5)"), _chupito, Juego.oro >= 5 and _usos < 2)
 	_salir()
 
@@ -321,7 +321,7 @@ func _chupito() -> void:
 			texto = Idioma.t("APARECE UNA CARTA BAJO EL POSAVASOS: %s.") % CartasDB.nombre(_carta).to_upper()
 			Sonido.tocar("carta_coger")
 		_:
-			if Juego.vida > 1:
+			if Juego.vida_titular() > 1:
 				Juego.herir(1)
 			texto = Idioma.t("NO DEBISTE BEBER ESO: PIERDES MEDIO CORAZÓN.")
 			Sonido.tocar("perder")

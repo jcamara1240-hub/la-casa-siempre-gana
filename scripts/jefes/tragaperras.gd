@@ -36,7 +36,7 @@ func _comportamiento(delta: float, horda: Horda) -> void:
 	match _estado:
 		Estado.ESPERA:
 			frame = 0
-			position += (horda.jugador.global_position - position).normalized() * vel * delta
+			position += (_blanco(horda).global_position - position).normalized() * vel * delta
 			if _reloj <= 0.0:
 				_estado = Estado.TIRADA
 				_reloj = 1.1

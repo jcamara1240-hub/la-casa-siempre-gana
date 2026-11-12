@@ -40,6 +40,7 @@ class Lienzo extends Node2D:
 
 var _mundo: Node2D
 var _jugador  # el de player.gd
+var otros: Array = []  # cooperativo: el J2 (lo pone Jugo.poner_segundo)
 var _con_etiqueta: Array = []  # los raros y élites que enseñan etiqueta este frame
 var _cand_e: Array = []  # candidatos a etiqueta, del más cercano al más lejano
 var _cand_d: Array = []
@@ -559,7 +560,10 @@ func _pintar_luz(l: Node2D) -> void:
 			l.draw_texture_rect(tex_luz, Rect2(p - Vector2(44, 34), Vector2(88, 68)), false, Color(c, 0.4 * k))
 			l.draw_texture_rect_region(_tex_adornos, Rect2(p - Vector2(8, 8), Vector2(16, 16)), Rect2(sala.rotulo[0] * 16, 0, 16, 16), Color(c, k))
 	if _jugador != null:
-		_luz_jugador(l)
+		_luz_jugador(l, _jugador)
+	for o in otros:
+		if is_instance_valid(o):
+			_luz_jugador(l, o)
 	for luz_m in _luces:
 		var avance: float = luz_m[1] / luz_m[2]
 		var color: Color = luz_m[4]
@@ -589,8 +593,8 @@ func _encendido_k(fase: float) -> float:
 	return 1.0
 
 
-func _luz_jugador(l: Node2D) -> void:
-	var p: Vector2 = _jugador.position + Vector2(0, 4)
+func _luz_jugador(l: Node2D, quien) -> void:
+	var p: Vector2 = quien.position + Vector2(0, 4)
 	var color := Color(1.0, 0.86, 0.62, 0.12 + 0.07 * _combate_v)  # en la penumbra, tu luz manda
 	var r := 62.0 + 10.0 * _combate_v
 	var fiebre := clampf(Juego.fiebre / 3.0, 0.0, 1.0)
@@ -609,6 +613,9 @@ func _pintar_sombras(l: Node2D) -> void:
 		var rueda: bool = _jugador.rodando()
 		var ancho := 9.0 if rueda else 11.0
 		_sombra(l, _jugador.position + Vector2(0, 8), ancho, 4.0, COLOR_SOMBRA)
+	for o in otros:
+		if is_instance_valid(o) and o.visible:
+			_sombra(l, o.position + Vector2(0, 8), 9.0 if o.rodando() else 11.0, 4.0, COLOR_SOMBRA)
 	var horda = _horda()
 	if horda != null:
 		for e in horda.enemigos:
@@ -686,8 +693,16 @@ func _pintar_avisos(l: Node2D) -> void:
 		l.draw_rect(Rect2(p.x - 1, p.y, 2, 5), color)
 		l.draw_rect(Rect2(p.x - 1, p.y + 6, 2, 2), color)
 	# Con balas cerca se ve tu caja de choque: lo único que de verdad tienes que salvar.
-	if _jugador != null and _jugador.visible and horda.ataques != null and horda.ataques.balas_enemigas_cerca(_jugador.position, 64.0) > 0:
-		var centro: Vector2 = (_jugador.position + Vector2(0, 2)).round()
+	if _jugador != null:
+		_pintar_caja_choque(l, horda, _jugador, parpadeo)
+	for o in otros:
+		if is_instance_valid(o) and not o.caido:
+			_pintar_caja_choque(l, horda, o, parpadeo)
+
+
+func _pintar_caja_choque(l: Node2D, horda, quien, parpadeo: bool) -> void:
+	if quien.visible and horda.ataques != null and horda.ataques.balas_enemigas_cerca(quien.position, 64.0) > 0:
+		var centro: Vector2 = (quien.position + Vector2(0, 2)).round()
 		l.draw_rect(Rect2(centro - Vector2(2, 2), Vector2(4, 4)), Color8(20, 16, 30))
 		l.draw_rect(Rect2(centro - Vector2(1, 1), Vector2(2, 2)), Color8(247, 236, 210) if parpadeo else COLOR_ORO)
 

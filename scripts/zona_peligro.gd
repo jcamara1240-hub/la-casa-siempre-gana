@@ -26,16 +26,22 @@ func _physics_process(delta: float) -> void:
 		return
 	if _duracion > 0.0:
 		# El charco sigue quemando hasta que se apaga.
-		if position.distance_to(_dueno.jugador.global_position) <= _radio:
-			_dueno.jugador.recibir_golpe(1, causa)
+		_quemar()
 		if _t >= _retardo + _duracion:
 			queue_free()
 		return
-	if position.distance_to(_dueno.jugador.global_position) <= _radio:
-		_dueno.jugador.recibir_golpe(1, causa)
+	_quemar()
 	Sonido.tocar("explosion", randf_range(1.1, 1.4), -8.0)
 	_dueno.explosion_hecha.emit()
 	queue_free()
+
+
+## A todos los que estén dentro (en cooperativo pueden ser los dos).
+func _quemar() -> void:
+	var lista: Array = _dueno.jugadores if _dueno.jugadores.size() > 1 else [_dueno.jugador]
+	for j in lista:
+		if not j.caido and position.distance_to(j.global_position) <= _radio:
+			j.recibir_golpe(1, causa)
 
 
 func _draw() -> void:
