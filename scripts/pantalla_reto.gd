@@ -387,6 +387,14 @@ const COMPARTIR := {
 		"pts": "%s pts", "dia": "racha: 1 día", "dias": "racha: %d días"},
 	"en": {"juego": "The House Always Wins", "reto": "Daily %s", "ganado": "won!", "piso": "floor %d/%d",
 		"pts": "%s pts", "dia": "streak: 1 day", "dias": "streak: %d days"},
+	"pt": {"juego": "A Casa Sempre Ganha", "reto": "Desafio %s", "ganado": "vitória!", "piso": "andar %d/%d",
+		"pts": "%s pts", "dia": "sequência: 1 dia", "dias": "sequência: %d dias"},
+	"fr": {"juego": "La Banque Gagne Toujours", "reto": "Défi du %s", "ganado": "gagné !", "piso": "étage %d/%d",
+		"pts": "%s pts", "dia": "série : 1 jour", "dias": "série : %d jours"},
+	"de": {"juego": "Die Bank Gewinnt Immer", "reto": "Challenge %s", "ganado": "gewonnen!", "piso": "Etage %d/%d",
+		"pts": "%s Pkt.", "dia": "Serie: 1 Tag", "dias": "Serie: %d Tage"},
+	"it": {"juego": "Il Banco Vince Sempre", "reto": "Sfida %s", "ganado": "vinta!", "piso": "piano %d/%d",
+		"pts": "%s punti", "dia": "serie: 1 giorno", "dias": "serie: %d giorni"},
 }
 
 
@@ -398,10 +406,10 @@ static func texto_compartir(d: Dictionary, racha: int) -> String:
 		c.pts % miles(int(d.get("puntos", 0))), dias, ENLACE]
 
 
-## 23410 -> "23.410" (o "23,410" en inglés).
+## 23410 -> "23.410" (o "23,410" en inglés, "23 410" en francés).
 static func miles(n: int) -> String:
 	var txt := str(absi(n))
-	var sep := "," if Idioma.actual == "en" else "."
+	var sep: String = {"en": ",", "fr": " "}.get(Idioma.actual, ".")
 	var partes: Array = []
 	while txt.length() > 3:
 		partes.push_front(txt.substr(txt.length() - 3))

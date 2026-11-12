@@ -71,6 +71,28 @@ func _correr() -> void:
 			if not fuentes[0].has(ch.unicode_at(0)):
 				nombres_sin_glifo.append(ch)
 	_ok(nombres_sin_glifo.is_empty(), "los nombres de los idiomas tienen glifos " + str(nombres_sin_glifo))
+
+	# Las frases del Dueño caben en una línea (como comprueba prueba_enganche_a en español e inglés)
+	# y el resultado para compartir del reto existe en cada idioma y se puede pintar.
+	var fuente: Font = load("res://assets/fuente/pixel.fnt")
+	var F = load("res://scripts/frases_db.gd")
+	var R = load("res://scripts/pantalla_reto.gd")
+	var detalle := {"fecha": "2026-11-12", "gano": false, "piso": 3, "puntos": 23410}
+	for codigo in I.OTROS:
+		I.actual = codigo
+		var largas: Array = []
+		for id in F.FRASES:
+			if fuente.get_string_size(I.t(F.FRASES[id].texto), HORIZONTAL_ALIGNMENT_LEFT, -1, 8).x > 560.0:
+				largas.append(id)
+		_ok(largas.is_empty(), "%s: las frases del Dueño caben en una línea %s" % [codigo, largas])
+		_ok(R.COMPARTIR.has(codigo), "%s: tiene su texto para compartir" % codigo)
+		var compartir: String = R.texto_compartir(detalle, 3).replace("·", "-").to_upper()
+		var raros: Array = []
+		for ch in compartir:
+			if ch != "\n" and ch != " " and not fuente.has_char(ch.unicode_at(0)):
+				raros.append(ch)
+		_ok(raros.is_empty(), "%s: el resultado para compartir se puede pintar: %s %s" % [codigo, compartir.get_slice("\n", 0), raros])
+	I.actual = "es"
 	# Cae al inglés y luego al español.
 	I.actual = "de"
 	_ok(I.t("JUGAR") == "SPIELEN", "en alemán se traduce")
