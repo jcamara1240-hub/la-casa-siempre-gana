@@ -46,6 +46,7 @@ const COLOR_MAPA := {
 	GeneradorMazmorra.Tipo.TIENDA: Color8(108, 207, 148),
 	GeneradorMazmorra.Tipo.JEFE: Color8(214, 61, 79),
 	GeneradorMazmorra.Tipo.EVENTO: Color8(111, 195, 232),
+	GeneradorMazmorra.Tipo.APUESTAS: Color8(232, 110, 200),
 }
 
 
@@ -396,6 +397,8 @@ func _dibujar_mapa() -> void:
 		if not s.visitada:
 			color = color.darkened(0.55)
 		draw_rect(caja, color)
+		if s.tipo == GeneradorMazmorra.Tipo.APUESTAS:
+			draw_rect(Rect2(caja.position + Vector2(2, 1), Vector2(2, 2)), Color8(247, 198, 74))  # la ficha: se distingue del evento
 		if c == posicion_actual:
 			_marco(caja.grow(1.0), Color8(247, 236, 210))
 

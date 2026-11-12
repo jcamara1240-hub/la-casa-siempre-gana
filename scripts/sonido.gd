@@ -11,6 +11,7 @@ const EFECTOS := [
 	"voltereta", "ordago", "mesa", "mesa_rota", "escopeta", "metralleta", "laser", "mina", "barrido", "fiebre",
 	"por_los_pelos", "impacto_fuerte", "casquillo",
 	"roce", "latido", "desatado", "oleada", "remate", "aviso",
+	"rodillo", "bola", "premio_gordo",  # sala de apuestas
 ]
 const MUSICAS := ["menu", "piso", "jefe", "victoria"]
 ## Las pistas que se aceleran, con su tempo (para el latido). Su capa es musica_<nombre>_capa.wav.
@@ -42,6 +43,7 @@ const PICO := {
 	"voltereta": 0.35, "ordago": 0.85, "mesa": 0.65, "mesa_rota": 0.65, "escopeta": 0.8, "metralleta": 0.4,
 	"laser": 0.4, "mina": 0.35, "barrido": 0.42, "fiebre": 0.45, "por_los_pelos": 0.45, "impacto_fuerte": 0.7,
 	"casquillo": 0.25, "roce": 0.32, "latido": 0.7, "desatado": 0.75, "oleada": 0.7, "remate": 0.85, "aviso": 0.22,
+	"rodillo": 0.45, "bola": 0.3, "premio_gordo": 0.6,
 }
 ## Si lo que ya suena (picos que se van apagando) más lo nuevo pasa de aquí, lo de prioridad 0 y 1
 ## entra más bajo, hasta TECHO_MAX_DB. Sin limitador en el bus (en la web no lo hay), esto evita saturar.

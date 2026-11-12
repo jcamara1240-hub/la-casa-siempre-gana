@@ -1252,6 +1252,8 @@ def efectos_ronda2():
     c.append(sprite(["", "", "...cccccccccc...", "..c..........c..", "..c..........c..", "..cccccccccccc..", "..c....cc....c..", "..c....cc....c..", "..c..........c..", "..cccccccccccc.."], 16))
     c.append(sprite(["", "", "......cccc......", ".....c....c.....", "..........c.....", ".........c......", "........c.......", ".......c........", ".......c........", "", ".......c........"], 16))
     c.append(sprite(["", "", "", "..c...cc...c....", "..cc.c..c.cc....", "..c.c....c.c....", "..c........c....", "..c........c....", "..cccccccccc....", "", "..cccccccccc...."], 16))
+    # 16: rótulo de la sala de apuestas, un siete de neón (también blanco: se tiñe).
+    c.append(sprite(["", "", "...cccccccccc...", "...c........c...", "...cccccc...c...", "........c..c....", ".......c..c.....", "......c..c......", ".....c..c.......", ".....c..c.......", ".....cccc......."], 16))
     guardar(hoja(c), "baldosas/adornos.png")
 
 
@@ -1338,7 +1340,8 @@ def objetos():
 
 
 # ---------------------------------------------------------------- baldosas
-ESTILOS = {"normal": ("d", "k", "p"), "tienda": ("g", "k", "G"), "jefe": ("d", "k", "r"), "tesoro": ("p", "d", "v")}
+ESTILOS = {"normal": ("d", "k", "p"), "tienda": ("g", "k", "G"), "jefe": ("d", "k", "r"), "tesoro": ("p", "d", "v"),
+           "apuestas": ("r", "k", "y")}
 
 
 def baldosas():
@@ -2002,6 +2005,122 @@ def icono_app():
         lienzo_icono.save(RAIZ / "icon.png")
 
 
+# ---------------------------------------------------------------- sala de apuestas
+def simbolo_siete():
+    img = lienzo(16, 16)
+    rect(img, 3, 2, 10, 3, "R"); rect(img, 10, 5, 3, 2, "R"); rect(img, 9, 7, 3, 2, "R")
+    rect(img, 8, 9, 3, 2, "R"); rect(img, 7, 11, 3, 3, "R")
+    rect(img, 3, 2, 10, 1, "o"); pon(img, 3, 3, "o")
+    return contorno(img)
+
+
+def simbolos_tragaperras():
+    """Los rodillos: siete, moneda, corazón, carta, diamante, órdago y los cuatro malos."""
+    f = [simbolo_siete()]
+    moneda = lienzo(16, 16)
+    elipse(moneda, 7.5, 7.5, 6.2, 6.2, "o"); elipse(moneda, 7.5, 7.5, 5.2, 5.2, "y")
+    rect(moneda, 7, 4, 2, 8, "o"); rect(moneda, 5, 5, 6, 1, "o"); rect(moneda, 5, 10, 6, 1, "o")
+    pon(moneda, 5, 4, "c"); pon(moneda, 4, 5, "c")
+    f.append(contorno(moneda))
+    corazon = lienzo(16, 16)
+    for y, fila in enumerate([".RRR..RRR.", "RRcRRRRRRR", "RcRRRRRRRR", "RRRRRRRRRR", ".RRRRRRRr.", "..RRRRRr..", "...RRRr...", "....Rr...."]):
+        for x, ch in enumerate(fila):
+            if ch != ".":
+                pon(corazon, x + 3, y + 4, ch)
+    f.append(contorno(corazon))
+    carta = lienzo(16, 16)
+    rect(carta, 4, 2, 8, 12, "c"); texto(carta, 5, 3, "A", "k"); palo(carta, 6, 8, "picas", "k")
+    f.append(contorno(carta))
+    diamante = lienzo(16, 16)
+    for y in range(12):
+        ancho = 7 - abs(y - 4) if y <= 4 else 7 - (y - 4)
+        ancho = max(ancho, 0)
+        for x in range(8 - ancho, 8 + ancho):
+            pon(diamante, x, y + 2, "B" if (x + y) % 4 else "c")
+    rect(diamante, 2, 5, 12, 1, "b")
+    f.append(contorno(diamante))
+    ordago = lienzo(16, 16)
+    ordago.alpha_composite(icono_ordago(), (2, 2))
+    f.append(ordago)
+    calavera = lienzo(16, 16)
+    elipse(calavera, 7.5, 6.5, 5.5, 5.0, "c"); rect(calavera, 5, 10, 6, 3, "c")
+    rect(calavera, 4, 6, 3, 3, "k"); rect(calavera, 9, 6, 3, 3, "k"); pon(calavera, 7, 9, "k"); pon(calavera, 8, 9, "k")
+    for x in (6, 8, 10):
+        pon(calavera, x, 12, "s")
+    f.append(contorno(calavera))
+    gato = sprite(["", "", "...k.......k....", "...kk.....kk....", "...kkkkkkkkk....", "..kkykkkkkykk...", "..kkkkkkkkkkk...",
+                   "..kkkkkpkkkkk...", "...kkkkkkkkk....", "....kkkkkkk.....", "...kkkkkkkkk....", "...kkkkkkkkkk...", "...kkkkkkkkk.k..", "....kk...kk..k..", "............k..."], 16)
+    f.append(contorno(gato, "v"))
+    pistola = lienzo(16, 16)
+    rect(pistola, 2, 5, 12, 3, "s"); rect(pistola, 2, 5, 12, 1, "c"); rect(pistola, 11, 8, 3, 6, "o"); rect(pistola, 12, 8, 1, 6, "r")
+    rect(pistola, 9, 8, 2, 2, "s"); pon(pistola, 9, 10, "s"); rect(pistola, 1, 4, 2, 1, "s")
+    f.append(contorno(pistola))
+    antifaz = lienzo(16, 16)
+    rect(antifaz, 1, 5, 14, 5, "k"); rect(antifaz, 2, 4, 5, 1, "k"); rect(antifaz, 9, 4, 5, 1, "k")
+    rect(antifaz, 3, 6, 3, 2, "c"); rect(antifaz, 10, 6, 3, 2, "c"); rect(antifaz, 7, 9, 2, 2, "d")
+    rect(antifaz, 0, 6, 1, 1, "R"); rect(antifaz, 15, 6, 1, 1, "R")
+    f.append(contorno(antifaz, "s"))
+    guardar(hoja(f), "objetos/simbolos_tragaperras.png")
+
+
+def tragaperras_sala():
+    """La tragaperras de la sala: un mueble rojo y oro con tres rodillos, la palanca y la bandeja."""
+    img = lienzo(32, 46)
+    rect(img, 3, 6, 24, 38, "r"); rect(img, 4, 6, 22, 37, "R")
+    rect(img, 3, 1, 24, 7, "y"); rect(img, 4, 2, 22, 5, "o")
+    for x in range(5, 26, 3):
+        pon(img, x, 4, "c" if x % 2 else "y")  # las bombillas del marquesina
+    rect(img, 5, 11, 20, 12, "k")
+    for i in range(3):
+        rect(img, 6 + i * 6, 12, 5, 10, "c")
+        texto(img, 7 + i * 6, 14, "7", "R")
+    rect(img, 5, 16, 20, 1, "y")  # la línea de premio
+    rect(img, 6, 27, 18, 4, "d"); rect(img, 13, 28, 4, 2, "y")  # ranura de monedas
+    rect(img, 5, 36, 20, 5, "k"); rect(img, 6, 37, 18, 3, "s"); rect(img, 9, 38, 3, 1, "y"); rect(img, 16, 38, 2, 1, "y")
+    rect(img, 3, 43, 24, 2, "r")
+    rect(img, 27, 12, 2, 2, "s"); rect(img, 28, 5, 1, 9, "s"); rect(img, 27, 3, 3, 3, "R"); pon(img, 27, 3, "c")
+    guardar(contorno(img), "objetos/tragaperras.png")
+
+
+def mesa_ruleta_sala():
+    """La mesa de ruleta vista desde arriba: el plato a la izquierda y el tapete de apuestas."""
+    img = lienzo(68, 42)
+    rect(img, 1, 3, 66, 36, "o"); rect(img, 0, 5, 68, 32, "o")
+    rect(img, 2, 5, 64, 32, "G"); rect(img, 3, 4, 62, 34, "G")
+    rect(img, 2, 36, 64, 2, "g")
+    cx, cy = 17.5, 20.5
+    for y in range(img.height):
+        for x in range(img.width):
+            dx, dy = x - cx, y - cy
+            r = math.hypot(dx, dy)
+            if r > 14.5:
+                continue
+            if r > 13.0:
+                pon(img, x, y, "o")
+            elif r > 8.0:
+                sector = int((math.atan2(dy, dx) + math.pi) / (2 * math.pi) * 18)
+                pon(img, x, y, "R" if sector % 2 else "k")
+            elif r > 6.5:
+                pon(img, x, y, "y")
+            else:
+                pon(img, x, y, "r" if r > 2 else "y")
+    pon(img, 17, 9, "G"); pon(img, 18, 9, "G")
+    pon(img, 24, 12, "c")  # la bola
+    # Tapete de apuestas: casillas rojas y negras y el cero en verde.
+    rect(img, 36, 8, 28, 26, "c")
+    rect(img, 37, 9, 4, 24, "m")
+    for j in range(3):
+        for i in range(5):
+            rect(img, 42 + i * 4 + 1 - 1, 9 + j * 8, 3, 7, "R" if (i + j) % 2 == 0 else "k")
+    rect(img, 50, 26, 4, 3, "y")  # una ficha apostada
+    rect(img, 4, 37, 4, 4, "r"); rect(img, 60, 37, 4, 4, "r")
+    guardar(contorno(img), "objetos/mesa_ruleta.png")
+
+
+def sala_apuestas():
+    simbolos_tragaperras(); tragaperras_sala(); mesa_ruleta_sala()
+
+
 def main():
     (SALIDA / "fuente").mkdir(parents=True, exist_ok=True)
     crear_fuente("pixel", 1)
@@ -2013,6 +2132,7 @@ def main():
     enemigo_crupier(); maton(); botones()
     proyectiles(); objetos(); baldosas(); cartas(); pasivos(); eventos(); icono_app()
     efectos_punchy(); objetos_punchy(); efectos_ronda2()
+    sala_apuestas()
 
 
 if __name__ == "__main__":

@@ -52,7 +52,12 @@ const ROTULOS := {
 	GeneradorMazmorra.Tipo.TESORO: [13, Color(1.0, 0.8, 0.3)],
 	GeneradorMazmorra.Tipo.EVENTO: [14, Color(0.45, 0.85, 1.0)],
 	GeneradorMazmorra.Tipo.JEFE: [15, Color(1.0, 0.3, 0.36)],
+	GeneradorMazmorra.Tipo.APUESTAS: [16, Color(1.0, 0.45, 0.85)],
 }
+# Sala de apuestas: dónde están la tragaperras (contra la pared) y la mesa de ruleta, y lo
+# que ocupan. Lejos de las entradas y de las líneas entre puertas: nada estorba al cruzar.
+const MAQUINAS := {"tragaperras": Vector2(176, 50), "ruleta": Vector2(472, 96)}
+const CAJAS_MAQUINAS := [Rect2(162, 36, 28, 37), Rect2(440, 80, 64, 30)]
 const COLOR_SOMBRA := Color(0.03, 0.02, 0.07, 0.42)
 # El contorno del rombo de la moqueta, píxel a píxel.
 const ROMBO_MOQUETA := [Vector2i(-3, 0), Vector2i(3, 0), Vector2i(0, -3), Vector2i(0, 3),
@@ -127,6 +132,9 @@ func construir(datos: Dictionary, salas: Dictionary) -> void:
 			_crear_solido(caja)
 		# Después de las columnas, con el mismo azar: el suelo y las columnas no cambian.
 		_crear_mesas(azar)
+	elif datos.tipo == GeneradorMazmorra.Tipo.APUESTAS:
+		# Las máquinas se rodean como las mesas (no son cuerpos físicos).
+		cajas_mesas.append_array(CAJAS_MAQUINAS)
 	poner_puertas(true)
 	version += 1
 	_preparar_adornos()
@@ -348,6 +356,8 @@ func _preparar_adornos() -> void:
 		_cortinas = Color8(143, 35, 64)
 	elif tipo == t.TIENDA:
 		_cortinas = Color8(31, 92, 80)
+	elif tipo == t.APUESTAS:
+		_cortinas = Color8(122, 90, 160)
 	var arriba_libre := not _vecinas.has(Vector2i.UP)
 	if ROTULOS.has(tipo):
 		rotulo = [ROTULOS[tipo][0], Vector2(320.0 if arriba_libre else 256.0, 24.0), ROTULOS[tipo][1]]
@@ -360,6 +370,8 @@ func _preparar_adornos() -> void:
 			continue
 		if not rotulo.is_empty() and absf(x - rotulo[1].x) < 20.0:
 			continue
+		if tipo == t.APUESTAS and absf(x - MAQUINAS.tragaperras.x) < 28.0:
+			continue  # ahí está la tragaperras, pegada a la pared
 		if i % 2 == 0:
 			_pared.append([int(estilo.aplique), x])
 			var parpadeo := 0.45 if piso == 1 or int(estilo.aplique) == 5 else 0.12
@@ -400,6 +412,15 @@ func _preparar_adornos() -> void:
 			for x in [274.0, 366.0]:
 				luces.append([Vector2(x, 160), Vector2(96, 72), Color(1.0, 0.85, 0.45, 0.28), 0.0, 0.0])
 			_esquinas = [[10, Vector2(214, 114)], [10, Vector2(426, 114)], [10, Vector2(214, 198)], [10, Vector2(426, 198)]]
+		t.APUESTAS:
+			# Pasillo rojo hasta la ruleta, alfombra delante de la tragaperras y mucho neón rosa.
+			_alfombras.append([Rect2(132, 82, 88, 40), Color8(84, 24, 46), oro, false])
+			_alfombras.append([Rect2(424, 64, 96, 64), Color8(20, 60, 52), oro, false])
+			_alfombras.append([Rect2(248, 200, 144, 64), Color8(84, 24, 46), Color8(232, 110, 200), false])
+			luces.append([Vector2(176, 64), Vector2(110, 80), Color(1.0, 0.4, 0.8, 0.26), 0.25, azar.randf() * TAU])
+			luces.append([Vector2(472, 96), Vector2(120, 80), Color(1.0, 0.9, 0.6, 0.22), 0.0, 0.0])
+			luces.append([Vector2(320, 232), Vector2(160, 70), Color(1.0, 0.45, 0.85, 0.12), 0.1, azar.randf() * TAU])
+			_esquinas = [[10, Vector2(40, 270)], [10, Vector2(600, 270)], [9, Vector2(40, 54)], [9, Vector2(600, 54)]]
 		t.EVENTO:
 			_alfombras.append([Rect2(272, 116, 96, 88), Color8(30, 40, 80), Color8(111, 195, 232), true])
 			luces.append([Vector2(320, 160), Vector2(130, 100), Color(0.6, 0.85, 1.0, 0.22), 0.0, 0.0])
@@ -425,10 +446,13 @@ func _draw() -> void:
 		GeneradorMazmorra.Tipo.TIENDA, GeneradorMazmorra.Tipo.EVENTO: fila_suelo = 1
 		GeneradorMazmorra.Tipo.JEFE: fila_suelo = 2
 		GeneradorMazmorra.Tipo.TESORO: fila_suelo = 3
+		GeneradorMazmorra.Tipo.APUESTAS: fila_suelo = 4
 	# Los muros siempre llevan el tinte del piso; el suelo, solo el normal y el del jefe
 	# (la tienda, el tesoro y el evento tienen su propio color).
 	var tinte: Color = _estilo().get("tinte", Color.WHITE)
 	var tinte_suelo: Color = tinte if fila_suelo == 0 or fila_suelo == 2 else Color.WHITE
+	if fila_suelo == 4:
+		tinte_suelo = Color(0.8, 0.74, 0.8)  # el granate de la sala de apuestas, algo apagado: que no grite
 	for y in 19:
 		for x in 40:
 			var destino := Rect2(x * 16, y * 16, 16, 16)

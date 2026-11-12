@@ -504,6 +504,26 @@ def capa_jefe():
     guardar_bucle("musica_jefe_capa", p.mezcla, 0.45)
 
 
+def efectos_apuestas():
+    """La sala de apuestas: el golpe seco de cada rodillo, la bola de la ruleta y el premio gordo.
+    Va la última: usa su propio azar y no cambia ninguno de los sonidos de antes."""
+    propio = np.random.default_rng(777)
+    # Rodillo que se para: un clac metálico con un poco de muelle.
+    d = 0.09
+    clac = propio.uniform(-1.0, 1.0, int(FS * d)) * caida(d, 70) * 0.7
+    clac += triangular(barrido(520, 260, d), d) * caida(d, 32)
+    guardar_limpio("rodillo", clac, 0.45, 2)
+    # La bola saltando entre casillas: un tic de madera muy corto (suena muchas veces).
+    d = 0.03
+    tic = (triangular(1800, d) * 0.6 + agudo(propio.uniform(-1.0, 1.0, int(FS * d)), 2) * 0.4) * caida(d, 140)
+    guardar_limpio("bola", tic, 0.3, 2)
+    # Premio gordo: campanas de máquina y un arpegio que sube y no para.
+    notas = [(523, 0.07), (659, 0.07), (784, 0.07), (1047, 0.07)] * 3 + [(1319, 0.08), (1568, 0.08), (2093, 0.5)]
+    campanas = serie(notas, cuadrada, 9)
+    timbre = cuadrada(2093, len(campanas) / FS, 0.25) * (np.sin(t(len(campanas) / FS) * 2 * np.pi * 18) > 0) * 0.25
+    guardar("premio_gordo", campanas + timbre[:len(campanas)] * caida(len(campanas) / FS, 2.5)[:len(campanas)], 0.6)
+
+
 if __name__ == "__main__":
     efectos()
     musica_menu()
@@ -514,3 +534,4 @@ if __name__ == "__main__":
     efectos_ronda2()
     capa_piso()
     capa_jefe()
+    efectos_apuestas()

@@ -117,6 +117,8 @@ var _articulo_mostrado := ""
 var _jugo: Jugo
 var _lenta_hecha := false  # la cámara lenta de la última baja, una vez por sala
 var _hint_mesa := ""
+var _panel_apuestas: PanelApuestas
+var _hint_maquina := ""
 
 @onready var _mundo: Node2D = $Mundo
 @onready var _sala: Sala = $Mundo/Sala
@@ -203,6 +205,11 @@ func _crear_pantallas_extra() -> void:
 	_reto.jugar_reto.connect(empezar_reto)
 	Juego.logro_obtenido.connect(_hud.avisar_logro)
 	Juego.transformacion_obtenida.connect(_al_transformarse)
+	# La sala de apuestas: su panel va encima de todo, como el de los eventos.
+	_panel_apuestas = PanelApuestas.new()
+	$UI.add_child(_panel_apuestas)
+	_panel_apuestas.cerrado.connect(_al_cerrar_apuestas)
+	_panel_apuestas.jugada.connect(_guardar_punto)
 
 
 ## La sensación de cada golpe y las mecánicas nuevas (voltereta, órdago, mesas, fiebre).
@@ -354,6 +361,7 @@ func _generar_piso() -> void:
 		Juego.azar.seed = hash("%s-%d" % [Juego.fecha_hoy(), Juego.piso])
 	salas = GeneradorMazmorra.generar(Juego.azar, mini(12 + Juego.piso, 15))
 	_quitar_tienda_si_extremo()
+	_quitar_apuestas_si_extremo()
 	_repartir_eventos()
 	_hud.salas = salas
 	_pintar_piso()
@@ -368,6 +376,18 @@ func _quitar_tienda_si_extremo() -> void:
 		return
 	for c in salas:
 		if salas[c].tipo == TIPO.TIENDA or (Juego.imposible and salas[c].tipo == TIPO.TESORO):
+			salas[c].tipo = TIPO.NORMAL
+			salas[c].limpia = false
+
+
+## En extremo e imposible no hay sala de apuestas: ahí no hay tienda (ni tesoro) a propósito,
+## y una máquina que reparte corazones, objetos y montones de monedas rompería esa escasez.
+## Vuelve a ser la sala de combate que era.
+func _quitar_apuestas_si_extremo() -> void:
+	if not Juego.extremo:
+		return
+	for c in salas:
+		if salas[c].tipo == TIPO.APUESTAS:
 			salas[c].tipo = TIPO.NORMAL
 			salas[c].limpia = false
 
@@ -414,6 +434,7 @@ func entrar_sala(c: Vector2i, venimos: Vector2i) -> void:
 	_sala.construir(actual, salas)
 	_colocar_jugador(venimos)
 	_hint_tienda = ""
+	_hint_maquina = ""
 	_aviso.text = ""
 	_barra.info_externa = {}
 	jugador.seguro_listo = Juego.stat("seguro") > 0.0
@@ -437,6 +458,8 @@ func entrar_sala(c: Vector2i, venimos: Vector2i) -> void:
 			_crear_tienda()
 		TIPO.EVENTO:
 			_crear_evento()
+		TIPO.APUESTAS:
+			_crear_apuestas()
 	_guardar_punto()
 
 
@@ -464,6 +487,7 @@ func _physics_process(delta: float) -> void:
 		_limite_avisado = false
 	_actualizar_hint_tienda()
 	_actualizar_hint_mesa()
+	_actualizar_hint_maquina()
 
 
 # ------------------------------------------------------------ combate
@@ -692,6 +716,9 @@ func _terminar_combate() -> void:
 		_crear_salida_jefe(true)
 		Sonido.musica("piso")
 		return
+	if actual.tipo == TIPO.APUESTAS:
+		actual["emboscada"] = false
+		return  # la emboscada era un castigo: ni cuenta como sala ni deja carta
 	_salas_limpiadas += 1
 	if Juego.azar.randf() < _prob_carta:
 		_prob_carta = 0.4
@@ -987,6 +1014,83 @@ func _al_cerrar_evento(carta: String) -> void:
 		_dar_carta(carta)
 
 
+# ------------------------------------------------------------ sala de apuestas
+## La tragaperras y la ruleta. Si una tirada trajo una emboscada y se cerró el juego en
+## mitad de la pelea, al volver a entrar empieza otra vez: recargar no la evita.
+func _crear_apuestas() -> void:
+	for maquina in Sala.MAQUINAS:
+		var ruta := "res://assets/objetos/tragaperras.png" if maquina == "tragaperras" else "res://assets/objetos/mesa_ruleta.png"
+		var r := _crear_recogible(Recogible.Clase.MAQUINA, ruta, Sala.MAQUINAS[maquina])
+		r.datos = {"maquina": maquina}
+	_entregar_carta_apuestas.call_deferred()
+	if not actual.limpia:
+		_empezar_emboscada()
+
+
+## La máquina que tienes al lado (para E y el botón táctil), o null.
+func maquina_a_mano() -> Recogible:
+	if actual.get("tipo") != TIPO.APUESTAS or en_combate or get_tree().paused:
+		return null
+	for r in _recogibles.get_children():
+		if not r.is_queued_for_deletion() and r.clase == Recogible.Clase.MAQUINA and r.tocando():
+			return r
+	return null
+
+
+func jugar_maquina(r: Recogible) -> void:
+	if r == null or _panel_apuestas.visible or en_combate:
+		return
+	_hint_maquina = ""
+	_aviso.text = ""
+	get_tree().paused = true
+	Sonido.tocar("clic")
+	_panel_apuestas.abrir(String(r.datos.maquina), actual)
+
+
+func _al_cerrar_apuestas() -> void:
+	get_tree().paused = false
+	_entregar_carta_apuestas()
+	if actual.get("emboscada", false) and not actual.limpia:
+		_empezar_emboscada()
+	_guardar_punto()
+
+
+## La carta que ganaste con la fila llena: ahora eliges qué cambiar.
+func _entregar_carta_apuestas() -> void:
+	var carta := String(actual.get("carta_pendiente", ""))
+	if carta == "" or _panel_apuestas.visible:
+		return
+	actual["carta_pendiente"] = ""
+	_dar_carta(carta)
+
+
+## Tres pistolas en la tragaperras: los matones de la casa. Una pelea corta (dos oleadas
+## como mucho) y sin propina; mientras dura, las máquinas no se pueden usar.
+func _empezar_emboscada() -> void:
+	_empezar_combate()
+	_oleadas = _oleadas.slice(0, 2)
+	_oleadas_total = _oleadas.size()
+	_sala_previstos = 0
+	for grupo in _oleadas:
+		_sala_previstos += grupo.size()
+	_propina_t = 0.0
+	mostrar_cartel(Idioma.t("¡EMBOSCADA!"), Idioma.t("LOS MATONES DE LA CASA VIENEN A COBRAR"))
+
+
+func _actualizar_hint_maquina() -> void:
+	if actual.get("tipo") != TIPO.APUESTAS:
+		return
+	var r := maquina_a_mano()
+	var texto := ""
+	if r != null and not Juego.tactil:
+		texto = Idioma.t("E: JUGAR A LA TRAGAPERRAS") if r.datos.maquina == "tragaperras" else Idioma.t("E: JUGAR A LA RULETA")
+	if texto == _hint_maquina:
+		return
+	if _aviso.text == _hint_maquina:
+		_aviso.text = texto
+	_hint_maquina = texto
+
+
 func _crear_cofre() -> void:
 	var c := _crear_recogible(Recogible.Clase.COFRE, "res://assets/objetos/cofre.png", Sala.CENTRO + Vector2(-46, 0))
 	c.hframes = 2
@@ -1173,7 +1277,9 @@ func _unhandled_input(evento: InputEvent) -> void:
 ## La E (o el botón de interactuar del mando): comprar lo que tienes delante o volcar una mesa.
 func _interactuar() -> void:
 	var articulo := _articulo_cerca()
-	if articulo != null:
+	if maquina_a_mano() != null:
+		jugar_maquina(maquina_a_mano())
+	elif articulo != null:
 		comprar(articulo)
 	else:
 		_sala.volcar_cerca(jugador.position, 12.0, _horda)
