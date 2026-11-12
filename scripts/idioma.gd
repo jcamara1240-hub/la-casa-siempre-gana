@@ -3,8 +3,14 @@ extends RefCounted
 ## Traducciones. El texto en español hace de clave: si falta una, se ve en español
 ## y tests/prueba_combo.gd avisa.
 
-const IDIOMAS := ["es", "en"]
-const NOMBRES := {"es": "ESPAÑOL", "en": "ENGLISH"}
+const IDIOMAS := ["es", "en", "pt", "fr", "de", "it"]
+const NOMBRES := {"es": "ESPAÑOL", "en": "ENGLISH", "pt": "PORTUGUÊS", "fr": "FRANÇAIS", "de": "DEUTSCH", "it": "ITALIANO"}
+## Los demás idiomas, cada uno en su archivo (scripts/idiomas/<código>.gd) con su const TEXTOS.
+## Si les falta un texto, se ve en inglés y, si tampoco está, en español.
+const OTROS := {
+	"pt": preload("res://scripts/idiomas/pt.gd"), "fr": preload("res://scripts/idiomas/fr.gd"),
+	"de": preload("res://scripts/idiomas/de.gd"), "it": preload("res://scripts/idiomas/it.gd"),
+}
 
 static var actual := "es"
 
@@ -447,6 +453,37 @@ const EN := {
 
 
 static func t(texto: String) -> String:
-	if actual == "en":
-		return EN.get(texto, texto)
-	return texto
+	if actual == "es":
+		return texto
+	return buscar(texto, OTROS[actual].TEXTOS if OTROS.has(actual) else {})
+
+
+## El texto en ese diccionario; si no está, en inglés; y si tampoco, en español.
+static func buscar(texto: String, propio: Dictionary) -> String:
+	return propio.get(texto, EN.get(texto, texto))
+
+
+## Nombre con adjetivos ("Ficha Blindada y Veloz", "Armored Swift Chip", "Gepanzerter Schneller Chip").
+## Cada adjetivo llega como [masculino, femenino] en español. Cada archivo de idioma dice qué
+## sustantivos son femeninos allí (FEMENINOS), si el adjetivo va delante (ADJETIVO_DELANTE),
+## la conjunción (Y) y la forma femenina de los adjetivos que en español no cambian (ADJETIVOS_FEMENINOS).
+static func con_adjetivos(sustantivo: String, femenino: bool, adjetivos: Array) -> String:
+	var archivo = OTROS.get(actual)
+	if archivo != null:
+		femenino = archivo.FEMENINOS.has(sustantivo)
+	var lista: Array = []
+	for par in adjetivos:
+		var clave := String(par[1] if femenino else par[0])
+		if femenino and archivo != null and archivo.ADJETIVOS_FEMENINOS.has(clave):
+			lista.append(archivo.ADJETIVOS_FEMENINOS[clave])
+		else:
+			lista.append(t(clave))
+	var nombre := t(sustantivo)
+	if lista.is_empty():
+		return nombre
+	if actual == "en" or (archivo != null and archivo.ADJETIVO_DELANTE):
+		return " ".join(lista) + " " + nombre
+	var y: String = archivo.Y if archivo != null else "y"
+	if lista.size() == 1:
+		return nombre + " " + lista[0]
+	return "%s %s %s %s" % [nombre, ", ".join(lista.slice(0, -1)), y, lista[-1]]

@@ -107,6 +107,41 @@ GLIFOS[">"] = "#../.#./..#/.#./#.."
 GLIFOS["."] = "./././#"
 GLIFOS["'"] = "#/#/./././"[:9]
 ACENTOS = {"Á": "A", "É": "E", "Í": "I", "Ó": "O", "Ú": "U", "Ñ": "N"}
+# Portugués, francés, alemán e italiano: letras sueltas, comillas y las vocales con su marca.
+GLIFOS["ß"] = ".##./#..#/#.#./#..#/#.#."
+GLIFOS["ẞ"] = GLIFOS["ß"]
+GLIFOS["Œ"] = ".####/#.#../#.##./#.#../.####"
+GLIFOS["Æ"] = ".####/#.#../####./#.#../#.###"
+GLIFOS["«"] = "..../.#.#/#.#./.#.#/...."
+GLIFOS["»"] = "..../#.#./.#.#/#.#./...."
+GLIFOS['"'] = "#.#/#.#/.../.../..."
+GLIFOS["’"] = GLIFOS["'"]
+# La marca de cada letra acentuada: aguda, grave, circunfleja, diéresis, virgulilla y cedilla.
+MARCAS = {"Ñ": "virgulilla", "Ç": "cedilla", "Ý": "aguda", "Ÿ": "dieresis"}
+for _base, _letras in {"A": "ÁÀÂÄÃ", "E": "ÉÈÊË", "I": "ÍÌÎÏ", "O": "ÓÒÔÖÕ", "U": "ÚÙÛÜ"}.items():
+    for _letra, _marca in zip(_letras, ["aguda", "grave", "circunfleja", "dieresis", "virgulilla"]):
+        MARCAS[_letra] = _marca
+        ACENTOS.setdefault(_letra, _base)
+ACENTOS.update({"Ç": "C", "Ý": "Y", "Ÿ": "Y"})
+
+
+def pinta_marca(img, x, y, an, marca, escala):
+    """La marca va en las dos filas de encima de la letra (solo la circunfleja baja a la 2ª) y la cedilla debajo, en la fila 7."""
+    centro = an // 2 + (1 if an % 2 == 0 else 0)
+    if marca == "aguda":
+        puntos = [(centro, 0)]
+    elif marca == "grave":
+        puntos = [(centro - 1, 0)]
+    elif marca == "circunfleja":
+        puntos = [(centro - 1, 1), (centro, 0), (centro + 1, 1)]
+    elif marca == "dieresis":
+        puntos = [(centro - 1, 0), (centro + 1, 0)]
+    elif marca == "virgulilla":
+        puntos = [(i, 0) for i in range(an)]
+    else:  # cedilla
+        puntos = [(centro, 7)]
+    for i, j in puntos:
+        rect_b(img, (x + i) * escala, (y + j) * escala, escala)
 
 
 def glifo_a_filas(texto):
@@ -133,12 +168,8 @@ def crear_fuente(nombre, escala):
             for i, c in enumerate(f):
                 if c == "#":
                     rect_b(img, (x + i) * escala, (y + j + 2) * escala, escala)
-        if ch in ACENTOS:
-            if ch == "Ñ":
-                for i in range(an):
-                    rect_b(img, (x + i) * escala, y * escala, escala)
-            else:
-                rect_b(img, (x + an // 2 + (1 if an % 2 == 0 else 0)) * escala, y * escala, escala)
+        if ch in MARCAS:
+            pinta_marca(img, x, y, an, MARCAS[ch], escala)
         entradas.append((ch, x, y, an))
         x += an + 1
     guardar(img, f"fuente/{nombre}.png")
@@ -148,11 +179,13 @@ def crear_fuente(nombre, escala):
         f'page id=0 file="{nombre}.png"',
     ]
     registros = []
+    vistos = set()  # ß ya es su propia minúscula: que la mayúscula ẞ no la repita
     for ch, cx, cy, an in entradas:
         ids = {ord(ch)}
         if ch.lower() != ch:
             ids.add(ord(ch.lower()))
-        for cid in ids:
+        for cid in sorted(ids - vistos):
+            vistos.add(cid)
             registros.append(
                 f"char id={cid} x={cx * escala} y={cy * escala} width={an * escala} height={alto_celda * escala} "
                 f"xoffset=0 yoffset=0 xadvance={(an + 1) * escala} page=0 chnl=15"

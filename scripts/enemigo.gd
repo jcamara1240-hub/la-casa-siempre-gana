@@ -286,17 +286,10 @@ static func elegir_mods(azar: RandomNumberGenerator, nombre: String, cuantos: in
 ## "Ficha Blindada y Veloz" / "Swift Armored Chip".
 static func nombre_de(nombre: String, lista_mods: Array) -> String:
 	var datos: Array = NOMBRES_RANGO.get(nombre, [nombre.capitalize(), false])
-	var sustantivo := Idioma.t(String(datos[0]))
 	var adjetivos: Array = []
 	for m in lista_mods:
-		adjetivos.append(Idioma.t(String(MODS[m].f if datos[1] else MODS[m].m)))
-	if adjetivos.is_empty():
-		return sustantivo
-	if Idioma.actual == "en":
-		return " ".join(adjetivos) + " " + sustantivo
-	if adjetivos.size() == 1:
-		return sustantivo + " " + adjetivos[0]
-	return "%s %s y %s" % [sustantivo, ", ".join(adjetivos.slice(0, -1)), adjetivos[-1]]
+		adjetivos.append([MODS[m].m, MODS[m].f])
+	return Idioma.con_adjetivos(String(datos[0]), datos[1], adjetivos)
 
 
 ## Lo que se pinta sobre la cabeza: el modificador del raro; el nombre del élite al aparecer
