@@ -40,6 +40,9 @@ const LOGROS := {
 	"roces": {"nombre": "A Flor de Piel", "desc": "Deja que 100 balas te pasen rozando sin rodar."},
 	"desatado": {"nombre": "Sin Freno", "desc": "Desátate 25 veces en total."},
 	"servicio": {"nombre": "Servicio Rápido", "desc": "Cobra 25 propinas por rapidez."},
+	# Sala de apuestas: se marcan con Juego.marcar_logro() desde Apuestas.
+	"premio_gordo": {"nombre": "Premio Gordo", "desc": "Saca tres sietes en la tragaperras."},
+	"a_la_ruina": {"nombre": "A la Ruina", "desc": "Apuesta todo tu oro (20 o más) en la ruleta y piérdelo."},
 }
 
 

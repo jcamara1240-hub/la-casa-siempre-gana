@@ -44,7 +44,12 @@ func _process(delta: float) -> void:
 
 
 func _hay_compra() -> bool:
-	return principal != null and not get_tree().paused and principal.articulo_a_mano() != null
+	return principal != null and not get_tree().paused and (principal.articulo_a_mano() != null or _maquina() != null)
+
+
+## La tragaperras o la ruleta a mano: el mismo botón sirve para jugar.
+func _maquina() -> Node:
+	return principal.maquina_a_mano() if principal != null and principal.has_method("maquina_a_mano") else null
 
 
 ## Con el botón de comprar a la vista, los de rodar y órdago se apartan (están debajo).
@@ -76,7 +81,10 @@ func _toque(evento: InputEventScreenTouch) -> void:
 		principal.quizas_pausar()
 		get_viewport().set_input_as_handled()
 	elif _hay_compra() and CAJA_COMPRAR.has_point(p):
-		principal.comprar(principal.articulo_a_mano())
+		if _maquina() != null:
+			principal.jugar_maquina(_maquina())
+		else:
+			principal.comprar(principal.articulo_a_mano())
 		get_viewport().set_input_as_handled()
 	elif _hay_botones() and _en_boton(p, BOTON_RODAR, RADIO_RODAR):
 		principal.jugador.pedir_voltereta()
@@ -117,7 +125,8 @@ func _draw() -> void:
 	if _hay_compra():
 		draw_rect(CAJA_COMPRAR, Color8(122, 90, 160))
 		draw_rect(CAJA_COMPRAR, Color8(247, 198, 74), false, 1.0)
-		draw_string(Juego.fuente_grande, CAJA_COMPRAR.position + Vector2(0, 27), Idioma.t("COMPRAR"),
+		var rotulo := Idioma.t("JUGAR") if _maquina() != null else Idioma.t("COMPRAR")
+		draw_string(Juego.fuente_grande, CAJA_COMPRAR.position + Vector2(0, 27), rotulo,
 				HORIZONTAL_ALIGNMENT_CENTER, CAJA_COMPRAR.size.x, 16, CREMA)
 	elif _hay_botones():
 		_dibujar_botones()

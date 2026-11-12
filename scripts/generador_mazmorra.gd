@@ -5,12 +5,13 @@ extends RefCounted
 ## Una sala nueva solo puede tener un vecino al nacer. Así el mapa sale en forma
 ## de árbol, con callejones sin salida, y ahí van las salas especiales.
 
-enum Tipo { INICIO, NORMAL, TESORO, TIENDA, JEFE, EVENTO }
+enum Tipo { INICIO, NORMAL, TESORO, TIENDA, JEFE, EVENTO, APUESTAS }  # los nuevos, siempre al final: se guardan como enteros
 
 const ANCHO := 7
 const ALTO := 5
 const INICIO := Vector2i(3, 2)
 const DIRECCIONES: Array[Vector2i] = [Vector2i.UP, Vector2i.RIGHT, Vector2i.DOWN, Vector2i.LEFT]
+const PROB_APUESTAS := 0.6  # pisos con sala de apuestas (tragaperras y ruleta)
 
 
 static func generar(azar: RandomNumberGenerator, cuantas := 11) -> Dictionary:
@@ -65,6 +66,7 @@ static func _montar(celdas: Dictionary, extremos: Array, azar: RandomNumberGener
 	for especial in [extremos[1], extremos[2]]:
 		salas[especial].limpia = true
 	_poner_eventos(salas, azar)
+	_poner_apuestas(salas, extremos)
 	return salas
 
 
@@ -75,6 +77,26 @@ static func _poner_eventos(salas: Dictionary, azar: RandomNumberGenerator) -> vo
 		var elegida: Vector2i = normales.pop_at(azar.randi() % normales.size())
 		salas[elegida].tipo = Tipo.EVENTO
 		salas[elegida].limpia = true
+
+
+## La sala de apuestas: como mucho una por piso. Sale de la semilla de la sala de inicio,
+## que ya viene del azar del piso: así no gasta tiradas del azar común (el resto del piso
+## queda igual que antes) y en el reto diario es la misma para todos.
+static func _poner_apuestas(salas: Dictionary, extremos: Array) -> void:
+	var azar := RandomNumberGenerator.new()
+	azar.seed = hash(int(salas[INICIO].semilla) * 31 + 7)
+	if azar.randf() >= PROB_APUESTAS:
+		return
+	# Mejor en un callejón sin salida que sobre; si no hay, en cualquier sala normal.
+	var normal := func(c): return salas[c].tipo == Tipo.NORMAL
+	var candidatas: Array = extremos.slice(3).filter(normal)
+	if candidatas.is_empty():
+		candidatas = salas.keys().filter(normal)
+	if candidatas.is_empty():
+		return
+	var elegida: Vector2i = candidatas[azar.randi() % candidatas.size()]
+	salas[elegida].tipo = Tipo.APUESTAS
+	salas[elegida].limpia = true
 
 
 static func _dentro(c: Vector2i) -> bool:

@@ -2,15 +2,16 @@ class_name Recogible
 extends Sprite2D
 ## Cualquier cosa que el jugador toca en el suelo: monedas, cofres, artículos...
 
-enum Clase { MONEDA, CORAZON, CARTA, COFRE, TRAMPILLA, ARTICULO, OBJETO, EVENTO }
+enum Clase { MONEDA, CORAZON, CARTA, COFRE, TRAMPILLA, ARTICULO, OBJETO, EVENTO, MAQUINA }
 
 const RADIO := {
 	Clase.MONEDA: 9.0, Clase.CORAZON: 10.0, Clase.CARTA: 13.0,
 	Clase.COFRE: 14.0, Clase.TRAMPILLA: 15.0, Clase.ARTICULO: 18.0, Clase.OBJETO: 13.0, Clase.EVENTO: 15.0,
+	Clase.MAQUINA: 46.0,  # tragaperras y ruleta: se juega con E (o el botón) estando al lado
 }
 
 var clase := Clase.MONEDA
-var datos: Dictionary = {}  # artículos de tienda: id, precio, tipo
+var datos: Dictionary = {}  # artículos de tienda: id, precio, tipo; máquinas: maquina
 var iman := false
 
 var _armada := false  # la trampilla no se traga a quien ya estaba encima
@@ -38,7 +39,7 @@ func _physics_process(delta: float) -> void:
 	if clase == Clase.TRAMPILLA and not _armada:
 		_armada = not tocando()
 		return
-	if clase != Clase.ARTICULO and tocando():
+	if clase != Clase.ARTICULO and clase != Clase.MAQUINA and tocando():
 		_principal.recogido(self)
 
 
