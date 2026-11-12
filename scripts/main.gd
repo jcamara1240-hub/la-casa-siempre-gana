@@ -166,7 +166,6 @@ func _ready() -> void:
 	_barra.sustitucion_cancelada.connect(_cerrar_selector)
 	_pantalla.aceptada.connect(_al_cerrar_final)
 	_pantalla.seguir_infinito.connect(_seguir_infinito)
-	_menu.jugar.connect(empezar_partida)
 	_menu.continuar.connect(_reanudar)
 	_menu.ir_a_portada.connect(_ir_al_menu)
 	_crear_pantallas_extra()
