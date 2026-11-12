@@ -76,6 +76,14 @@ var cartas: Array = []
 var objetos: Array = []
 var stats: Dictionary = STATS_BASE.duplicate()
 var azar := RandomNumberGenerator.new()
+## El azar de dentro de la pelea (combos, botín, dónde nace cada uno). Va aparte para que
+## lo que pase en un combate no descoloque las tiradas de la mazmorra (mapas, tiendas, oleadas).
+var azar_combate := RandomNumberGenerator.new()
+## Reto diario: la fecha (UTC) de la mazmorra que se juega, si cuenta para la marca
+## y los golpes recibidos, que restan puntos.
+var fecha_reto := ""
+var reto_puntuable := false
+var golpes := 0
 var ordagos := ORDAGOS_BASE
 ## La presión del Director: sube si limpias salas sin que te toquen y baja si te dan.
 var presion := Director.PRESION_INICIAL
@@ -185,6 +193,11 @@ func nueva_partida(semilla := 0, id_personaje := "", id_mesa := -1, modo_extremo
 		azar.randomize()
 	else:
 		azar.seed = semilla
+	azar_combate.randomize()
+	if not reto_diario:
+		fecha_reto = ""
+		reto_puntuable = false
+	golpes = 0
 	var datos: Dictionary = PersonajesDB.PERSONAJES[personaje]
 	# En modo extremo hay un solo corazón, y un golpe se lo lleva entero.
 	vida_max = 2 if extremo else int(datos.vida) - (2 if mesa >= 4 else 0)
@@ -224,18 +237,95 @@ func nueva_partida(semilla := 0, id_personaje := "", id_mesa := -1, modo_extremo
 	estado_cambiado.emit()
 
 
+## La fecha del reto es la de UTC: así cambia a la vez en todo el mundo.
 func fecha_hoy() -> String:
 	return Time.get_date_string_from_system(true)
 
 
+## El reto diario de una fecha: el Tahúr en la Mesa Verde, sin extremo, y la mazmorra sale de la fecha.
+func nueva_partida_reto(fecha: String, puntuable: bool) -> void:
+	nueva_partida(semilla_de("reto:" + fecha), "tahur", 1, false, true)
+	fecha_reto = fecha
+	reto_puntuable = puntuable
+
+
+## Una semilla estable a partir de un texto: la misma en cualquier máquina y versión de Godot
+## (String.hash es djb2). Nunca 0, que para nueva_partida significa "al azar".
+static func semilla_de(texto: String) -> int:
+	var h := texto.hash()
+	return h if h != 0 else 1
+
+
+## Un azar propio para una cosa concreta de una sala (su plan, su tienda, su cofre...).
+## Sale de la semilla de la sala, así que no depende del orden en que pasen las cosas.
+static func azar_para(semilla: int, etiqueta: String) -> RandomNumberGenerator:
+	var r := RandomNumberGenerator.new()
+	r.seed = semilla_de("%d:%s" % [semilla, etiqueta])
+	return r
+
+
+## La presión con la que se planea una sala. En el reto diario es fija: todo el mundo
+## se encuentra las mismas oleadas, juegue como juegue.
+func presion_sala() -> float:
+	return Director.PRESION_INICIAL if diario else presion
+
+
+## Qué cartas y objetos pueden salir. En el reto diario, solo los de partida para todos:
+## lo que tengas desbloqueado no cambia lo que encuentras.
+func carta_en_bolsa(id: String) -> bool:
+	if diario:
+		return CartasDB.CARTAS[id].rareza == 0 or Progreso.RARAS_INICIALES.has(id)
+	return Progreso.carta_libre(id)
+
+
+func objeto_en_bolsa(id: String) -> bool:
+	if diario:
+		return Progreso.OBJETOS_INICIALES.has(id)
+	return Progreso.objeto_libre(id)
+
+
+# Puntos del reto diario. Fórmula fija (el servidor la recalcula igual, ver servidor/esquema.sql):
+#   1000 por piso superado (5 si ganas) + 5000 por ganar + 2 por baja + 1 por moneda ganada
+#   - 100 por golpe recibido + al ganar, 3 por cada segundo por debajo de 25 minutos.
+#   Nunca baja de 0.
+const PUNTOS_PISO := 1000
+const PUNTOS_VICTORIA := 5000
+const PUNTOS_BAJA := 2
+const PUNTOS_MONEDA := 1
+const PUNTOS_GOLPE := 100
+const PUNTOS_SEGUNDO := 3
+const SEGUNDOS_BONO := 1500
+
+
+static func calcular_puntos(pisos: int, gano: bool, segundos: int, bajas: int, monedas: int, golpes_recibidos: int) -> int:
+	var total := pisos * PUNTOS_PISO + bajas * PUNTOS_BAJA + monedas * PUNTOS_MONEDA - golpes_recibidos * PUNTOS_GOLPE
+	if gano:
+		total += PUNTOS_VICTORIA + maxi(SEGUNDOS_BONO - segundos, 0) * PUNTOS_SEGUNDO
+	return maxi(total, 0)
+
+
+## Pisos superados: los anteriores al que estás, o los cinco si ganas.
+func pisos_superados(gano: bool) -> int:
+	return PISOS_TOTALES if gano else piso - 1
+
+
 func puntos_reto(gano: bool) -> int:
-	return (piso - 1) * 1000 + (5000 if gano else 0) + enemigos_eliminados * 2 + mini(roundi(mejor_combo), 3000) + oro_total
+	return calcular_puntos(pisos_superados(gano), gano, int(tiempo_partida), enemigos_eliminados, oro_total, golpes)
+
+
+## Todo lo que se guarda (y se envía a la tabla mundial) de un reto terminado.
+func resumen_reto(gano: bool) -> Dictionary:
+	return {
+		"fecha": fecha_reto, "modo": "diario", "puntos": puntos_reto(gano), "piso": piso,
+		"pisos": pisos_superados(gano), "gano": gano, "tiempo": int(tiempo_partida),
+		"bajas": enemigos_eliminados, "monedas": oro_total, "golpes": golpes,
+	}
 
 
 # ---------------------------------------------------------------- guardado
 const CAMPOS_PARTIDA := ["vida", "vida_max", "oro", "piso", "enemigos_eliminados", "racha", "personaje", "mesa", "extremo",
 	"diario", "imposible", "infinito", "deuda", "orden_jefes", "cartas", "objetos", "stats", "transformaciones", "novedades", "tiempo_partida",
-	"mejor_combo", "oro_total", "ordagos", "presion"]
+	"mejor_combo", "oro_total", "ordagos", "presion", "fecha_reto", "reto_puntuable", "golpes"]
 
 
 func volcar() -> Dictionary:
@@ -309,7 +399,7 @@ func contexto_combo(con_azar := false) -> Dictionary:
 	var ctx := {"monedas": oro, "racha": racha, "vida": vida, "dano_global": stat("dano_global"),
 		"fiebre": nivel_fiebre(), "voltereta": rodo_hace_poco(), "ordagos": ordagos}
 	if con_azar:
-		ctx["azar"] = azar
+		ctx["azar"] = azar_combate
 	return ctx
 
 
@@ -559,18 +649,28 @@ func cobrar_deuda() -> String:
 
 
 ## Un objeto que aún no tengas. Devuelve "" si ya los tienes todos.
-func robar_objeto(excluir := []) -> String:
-	var libres: Array = []
+## Baraja la bolsa entera y da el primero que no tengas: con el mismo azar sale lo mismo
+## a todo el mundo, salvo que ya lo lleves (y el azar gastado no depende de lo que lleves).
+func robar_objeto(excluir := [], rng: RandomNumberGenerator = null) -> String:
+	if rng == null:
+		rng = azar
+	var bolsa: Array = []
 	for id in ObjetosDB.OBJETOS:
 		if extremo and OBJETOS_PROHIBIDOS_EXTREMO.has(id):
 			continue
 		if imposible and id == "ficha_vip":
 			continue
-		if not objetos.has(id) and not excluir.has(id) and Progreso.objeto_libre(id):
-			libres.append(id)
-	if libres.is_empty():
-		return ""
-	return libres[azar.randi() % libres.size()]
+		if objeto_en_bolsa(id):
+			bolsa.append(id)
+	for i in range(bolsa.size() - 1, 0, -1):
+		var j := rng.randi_range(0, i)
+		var t = bolsa[i]
+		bolsa[i] = bolsa[j]
+		bolsa[j] = t
+	for id in bolsa:
+		if not objetos.has(id) and not excluir.has(id):
+			return id
+	return ""
 
 
 func precio_final(base: int) -> int:
@@ -652,8 +752,10 @@ func herir(cantidad: int) -> void:
 
 
 ## Saca cartas distintas entre sí. Con suerte > 0 salen más raras (tesoros).
-func robar_cartas(cuantas: int, suerte := 0.0) -> Array:
-	var bolsa: Array = CartasDB.CARTAS.keys().filter(func(id): return Progreso.carta_libre(id))
+func robar_cartas(cuantas: int, suerte := 0.0, rng: RandomNumberGenerator = null) -> Array:
+	if rng == null:
+		rng = azar
+	var bolsa: Array = CartasDB.CARTAS.keys().filter(func(id): return carta_en_bolsa(id))
 	var elegidas: Array = []
 	var suerte_total := suerte + stat("suerte")
 	for _i in cuantas:
@@ -665,7 +767,7 @@ func robar_cartas(cuantas: int, suerte := 0.0) -> Array:
 				peso *= 1.0 + suerte_total
 			suma += peso
 			pesos.append(peso)
-		var tirada := azar.randf() * suma
+		var tirada := rng.randf() * suma
 		for j in bolsa.size():
 			tirada -= pesos[j]
 			if tirada <= 0.0:

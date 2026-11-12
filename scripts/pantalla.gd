@@ -79,6 +79,9 @@ func _preparar_datos() -> void:
 		{"texto": "PERSONAJE", "fijo": PersonajesDB.nombre(Juego.personaje).to_upper()},
 		{"texto": "MESA", "fijo": _nombre_mesa()},
 	]
+	# En el reto la mesa es siempre la misma: en su sitio, los golpes, que restan puntos.
+	if Juego.diario:
+		_datos[-1] = {"texto": "GOLPES RECIBIDOS", "valor": Juego.golpes}
 	if Juego.infinito:
 		_datos.append({"texto": "RÉCORD INFINITO", "valor": Progreso.mejor_infinito})
 
@@ -292,6 +295,11 @@ func _dibujar_titulo() -> void:
 	else:
 		frase = (Idioma.t("HAS LLEGADO AL PISO %d EN EL MODO INFINITO.") % Juego.piso) if Juego.infinito else (Idioma.t("HAS CAÍDO EN EL PISO %d DE %d.") % [Juego.piso, Juego.PISOS_TOTALES])
 	draw_string(Juego.fuente, Vector2(0, 100), frase, HORIZONTAL_ALIGNMENT_CENTER, 640, 8, COLOR_CREMA)
+	if Juego.diario:
+		var nota := Idioma.t("RETO DEL %s") % Juego.fecha_reto
+		if not Juego.reto_puntuable:
+			nota += "  " + Idioma.t("PRÁCTICA: ESTE INTENTO NO PUNTÚA")
+		draw_string(Juego.fuente, Vector2(0, 112), nota, HORIZONTAL_ALIGNMENT_CENTER, 640, 8, COLOR_GRIS)
 
 
 func _dibujar_datos() -> void:

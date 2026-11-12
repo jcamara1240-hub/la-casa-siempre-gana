@@ -59,7 +59,7 @@ func _nuevo_ciclo() -> void:
 		Juego.gastar_oro(mini(plan.coste, Juego.oro))
 	ciclo_empezado.emit(plan)
 	_cola = plan.pasos.duplicate()
-	if Juego.azar.randf() < Juego.stat("doble_ciclo"):
+	if Juego.azar_combate.randf() < Juego.stat("doble_ciclo"):
 		_cola += plan.pasos
 	_pasos_ciclo = _cola.size()
 	_hueco = minf(HUECO_MAX, REPARTO / maxf(1.0, float(_pasos_ciclo))) / Juego.factor_fiebre()
