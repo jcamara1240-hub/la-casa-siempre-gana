@@ -51,10 +51,20 @@ def pon(img, x, y, letra):
         img.putpixel((x, y), rgba(letra))
 
 
+def mismos_pixeles(img, destino):
+    """True si el archivo ya tiene esos píxeles: otra versión de Pillow comprime distinto
+    y reescribirlo ensuciaría git sin cambiar nada."""
+    if not destino.exists():
+        return False
+    with Image.open(destino) as viejo:
+        return viejo.size == img.size and viejo.convert("RGBA").tobytes() == img.convert("RGBA").tobytes()
+
+
 def guardar(img, ruta):
     destino = SALIDA / ruta
     destino.parent.mkdir(parents=True, exist_ok=True)
-    img.save(destino)
+    if not mismos_pixeles(img, destino):
+        img.save(destino)
 
 
 def hoja(frames, columnas=None):
@@ -208,6 +218,24 @@ def elipse(img, cx, cy, rx, ry, letra):
         for x in range(img.width):
             if ((x - cx) / rx) ** 2 + ((y - cy) / ry) ** 2 <= 1.0:
                 pon(img, x, y, letra)
+
+
+def linea(img, x0, y0, x1, y1, letra):
+    """Línea de un píxel de grosor (Bresenham)."""
+    dx, dy = abs(x1 - x0), -abs(y1 - y0)
+    sx, sy = (1 if x0 < x1 else -1), (1 if y0 < y1 else -1)
+    err = dx + dy
+    while True:
+        pon(img, x0, y0, letra)
+        if x0 == x1 and y0 == y1:
+            break
+        e2 = 2 * err
+        if e2 >= dy:
+            err += dy
+            x0 += sx
+        if e2 <= dx:
+            err += dx
+            y0 += sy
 
 
 def palo(img, x, y, nombre, letra):
@@ -605,6 +633,78 @@ def sota():
     guardar(hoja(frames), "personajes/sota.png")
 
 
+def enemigo_crupier():
+    """Visera verde, chaleco y un abanico de naipes. En el fotograma 3 avisa: los naipes brillan."""
+    frames = []
+    for f in range(4):
+        img = lienzo(16, 16)
+        b = 1 if f in (1, 3) else 0
+        aviso = f == 3
+        rect(img, 4, 1 + b, 8, 1, "k")  # pelo engominado
+        rect(img, 3, 2 + b, 10, 2, "m" if aviso else "G"); rect(img, 3, 3 + b, 10, 1, "g")  # la visera
+        rect(img, 4, 4 + b, 8, 4, "c" if aviso else "o")
+        pon(img, 6, 5 + b, "k"); pon(img, 9, 5 + b, "k")
+        rect(img, 6, 7 + b, 4, 1, "k")  # bigote
+        rect(img, 4, 8 + b, 8, 5, "c")  # camisa
+        rect(img, 4, 8 + b, 2, 5, "k"); rect(img, 10, 8 + b, 2, 5, "k")  # chaleco
+        rect(img, 6, 8 + b, 4, 1, "R"); pon(img, 7, 8 + b, "r"); pon(img, 8, 8 + b, "r")  # pajarita
+        rect(img, 2, 9 + b, 2, 3, "c"); rect(img, 2, 10 + b, 2, 1, "R")  # brazo con liga
+        naipe = "y" if aviso else "c"
+        rect(img, 12, 6 + b, 2, 4, naipe); rect(img, 13, 5 + b, 2, 4, naipe)  # los naipes en abanico
+        pon(img, 13, 7 + b, "R"); pon(img, 14, 6 + b, "k")
+        pie = f % 2 == 0
+        rect(img, 5, 13 + b, 2, 3 - b if pie else 2 - b, "k"); rect(img, 9, 13 + b, 2, 2 - b if pie else 3 - b, "k")
+        frames.append(contorno(img))
+    guardar(hoja(frames), "personajes/crupier.png")
+
+
+def maton():
+    """Sombrero de ala, traje de raya diplomática y una metralleta. En el 3 la boca del cañón se enciende."""
+    frames = []
+    for f in range(4):
+        img = lienzo(16, 16)
+        b = 1 if f in (1, 3) else 0
+        aviso = f == 3
+        rect(img, 4, 0 + b, 8, 3, "p"); rect(img, 4, 2 + b, 8, 1, "R"); rect(img, 6, 0 + b, 4, 1, "v")  # el sombrero
+        rect(img, 2, 3 + b, 12, 1, "p")
+        rect(img, 4, 4 + b, 8, 4, "o"); rect(img, 4, 7 + b, 8, 1, "r")  # cara y barba de tres días
+        rect(img, 5, 5 + b, 2, 1, "k"); rect(img, 9, 5 + b, 2, 1, "k")
+        traje = "c" if aviso else "s"
+        rect(img, 2, 8 + b, 12, 5, traje)
+        for x in (3, 5, 10, 12):
+            rect(img, x, 8 + b, 1, 5, "y" if aviso else "v")  # la raya diplomática
+        rect(img, 7, 8 + b, 2, 3, "c"); rect(img, 7, 8 + b, 2, 2, "R")  # corbata
+        rect(img, 1, 11 + b, 12, 2, "k"); rect(img, 4, 13 + b, 3, 2, "s"); pon(img, 5, 13 + b, "c")  # metralleta y su tambor
+        rect(img, 13, 11 + b, 2, 1, "y" if aviso else "k")
+        pie = f % 2 == 0
+        rect(img, 4, 14, 3, 2 if pie else 1, "k"); rect(img, 9, 14, 3, 1 if pie else 2, "k")
+        frames.append(contorno(img))
+    guardar(hoja(frames), "personajes/maton.png")
+
+
+def botones():
+    """El botones del hotel: gorrito, chaqueta roja y una bomba con la mecha encendida."""
+    frames = []
+    for f in range(4):
+        img = lienzo(16, 16)
+        b = 1 if f in (1, 3) else 0
+        aviso = f == 3
+        rect(img, 5, 1 + b, 5, 2, "R"); rect(img, 5, 3 + b, 5, 1, "y")  # el gorrito
+        elipse(img, 7.5, 6.0 + b, 3.6, 2.8, "o")
+        pon(img, 6, 6 + b, "k"); pon(img, 9, 6 + b, "k"); rect(img, 7, 8 + b, 2, 1, "r")
+        rect(img, 4, 9 + b, 7, 4, "R"); rect(img, 4, 9 + b, 7, 1, "y")  # la chaqueta y sus botones
+        for y in (10, 12):
+            pon(img, 6, y + b, "y"); pon(img, 8, y + b, "y")
+        rect(img, 2, 10 + b, 2, 2, "R")
+        elipse(img, 13.0, 9.0 + b, 2.2, 2.2, "R" if aviso else "d")  # la bomba en alto
+        pon(img, 12, 8 + b, "c" if aviso else "v")
+        pon(img, 13, 6 + b, "o"); pon(img, 14, 5 + b, "y" if aviso else "o")
+        pie = f % 2 == 0
+        rect(img, 5, 13 + b, 2, 3 - b if pie else 2 - b, "r"); rect(img, 8, 13 + b, 2, 2 - b if pie else 3 - b, "r")
+        frames.append(contorno(img))
+    guardar(hoja(frames), "personajes/botones.png")
+
+
 def jefe():
     """La Banca: una tragaperras enfadada de 48x48."""
     frames = []
@@ -871,22 +971,46 @@ def rey_blackjack():
 
 
 # ---------------------------------------------------------------- proyectiles y efectos
+def con_halo(img, cerca="R", lejos="o"):
+    """Rodea lo opaco de un halo cálido semitransparente (dos anillos): las balas enemigas
+    se leen sobre cualquier fondo. Agranda el lienzo dos píxeles por cada lado."""
+    base = lienzo(img.width + 4, img.height + 4)
+    base.alpha_composite(img, (2, 2))
+    salida = base.copy()
+    for letra, alfa in ((cerca, 190), (lejos, 80)):
+        siguiente = salida.copy()
+        for y in range(base.height):
+            for x in range(base.width):
+                if salida.getpixel((x, y))[3]:
+                    continue
+                for dx, dy in ((1, 0), (-1, 0), (0, 1), (0, -1), (1, 1), (-1, 1), (1, -1), (-1, -1)):
+                    i, j = x + dx, y + dy
+                    if 0 <= i < base.width and 0 <= j < base.height and salida.getpixel((i, j))[3]:
+                        # en diagonal, más flojo: el halo sale redondeado
+                        a = alfa if dx == 0 or dy == 0 else alfa // 2
+                        siguiente.putpixel((x, y), rgba(letra)[:3] + (a,))
+                        break
+        salida = siguiente
+    return salida
+
+
 def proyectiles():
     guardar(sprite([
         "..kkk...", ".kyyyk..", "kyccyok.", "kyccyok.", "kyyyook.", ".kyook..", "..kkk...",
     ], 8), "efectos/bala.png")
-    guardar(sprite([
+    # Las enemigas llevan halo rojo y naranja: siempre se distinguen de las tuyas y del suelo.
+    guardar(con_halo(sprite([
         "..kkkk..", ".kRRRRk.", "kRRoyRRk", "kRoyyoRk", "kRoyyoRk", "kRRoyRRk", ".kRRRRk.", "..kkkk..",
-    ], 8), "efectos/bala_enemiga.png")
-    guardar(sprite([
+    ], 8)), "efectos/bala_enemiga.png")
+    guardar(con_halo(sprite([
         "..kkkk..", ".kBBBBk.", "kBcBBBBk", "kBBBBBBk", "kBBBBBBk", "kBBBBcBk", ".kBBBBk.", "..kkkk..",
-    ], 8), "efectos/burbuja.png")
-    guardar(sprite([
+    ], 8)), "efectos/burbuja.png")
+    guardar(con_halo(sprite([
         "kkkkkk", "kcccck", "kcRRck", "kRRRRk", "kcRRck", "kcRRck", "kcccck", "kkkkkk",
-    ], 6), "efectos/naipe_bala.png")
-    guardar(sprite([
+    ], 6)), "efectos/naipe_bala.png")
+    guardar(con_halo(sprite([
         "kkkkkk", "kcccck", "kckkck", "kkkkkk", "kckkck", "kckkck", "kcccck", "kkkkkk",
-    ], 6), "efectos/naipe_negro.png")
+    ], 6)), "efectos/naipe_negro.png")
     guardar(sprite([
         "......kk......", ".....kcck.....", ".....kcsk.....", "....kccsk.....", "....kccsk.....",
         "...kkccskk....", "kkkcccyysccckk", "kkkcccyysccckk", "...kkccskk....", ".....kcsk.....",
@@ -928,6 +1052,246 @@ def proyectiles():
     vacia = [f.replace("R", "d").replace("c", "d") for f in llena]
     media = [f[:4].replace("R", "R") + f[4:].replace("R", "d") for f in llena]
     guardar(hoja([sprite(s, 9) for s in (llena, media, vacia)]), "objetos/corazon.png")
+
+
+def efectos_punchy():
+    """Balas de las armas nuevas y el jugo: fogonazos, chispas, casquillos, polvo y la onda del órdago."""
+    guardar(sprite([".kk.", "kcyk", "kyok", ".kk."], 4), "efectos/perdigon.png")
+    guardar(sprite([".kkkk.", "kcyyok", "kyoyok", "kyooRk", "kooork", ".kkkk."], 6), "efectos/corcho.png")
+    guardar(sprite(["kk..", "kcsk", ".ksk", "..kk"], 4), "efectos/esquirla.png")
+    guardar(sprite(["....", "cyyo", "yoor", "...."], 4), "efectos/casquillo.png")
+
+    frames = []
+    for f in range(2):
+        img = lienzo(8, 8)
+        rect(img, 0, 3, 6, 4, "k"); rect(img, 1, 4, 4, 2, "R"); rect(img, 1, 5, 4, 1, "r"); rect(img, 3, 4, 1, 2, "c")
+        pon(img, 5, 2, "o"); pon(img, 6, 1, "o")  # la mecha
+        if f == 0:
+            pon(img, 7, 0, "y"); pon(img, 6, 0, "c")
+        else:
+            pon(img, 7, 0, "c"); pon(img, 7, 1, "y"); pon(img, 5, 0, "y")
+        frames.append(img)
+    guardar(hoja(frames), "efectos/dinamita.png")
+
+    frames = []
+    for f in range(2):
+        img = lienzo(8, 8)
+        for y in range(8):
+            for x in range(8):
+                r = math.hypot(x - 3.5, y - 3.5)
+                if r > 3.9:
+                    continue
+                if r > 3.1:
+                    pon(img, x, y, "k")
+                elif r > 1.7:
+                    a = math.atan2(y - 3.5, x - 3.5) % (math.pi / 2)
+                    pon(img, x, y, "c" if a < math.pi / 4 else ("R" if f else "r"))
+                else:
+                    pon(img, x, y, ("y" if f else "k"))
+        if f:
+            pon(img, 3, 3, "c")
+        frames.append(img)
+    guardar(hoja(frames), "efectos/mina.png")
+
+    # El tajo de la botella: apunta a +X y barre de arriba abajo.
+    frames = []
+    for f in range(4):
+        img = lienzo(32, 32)
+        desde, hasta, grueso = [(-75, -10, 3.5), (-75, 75, 5.5), (-20, 75, 4.0), (35, 75, 2.0)][f]
+        for y in range(32):
+            for x in range(32):
+                dx, dy = x - 15.5, y - 15.5
+                r = math.hypot(dx, dy)
+                a = math.degrees(math.atan2(dy, dx))
+                if desde <= a <= hasta and 14.5 - grueso <= r <= 14.5:
+                    borde = r < 14.5 - grueso + 1.0 or a > hasta - 12
+                    pon(img, x, y, "s" if borde and f else "c")
+        frames.append(img)
+    guardar(hoja(frames), "efectos/barrido.png")
+
+    # Fogonazo: centrado en la celda y con el lóbulo largo hacia +X (se gira con el disparo).
+    frames = []
+    for f in range(3):
+        img = lienzo(16, 16)
+        escala = [1.0, 0.78, 0.5][f]
+        for y in range(16):
+            for x in range(16):
+                dx, dy = x - 6.5, y - 7.5
+                r = math.hypot(dx, dy)
+                a = math.atan2(dy, dx)
+                # una estrella de cinco puntas estirada hacia delante
+                limite = escala * (2.6 + 6.0 * max(0.0, math.cos(a)) ** 4 + 1.6 * max(0.0, math.cos(a * 5)) ** 2)
+                if r > limite:
+                    continue
+                t = r / max(limite, 0.01)
+                if f < 2:
+                    pon(img, x, y, "c" if t < 0.4 else ("y" if t < 0.75 else "o"))
+                else:
+                    pon(img, x, y, "y" if t < 0.5 else "s")
+        frames.append(img)
+    guardar(hoja(frames), "efectos/fogonazo.png")
+
+    frames = []
+    for f in range(4):
+        img = lienzo(8, 8)
+        if f == 0:
+            rect(img, 3, 2, 2, 4, "c"); rect(img, 2, 3, 4, 2, "c"); rect(img, 3, 3, 2, 2, "y")
+        else:
+            d = [0, 1.6, 2.6, 3.4][f]
+            for i in range(8):
+                a = math.tau * i / 8 + (0.39 if i % 2 else 0)
+                largo = 1 if i % 2 else (2 if f < 3 else 1)
+                for k in range(largo):
+                    x = round(3.5 + math.cos(a) * (d + k * 0.9))
+                    y = round(3.5 + math.sin(a) * (d + k * 0.9))
+                    pon(img, x, y, ["c", "y", "y", "o"][min(3, f + k)])
+        frames.append(img)
+    guardar(hoja(frames), "efectos/chispa.png")
+
+    # El polvo de la voltereta: una nube que crece y se deshace.
+    frames = []
+    nubes = [(3.5, 4.5, 1.0), (2.5, 4.0, 0.8), (5.0, 4.2, 0.8)]
+    for f in range(4):
+        img = lienzo(8, 8)
+        crece = [1.2, 2.0, 2.6, 2.9][f]
+        for y in range(8):
+            for x in range(8):
+                dentro = any(math.hypot(x - cx, y - (cy - f * 0.3)) <= crece * k for cx, cy, k in nubes)
+                if not dentro:
+                    continue
+                if f == 3 and (x + y) % 2:
+                    continue
+                if f == 2 and (x + y * 3) % 5 == 0:
+                    continue
+                arriba = y < 4 - f * 0.3
+                pon(img, x, y, "c" if arriba and f < 2 else "s")
+        frames.append(img)
+    guardar(hoja(frames), "efectos/polvo.png")
+
+    frames = []
+    for claro, oscuro in (("R", "r"), ("G", "g"), ("B", "b"), ("y", "o")):
+        frames.append(sprite([".kkk", "k" + "c" + claro + "k", "k" + claro + oscuro + "k", "kkk."], 4))
+    guardar(hoja(frames), "efectos/ficha_rota.png")
+
+    onda = lienzo(64, 64)
+    for y in range(64):
+        for x in range(64):
+            r = math.hypot(x - 31.5, y - 31.5)
+            if 28.6 <= r <= 31.6:
+                pon(onda, x, y, "c")
+            elif 25.8 <= r < 27.2:
+                onda.putpixel((x, y), rgba("c")[:3] + (110,))
+    guardar(onda, "efectos/onda.png")
+
+
+def efectos_ronda2():
+    """Quemaduras que se quedan en el suelo y los adornos de las paredes de cada piso."""
+    # Tres manchas de hollín distintas; el centro más oscuro, el borde roto y con rayas.
+    azar = random.Random(11)
+    frames = []
+    for v in range(3):
+        img = lienzo(24, 24)
+        rayos = [azar.uniform(0, math.tau) for _ in range(5 + v)]
+        for y in range(24):
+            for x in range(24):
+                dx, dy = x - 11.5, y - 11.5
+                r = math.hypot(dx, dy)
+                a = math.atan2(dy, dx)
+                borde = 7.5 + 2.2 * math.sin(a * (3 + v) + v) + 1.3 * math.sin(a * 7 + 2 * v)
+                raya = any(abs((a - b + math.pi) % math.tau - math.pi) < 0.12 for b in rayos)
+                if raya:
+                    borde += 3.5
+                if r > borde:
+                    continue
+                t = r / borde
+                if t > 0.75 and azar.random() < 0.35:
+                    continue  # el borde se deshace en motas
+                alfa = int(200 * (1.0 - t * 0.6))
+                letra = "k" if t < 0.55 else "d"
+                img.putpixel((x, y), rgba(letra)[:3] + (alfa,))
+        frames.append(img)
+    guardar(hoja(frames), "efectos/quemado.png")
+
+    # Adornos de pared y de esquina: celdas de 16x16, se pintan tal cual (o teñidas los neones).
+    c = []
+    def cuadro(fondo, motivo):
+        img = lienzo(16, 16)
+        rect(img, 2, 3, 12, 10, "o"); rect(img, 2, 3, 12, 1, "y"); rect(img, 3, 4, 10, 8, fondo)
+        for x, y, l in motivo:
+            pon(img, x, y, l)
+        return contorno(img)
+    ficha_m = [(x, y, "R") for x in range(6, 10) for y in range(6, 10)] + [(7, 5, "R"), (8, 5, "R"), (7, 10, "R"), (8, 10, "R"), (5, 7, "R"), (5, 8, "R"), (10, 7, "R"), (10, 8, "R"), (7, 7, "c"), (8, 8, "c"), (6, 6, "c"), (9, 9, "c")]
+    c.append(cuadro("d", ficha_m))
+    pica = [(7, 5, "c"), (8, 5, "c"), (6, 6, "c"), (7, 6, "c"), (8, 6, "c"), (9, 6, "c"), (5, 7, "c"), (6, 7, "c"), (7, 7, "c"), (8, 7, "c"), (9, 7, "c"), (10, 7, "c"), (5, 8, "c"), (6, 8, "c"), (7, 8, "c"), (8, 8, "c"), (9, 8, "c"), (10, 8, "c"), (7, 9, "c"), (8, 9, "c"), (6, 10, "c"), (7, 10, "c"), (8, 10, "c"), (9, 10, "c")]
+    c.append(cuadro("k", pica))
+    siete = [(x, 5, "R") for x in range(5, 11)] + [(10, 6, "R"), (9, 7, "R"), (9, 8, "R"), (8, 9, "R"), (8, 10, "R")] + [(4, 11, "o"), (11, 11, "o")]
+    c.append(cuadro("y", siete))
+    dados = [(x, y, "c") for x in range(5, 9) for y in range(6, 10)] + [(6, 7, "k"), (7, 8, "k")] + [(x, y, "R") for x in range(9, 12) for y in range(8, 11)] + [(10, 9, "c")]
+    c.append(cuadro("G", dados))
+    # 4: aplique de latón con su tulipa
+    c.append(contorno(sprite(["", "", "......cc......", ".....cyyc.....", ".....yyyy.....", ".....oyyo.....", "......oo......", "......o.......", ".....ooo......", "....o.o.......", "....oo........"], 16)))
+    # 5: neón en forma de rombo (blanco: se tiñe al pintarlo)
+    c.append(sprite(["", "", ".......c........", "......c.c.......", ".....c...c......", "....c..c..c.....", "...c..c.c..c....", "....c..c..c.....", ".....c...c......", "......c.c.......", ".......c........"], 16))
+    # 6: candelabro de tres velas
+    c.append(contorno(sprite(["", "", "...y...y...y....", "...c...c...c....", "...c...c...c....", "...c...c...c....", "..ooo.ooo.ooo...", "...o...o...o....", "...ooooooooo....", ".......o........", "......ooo......."], 16)))
+    # 7: bombilla desnuda colgando del cable
+    c.append(contorno(sprite([".......k........", ".......k........", ".......k........", ".......k........", "......sss.......", "......cyy.......", ".....cyyyy......", ".....yyyyo......", "......yoo.......", ".......o........"], 16)))
+    # 8: rejilla de ventilación
+    rej = lienzo(16, 16); rect(rej, 3, 4, 10, 8, "s")
+    for y in (5, 7, 9):
+        rect(rej, 4, y, 8, 1, "k")
+    c.append(contorno(rej))
+    # 9: maceta con palmera, para las esquinas
+    c.append(contorno(sprite(["..G.....G.......", "...G...G....G...", "G...G.GmG..G....", ".GG..GmG..GG....", "...GGmGGGG......", ".GmG.GG..GmG....", "G....G.G....G...", "....g...g.......", "......g.........", "....rrrrr.......", "....ooooo.......", ".....rrr........", ".....rrr........", "......r........."], 16)))
+    # 10: poste de cordón de terciopelo
+    c.append(contorno(sprite(["", "", "", "......yy........", "......oo........", "......oo........", "......oo...RR...", "......oo.RR.....", "......ooR.......", "......oo........", "......oo........", ".....oooo.......", "....oooooo......"], 16)))
+    # 11: cenicero de pie
+    c.append(contorno(sprite(["", "", "", "", ".....sssss......", "....s.k.k.s.....", ".....sssss......", ".......s........", ".......s........", ".......s........", ".......s........", ".....sssss......", "....sssssss....."], 16)))
+    # 12-15: rótulos de neón (blancos: se tiñen): moneda, cofre, interrogación y corona.
+    c.append(sprite(["", "", ".....cccccc.....", "....c......c....", "...c...cc...c...", "...c..c.....c...", "...c...cc...c...", "...c.....c..c...", "...c...cc...c...", "....c......c....", ".....cccccc....."], 16))
+    c.append(sprite(["", "", "...cccccccccc...", "..c..........c..", "..c..........c..", "..cccccccccccc..", "..c....cc....c..", "..c....cc....c..", "..c..........c..", "..cccccccccccc.."], 16))
+    c.append(sprite(["", "", "......cccc......", ".....c....c.....", "..........c.....", ".........c......", "........c.......", ".......c........", ".......c........", "", ".......c........"], 16))
+    c.append(sprite(["", "", "", "..c...cc...c....", "..cc.c..c.cc....", "..c.c....c.c....", "..c........c....", "..c........c....", "..cccccccccc....", "", "..cccccccccc...."], 16))
+    guardar(hoja(c), "baldosas/adornos.png")
+
+
+def objetos_punchy():
+    """La mesa de póker que se vuelca y el icono del órdago."""
+    frames = []
+    # De pie: el tapete visto desde arriba, con unas fichas y un naipe.
+    img = lienzo(32, 24)
+    rect(img, 2, 3, 28, 13, "o"); rect(img, 1, 4, 30, 11, "o")
+    rect(img, 3, 4, 26, 11, "G"); rect(img, 2, 5, 28, 9, "G")
+    rect(img, 3, 13, 26, 1, "g")
+    for x, y in ((7, 6), (9, 7), (22, 10)):
+        rect(img, x, y, 2, 2, "R" if x != 9 else "B")
+    rect(img, 14, 6, 3, 4, "c"); pon(img, 15, 7, "R")
+    rect(img, 1, 15, 30, 3, "r"); rect(img, 2, 15, 28, 1, "o")  # el canto
+    rect(img, 4, 18, 2, 4, "r"); rect(img, 26, 18, 2, 4, "r")  # las patas
+    frames.append(contorno(img))
+    # Volcada: de canto, como un parapeto; se ve la madera de abajo y las patas hacia ti.
+    img = lienzo(32, 24)
+    rect(img, 1, 6, 30, 2, "G"); rect(img, 2, 5, 28, 1, "G")
+    rect(img, 1, 8, 30, 10, "o")
+    for x in range(5, 30, 6):
+        rect(img, x, 8, 1, 10, "r")  # las tablas
+    rect(img, 1, 17, 30, 1, "r")
+    rect(img, 5, 14, 3, 7, "r"); rect(img, 5, 14, 1, 7, "o"); rect(img, 24, 14, 3, 7, "r"); rect(img, 24, 14, 1, 7, "o")
+    rect(img, 5, 21, 3, 1, "y"); rect(img, 24, 21, 3, 1, "y")  # contera de latón
+    frames.append(contorno(img))
+    # Rota: dos trozos, astillas y fichas por el suelo.
+    img = lienzo(32, 24)
+    for x0, y0, ancho, alto in ((2, 11, 11, 7), (17, 12, 12, 6)):
+        rect(img, x0, y0, ancho, alto, "o"); rect(img, x0, y0, ancho, 1, "G")
+        rect(img, x0 + 3, y0 + 1, 1, alto - 1, "r")
+    for x, y in ((13, 12), (14, 14), (16, 11), (12, 9), (29, 10)):
+        pon(img, x, y, "o")
+    rect(img, 6, 18, 2, 3, "r"); rect(img, 22, 18, 2, 2, "r")
+    frames.append(contorno(img))
+    for x, y, c in ((10, 21, "R"), (19, 21, "B"), (27, 20, "y")):
+        rect(frames[2], x, y, 2, 1, c)
+    guardar(hoja(frames), "objetos/mesa.png")
+    guardar(icono_ordago(), "objetos/ordago.png")
 
 
 def objetos():
@@ -1176,6 +1540,257 @@ CARTAS_VISUAL = {
 ESTILO_CARTA = {"ataque": ("R", "r"), "mod": ("B", "b"), "mult": ("y", "o")}
 
 
+# ---------------------------------------------------------------- cartas del arsenal de los años 20
+# Se dibujan sin borde y contorno() les pone el negro: así se leen sobre el fondo morado.
+def icono_recortada():
+    img = lienzo(12, 12)
+    rect(img, 4, 4, 6, 1, "c"); rect(img, 4, 5, 6, 1, "s")  # los dos cañones, serrados
+    rect(img, 3, 4, 1, 3, "s"); rect(img, 5, 6, 3, 1, "o")  # báscula y guardamanos
+    rect(img, 1, 4, 2, 2, "o"); rect(img, 1, 6, 2, 1, "r"); rect(img, 1, 7, 1, 2, "r")  # culata cortada en pistola
+    pon(img, 4, 7, "s")
+    img = contorno(img)
+    for x, y in ((11, 2), (11, 4), (11, 6), (11, 8)):
+        pon(img, x, y, "y")
+    return img
+
+
+def icono_tommy():
+    img = lienzo(12, 12)
+    rect(img, 1, 3, 2, 2, "o"); pon(img, 1, 5, "r")  # culata
+    rect(img, 3, 3, 5, 2, "s"); rect(img, 3, 3, 5, 1, "c")  # cajón
+    rect(img, 8, 3, 3, 1, "s"); pon(img, 8, 2, "s"); pon(img, 10, 2, "s")  # cañón con aletas
+    rect(img, 3, 5, 1, 3, "o")  # empuñadura
+    elipse(img, 6.0, 6.6, 1.7, 1.9, "s"); pon(img, 6, 6, "k"); pon(img, 5, 6, "c")  # el tambor
+    rect(img, 9, 4, 1, 3, "o")  # empuñadura delantera
+    img = contorno(img)
+    pon(img, 11, 2, "y"); pon(img, 11, 4, "y")
+    return img
+
+
+def icono_ruleta_rusa():
+    img = lienzo(12, 12)
+    for y in range(12):
+        for x in range(12):
+            r = math.hypot(x - 5.5, y - 5.5)
+            if r <= 5.8:
+                pon(img, x, y, "k" if r > 5.0 else "s")
+    for i in range(6):
+        a = -math.pi / 2 + math.tau * i / 6
+        cx, cy = round(5.5 + math.cos(a) * 3.0 - 0.5), round(5.5 + math.sin(a) * 3.0 - 0.5)
+        rect(img, cx, cy, 2, 2, "y" if i == 0 else "k")
+        if i == 0:
+            pon(img, cx, cy, "c"); pon(img, cx + 1, cy + 1, "o")
+    rect(img, 5, 5, 2, 2, "d")
+    pon(img, 3, 2, "c")
+    return img
+
+
+def icono_dinamita():
+    img = lienzo(12, 12)
+    rect(img, 3, 4, 4, 7, "R"); rect(img, 6, 4, 1, 7, "r"); rect(img, 3, 4, 1, 7, "o")
+    rect(img, 3, 7, 4, 1, "c")  # la faja de papel
+    pon(img, 5, 3, "c"); pon(img, 6, 2, "c"); pon(img, 7, 1, "c")  # mecha
+    img = contorno(img)
+    for x, y, c in ((8, 0, "y"), (9, 1, "o"), (8, 1, "c"), (10, 0, "y"), (9, 2, "y")):
+        pon(img, x, y, c)
+    return img
+
+
+def icono_laser():
+    img = lienzo(12, 12)
+    rect(img, 1, 7, 3, 3, "s"); pon(img, 1, 7, "c"); rect(img, 2, 10, 2, 1, "p")  # el emisor de la cámara acorazada
+    img = contorno(img)
+    pon(img, 3, 7, "R")
+    for i in range(7):
+        x, y = 4 + i, 6 - i
+        pon(img, x, y, "c")  # el rayo
+        pon(img, x, y + 1, "R")
+        pon(img, x - 1, y, "R")
+    for x, y, c in ((10, 0, "y"), (11, 1, "y"), (11, 0, "c"), (9, 0, "o"), (11, 2, "o")):
+        pon(img, x, y, c)
+    return img
+
+
+def icono_corcho():
+    img = lienzo(12, 12)
+    rect(img, 1, 6, 4, 5, "g"); rect(img, 2, 6, 1, 5, "G")  # la botella
+    rect(img, 2, 4, 2, 2, "y"); rect(img, 1, 6, 4, 1, "y")  # papel dorado
+    rect(img, 1, 8, 4, 2, "c")  # etiqueta
+    pon(img, 2, 8, "R"); pon(img, 3, 9, "R")
+    rect(img, 7, 1, 3, 2, "o"); pon(img, 7, 1, "y"); rect(img, 8, 3, 1, 1, "o")  # el corcho volando
+    img = contorno(img)
+    for x, y in ((3, 2), (4, 3), (5, 2), (4, 1), (6, 4)):
+        pon(img, x, y, "c")  # la espuma
+    return img
+
+
+def icono_mina():
+    img = lienzo(12, 12)
+    elipse(img, 5.5, 8.3, 5.2, 2.6, "r")  # el canto
+    for y in range(12):
+        for x in range(12):
+            dx, dy = (x - 5.5) / 5.2, (y - 7.0) / 2.6
+            if dx * dx + dy * dy <= 1.0:
+                a = math.atan2(dy, dx) % (math.pi / 3)
+                pon(img, x, y, ("c" if a < math.pi / 6 else "R") if dx * dx + dy * dy > 0.4 else "r")
+    rect(img, 4, 5, 4, 2, "k")  # el detonador
+    rect(img, 5, 3, 2, 2, "R"); pon(img, 5, 3, "c")  # y su luz
+    img = contorno(img)
+    for x, y in ((5, 0), (6, 0), (2, 2), (9, 2), (3, 1), (8, 1)):
+        pon(img, x, y, "y")
+    return img
+
+
+def icono_botella():
+    """Una botella rota cogida por el cuello: el cristal roto arriba y unas esquirlas."""
+    img = sprite([
+        "............",
+        "............",
+        "............",
+        "............",
+        "...GGGGGG...",
+        "...mGGGGG...",
+        "...mGGGGG...",
+        "....mGGG....",
+        ".....GG.....",
+        ".....GG.....",
+        ".....gg.....",
+        "............",
+    ], 12)
+    img = contorno(img)
+    for x, y0 in ((3, 0), (4, 2), (5, 1), (6, 3), (7, 2), (8, 1)):
+        for y in range(y0, 4):
+            pon(img, x, y, "B" if y > y0 else "c")
+    for x, y in ((10, 2), (11, 4), (10, 6)):
+        pon(img, x, y, "c")
+    return img
+
+
+def icono_trucada():
+    img = lienzo(12, 12)
+    for x, y in ((0, 10), (1, 9), (1, 8), (2, 7), (3, 6), (4, 6)):
+        pon(img, x, y, "B")  # la estela curva
+    rect(img, 5, 4, 3, 3, "y"); pon(img, 5, 4, "c"); rect(img, 8, 5, 1, 1, "o"); pon(img, 7, 6, "o")
+    img = contorno(img)
+    for x, y in ((10, 9), (11, 10), (9, 10), (10, 11), (10, 10)):
+        pon(img, x, y, "R")  # la diana
+    pon(img, 10, 10, "c")
+    return img
+
+
+def icono_empujon():
+    img = lienzo(12, 12)
+    elipse(img, 7.0, 6.0, 3.6, 3.4, "R")  # el guante de boxeo
+    rect(img, 5, 3, 3, 2, "R"); pon(img, 8, 4, "c"); pon(img, 9, 4, "c")
+    rect(img, 3, 7, 2, 2, "r")
+    rect(img, 2, 4, 2, 5, "c")  # el puño de la manga
+    img = contorno(img)
+    for y in (3, 6, 9):
+        rect(img, 0, y, 1 if y != 6 else 1, 1, "c")
+    return img
+
+
+def icono_metralla():
+    img = lienzo(12, 12)
+    elipse(img, 2.5, 5.5, 2.0, 2.4, "o"); rect(img, 2, 5, 1, 2, "y")  # el estallido
+    for pts in (((7, 1), (8, 1), (8, 2), (9, 2)), ((8, 5), (9, 5), (10, 5), (9, 6), (8, 6)), ((7, 10), (8, 10), (8, 9), (9, 9))):
+        for i, (x, y) in enumerate(pts):
+            pon(img, x, y, "c" if i == 0 else "s")  # las esquirlas
+    img = contorno(img)
+    for x, y in ((5, 3), (6, 2), (6, 5), (5, 8), (6, 9)):
+        pon(img, x, y, "y")
+    return img
+
+
+def icono_calibre():
+    img = sprite([
+        "............",
+        ".....o......",
+        "....coo.....",
+        "....cor.....",
+        "...cooor....",
+        "...rrrrr....",
+        "...cyyyo....",
+        "...cyyyo....",
+        "...cyyyo....",
+        "...cyyyo....",
+        "..ooooooo...",
+        "............",
+    ], 12)
+    return contorno(img)
+
+
+def icono_fiebre():
+    img = lienzo(12, 12)
+    rect(img, 4, 1, 3, 8, "c"); rect(img, 5, 3, 1, 6, "R")  # el termómetro
+    elipse(img, 5.0, 9.0, 2.0, 2.0, "R"); pon(img, 4, 8, "c")
+    for y in (2, 4, 6):
+        pon(img, 6, y, "s")
+    img = contorno(img)
+    for x, y, c in ((9, 4, "o"), (10, 3, "y"), (9, 6, "y"), (10, 7, "o"), (10, 5, "R"), (1, 3, "o"), (1, 5, "y")):
+        pon(img, x, y, c)  # está que arde
+    return img
+
+
+def icono_pelos():
+    img = sprite([
+        "............",
+        "............",
+        "...ss.ss....",
+        "..scssss....",
+        "..scssss....",
+        "..kkkkkk....",
+        "s.ssssss.s..",
+        "sscccccccs..",
+        ".ssssssss...",
+        "............",
+    ], 12)
+    img = contorno(img)
+    pon(img, 6, 3, "d"); pon(img, 6, 4, "k")  # el agujero de la bala
+    rect(img, 8, 3, 2, 1, "c")
+    rect(img, 10, 2, 2, 3, "y"); pon(img, 11, 3, "o")
+    return img
+
+
+def icono_ordago():
+    """El órdago: una ficha a punto de reventar. Sirve también de icono en la tienda y el marcador."""
+    img = lienzo(12, 12)
+    for y in range(12):
+        for x in range(12):
+            r = math.hypot(x - 5.5, y - 5.5)
+            if r > 4.6:
+                continue
+            if r > 3.9:
+                pon(img, x, y, "k")
+            elif r > 2.9:
+                a = math.atan2(y - 5.5, x - 5.5) % (math.pi / 2)
+                pon(img, x, y, "y" if a < math.pi / 4 else "o")
+            else:
+                pon(img, x, y, "R")
+    rect(img, 5, 3, 2, 4, "c"); rect(img, 5, 8, 2, 1, "c")  # ¡!
+    for x, y in ((0, 0), (1, 1), (11, 0), (10, 1), (0, 11), (1, 10), (11, 11), (10, 10)):
+        pon(img, x, y, "y")
+    for x, y in ((5, 0), (6, 0), (0, 5), (0, 6), (11, 5), (11, 6), (5, 11), (6, 11)):
+        pon(img, x, y, "o")
+    return img
+
+
+ICONOS.update({
+    "recortada": icono_recortada(), "tommy": icono_tommy(), "ruleta_rusa": icono_ruleta_rusa(),
+    "dinamita": icono_dinamita(), "laser": icono_laser(), "corcho": icono_corcho(), "mina": icono_mina(),
+    "botella": icono_botella(), "trucada": icono_trucada(), "empujon": icono_empujon(),
+    "metralla": icono_metralla(), "calibre": icono_calibre(), "fiebre": icono_fiebre(),
+    "pelos": icono_pelos(), "ordago": icono_ordago(),
+})
+CARTAS_VISUAL.update({
+    "recortada": ("ataque", 0, "2"), "tommy": ("ataque", 1, "1.5"), "ruleta_rusa": ("ataque", 1, "6"),
+    "dinamita": ("ataque", 1, "14"), "laser": ("ataque", 2, "9"), "corcho": ("ataque", 0, "5"),
+    "mina": ("ataque", 0, "9"), "botella": ("ataque", 0, "7"),
+    "trucada": ("mod", 1, ""), "empujon": ("mod", 0, ""), "metralla": ("mod", 1, "+3"), "calibre": ("mod", 1, "+4"),
+    "fiebre": ("mult", 1, "X+"), "pelos": ("mult", 1, "X3"), "ordago": ("mult", 2, "X+"),
+})
+
+
 def cartas():
     for id_carta, (tipo, rareza, etiqueta) in CARTAS_VISUAL.items():
         claro, oscuro = ESTILO_CARTA[tipo]
@@ -1204,6 +1819,76 @@ def cartas():
 
 
 # ---------------------------------------------------------------- objetos pasivos
+def pasivos_punchy():
+    """Los objetos de la voltereta, el órdago y las mesas. 12 de ancho, como los demás."""
+    tirantes = sprite([
+        "............", ".....RR.....", ".....RR.....", "....oyyo....", "...RRooRR...", "...RR..RR...",
+        "..RR....RR..", "..RR....RR..", ".RR......RR.", ".ss......ss.", ".yy......yy.", "............",
+    ], 12)
+    petaca = sprite([
+        "............", "......yy....", "......oo....", "...ssssss...", "..sccsssss..", "..scssssss..",
+        "..scsyysss..", "..scsyysss..", "..sssssss...", "..ssssssss..", "...ssssss...", "............",
+    ], 12)  # plana, con tapón de rosca y un sello dorado
+    pitillera = lienzo(12, 10)
+    rect(pitillera, 1, 1, 10, 8, "s"); rect(pitillera, 5, 1, 2, 8, "p")  # las dos tapas y la bisagra
+    for x in (2, 3, 4):
+        rect(pitillera, x, 2, 1, 5, "c"); pon(pitillera, x, 6, "o")  # los cigarrillos
+    rect(pitillera, 2, 4, 3, 1, "R")  # la goma
+    rect(pitillera, 7, 2, 3, 6, "c"); rect(pitillera, 8, 3, 1, 4, "s"); pon(pitillera, 8, 4, "y")  # el grabado
+    claque = sprite([
+        "............", "............", "..ooo.......", "..ocy.......", ".occcc......", ".occcccc....",
+        ".occcccooo..", ".ooccccoooo.", ".kkkkkkkkkk.", ".sss....sss.", "............",
+    ], 12)
+    casquillo = sprite([
+        "............", ".R........R.", "..R......R..", "...R....R...", "....RkkR....", "....cyyo....",
+        "....cyyo....", "....cGyo....", "....cyyo....", "...oooooo...", "............",
+    ], 12)  # colgado al cuello con un cordón
+    manga = lienzo(12, 12)
+    rect(manga, 1, 6, 3, 5, "p"); rect(manga, 1, 6, 1, 5, "v")  # la manga del traje
+    rect(manga, 4, 6, 1, 5, "c"); pon(manga, 4, 8, "y")  # el puño y su gemelo
+    rect(manga, 6, 2, 4, 6, "c")  # el as
+    for x, y in ((8, 3), (7, 4), (8, 4), (9, 4), (8, 5)):
+        pon(manga, x, y, "k")
+    rect(manga, 9, 9, 2, 2, "c"); rect(manga, 2, 1, 2, 2, "c")  # naipes saliendo
+    tapete = lienzo(12, 11)
+    rect(tapete, 1, 1, 10, 9, "s"); rect(tapete, 2, 2, 8, 7, "G")
+    palo(tapete, 4, 3, "diamante", "m")
+    for x, y in ((1, 1), (9, 1), (1, 8), (9, 8)):
+        rect(tapete, x, y, 2, 2, "c"); pon(tapete, x + (1 if x == 1 else 0), y + (1 if y == 1 else 0), "k")  # esquinas remachadas
+    gatillo = lienzo(12, 11)
+    rect(gatillo, 3, 2, 8, 2, "s"); rect(gatillo, 3, 2, 8, 1, "c")  # el cañón
+    rect(gatillo, 2, 4, 5, 1, "s")
+    rect(gatillo, 2, 5, 2, 3, "o"); rect(gatillo, 1, 7, 2, 2, "o"); pon(gatillo, 3, 5, "r")  # la culata
+    rect(gatillo, 5, 5, 1, 2, "y")  # el gatillo, bien a la vista
+    rect(gatillo, 4, 7, 3, 1, "s"); pon(gatillo, 6, 6, "s")  # el guardamonte
+    return {
+        "tirantes": contorno(tirantes), "petaca": contorno(petaca), "pitillera": contorno(pitillera),
+        "zapatos_claque": contorno(claque), "casquillo": contorno(casquillo), "naipe_manga": contorno(manga),
+        "tapete_reforzado": contorno(tapete), "gatillo": contorno(gatillo),
+    }
+
+
+# Los objetos de la ronda hardcore: contra élites, golpes de un corazón y oleadas.
+PASIVOS_HARDCORE = {
+    "chaleco": ["..bb....bb..", ".bbbb..bbbb.", ".bbbbbbbbbb.", ".bBbbbbbbBb.", ".bbbssssbbb.", ".bbbsccsbbb.",
+                ".bbbssssbbb.", ".bBbbbbbbBb.", ".bbbbbbbbbb.", "..bbbbbbbb.."],
+    "espuelas": ["............", "..ooo.......", "..ooo.......", "..oooo......", "..ooooss.y..", "..oooo.syyy.",
+                 "..ooooss.y..", ".rrrrrr.....", "............"],
+    "cronometro": [".....ss.....", "....ssss....", "...scccs....", "..sccRccs...", "..sccRccs...", "..sccRRcs...",
+                   "..scccccs...", "...scccs....", "....sss....."],
+    "trofeo_caza": [".c........c.", ".cc.c..c.cc.", "..cccccccc..", "...cccccc...", "..oooooooo..", "..ooccccoo..",
+                    "..ookcckoo..", "...occcco...", "....oooo...."],
+    "bala_plata": ["............", ".....cc.....", "....cssc....", "....cssc....", "....csss....", "....csss....",
+                   "....yyyy....", "....yooy....", "....yyyy...."],
+    "navaja": ["............", ".........cc.", ".......cccs.", ".....cccss..", "...cccss....", "..ccss......",
+               ".rRRr.......", ".rRRRr......", "..rrr......."],
+    "campana": [".....yy.....", "....yyyy....", "...yyyyyy...", "...ycyyyy...", "..yycyyyyy..", "..yyyyyyyy..",
+                ".oooooooooo.", ".....rr.....", "....ssss...."],
+    "espejo": ["...yyyyyy...", "..yBBBBBBy..", "..yBcBBBBy..", "..yBBcBBBy..", "..yBBBBBBy..", "...yyyyyy...",
+               ".....yy.....", ".....oo.....", ".....oo.....", ".....yy....."],
+}
+
+
 def pasivos():
     dibujos = {
         "trebol": ["...GG..GG...", "..GmGGGGmG..", "..GGGGGGGG..", "...GGGGGG...", "..GGGGGGGG..", "..GmGGGGmG..",
@@ -1248,6 +1933,8 @@ def pasivos():
         "seguro": ["kkkkkkkkkkkk", "kGGGGGGGGGGk", "kGGGGcGGGGGk", "kGGGccGGGGGk", "kGGcGcGGcGGk", "kGGGGcGcGGGk",
                    "kGGGGccGGGGk", ".kGGGcGGGGk.", "..kkGGGGkk..", "....kkkk...."],
     }
+    dibujos.update(pasivos_punchy())
+    dibujos.update({nombre: contorno(sprite(filas, 12)) for nombre, filas in PASIVOS_HARDCORE.items()})
     for nombre, dibujo in dibujos.items():
         icono = dibujo if isinstance(dibujo, Image.Image) else sprite(dibujo, 12)
         guardar(icono, f"pasivos/{nombre}.png")
@@ -1311,7 +1998,8 @@ def icono_app():
     icono = icono_ficha("R", "r").resize((120, 120), Image.NEAREST)
     lienzo_icono = lienzo(128, 128)
     lienzo_icono.alpha_composite(icono, (4, 4))
-    lienzo_icono.save(RAIZ / "icon.png")
+    if not mismos_pixeles(lienzo_icono, RAIZ / "icon.png"):
+        lienzo_icono.save(RAIZ / "icon.png")
 
 
 def main():
@@ -1322,7 +2010,9 @@ def main():
     ficha_oro_sprite(); camara(); ratero(); dado_bomba(); reina(); dado_jefe(); revolver(); bingo()
     cajero(); coctelero(); poker(); dueno()
     jefe(); pez_rojo(); ruleta(); mosca(); rey_blackjack()
+    enemigo_crupier(); maton(); botones()
     proyectiles(); objetos(); baldosas(); cartas(); pasivos(); eventos(); icono_app()
+    efectos_punchy(); objetos_punchy(); efectos_ronda2()
 
 
 if __name__ == "__main__":

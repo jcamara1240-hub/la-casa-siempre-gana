@@ -132,3 +132,8 @@ func _reiniciar() -> void:
 
 func aplicar_golpe(dano: float, retroceso: Vector2) -> void:
 	super.aplicar_golpe(dano * (1.0 if _estado == Estado.VULNERABLE else 0.2), retroceso)
+
+
+## La mezcla (hay que poder seguirla con la vista) y el rato pillado van a su ritmo.
+func _acelera() -> bool:
+	return _estado != Estado.VULNERABLE and _estado != Estado.MEZCLA

@@ -7,7 +7,9 @@ var _fallos := 0
 
 func _initialize() -> void:
 	_cartas_validas()
+	_datos_coherentes()
 	_reglas_del_combo()
+	_cartas_nuevas()
 	_mazmorras()
 	_traducciones()
 	print("FALLOS: %d" % _fallos)
@@ -129,6 +131,103 @@ func _reglas_del_combo() -> void:
 	_igual(Combo.resolver(["bala", "mesa_llena"]).total, 7.5, "mesa llena")
 	_igual(Combo.resolver(["bala", "", "rojo_negro"]).total, 10, "rojo o negro en ranura impar")
 	_igual(Combo.resolver(["bala", "rojo_negro"]).total, 5, "rojo o negro en ranura par")
+
+
+## Los nombres que se cruzan entre bases de datos tienen que existir.
+func _datos_coherentes() -> void:
+	var listas := {"cartas iniciales": [Progreso.RARAS_INICIALES, CartasDB.CARTAS],
+		"objetos iniciales": [Progreso.OBJETOS_INICIALES, ObjetosDB.OBJETOS]}
+	for que in listas:
+		for id in listas[que][0]:
+			if not listas[que][1].has(id):
+				_fallos += 1
+				print("MAL  %s: no existe %s" % [que, id])
+	for id in Progreso.RARAS_INICIALES:
+		if CartasDB.CARTAS.has(id) and CartasDB.CARTAS[id].rareza == 0:
+			_fallos += 1
+			print("MAL  %s es común: no hace falta en las iniciales" % id)
+	for t in ObjetosDB.TRANSFORMACIONES:
+		for pieza in ObjetosDB.TRANSFORMACIONES[t].piezas:
+			if not ObjetosDB.OBJETOS.has(pieza):
+				_fallos += 1
+				print("MAL  la transformación %s pide %s, que no existe" % [t, pieza])
+	for p in PersonajesDB.PERSONAJES:
+		for id in PersonajesDB.PERSONAJES[p].cartas:
+			if not CartasDB.CARTAS.has(id):
+				_fallos += 1
+				print("MAL  %s empieza con %s, que no existe" % [p, id])
+	var campos := {CartasDB.Tipo.ATAQUE: ["dano", "n"], CartasDB.Tipo.MODIFICADOR: ["mod", "valor"], CartasDB.Tipo.MULTIPLICADOR: ["mult"]}
+	for id in CartasDB.CARTAS:
+		var carta: Dictionary = CartasDB.CARTAS[id]
+		for campo in campos[carta.tipo]:
+			if not carta.has(campo):
+				_fallos += 1
+				print("MAL  a la carta %s le falta %s" % [id, campo])
+
+
+func _cartas_nuevas() -> void:
+	# Ataques nuevos, solos.
+	_igual(Combo.resolver(["recortada"]).total, 12, "recortada: 6 perdigones de 2")
+	_igual(Combo.resolver(["tommy"]).total, 12, "metralleta: 8 balas de 1.5")
+	_igual(Combo.resolver(["ruleta_rusa"]).total, 11, "ruleta rusa: previsión media (6 x 11/6)")
+	_igual(Combo.resolver(["dinamita"]).total, 14, "dinamita")
+	_igual(Combo.resolver(["laser"]).total, 9, "láser")
+	_igual(Combo.resolver(["corcho"]).total, 5, "corcho")
+	_igual(Combo.resolver(["corcho"]).ataques[0].paredes, 3, "el corcho rebota 3 veces")
+	_igual(Combo.resolver(["mina"]).total, 18, "dos fichas trampa de 9")
+	_igual(Combo.resolver(["botella"]).total, 7, "botella")
+	# Modificadores nuevos: los gasta solo el siguiente ataque.
+	var r := Combo.resolver(["trucada", "bala"])
+	_igual(r.total, 5, "bala trucada no cambia el daño")
+	_igual(r.ataques[0].busca, 1, "bala trucada: el ataque persigue")
+	_igual(Combo.resolver(["empujon", "bala"]).ataques[0].empuje, 1, "empujón")
+	r = Combo.resolver(["metralla", "bala", "bala"])
+	_igual(r.ataques[0].metralla, 1, "metralla en el primer ataque")
+	_igual(r.ataques[1].metralla, 0, "metralla no pasa al segundo ataque")
+	r = Combo.resolver(["calibre", "bala"])
+	_igual(r.total, 9, "gran calibre: +4")
+	_igual(r.ataques[0].calibre, 1, "gran calibre: bala gorda")
+	_igual(Combo.resolver(["calibre", "subir", "bala"]).total, 13.5, "gran calibre suma antes del porcentaje")
+	_igual(int(Combo.resolver(["metralla"]).pasos[0].sin_efecto), 1, "metralla sin ataque detrás")
+	_igual(Combo.resolver(["trucada", "bala", "eco"]).ataques[1].busca, 1, "la reapuesta copia los modificadores")
+	# Atravesar y rebotar en los ataques sin proyectil.
+	_igual(Combo.resolver(["rebote", "laser"]).ataques[0].paredes, 2, "carambola: el láser rebota en las paredes")
+	_igual(Combo.resolver(["perforar", "laser"]).ataques[0].radio, 10, "farol: el láser es más ancho")
+	_igual(Combo.resolver(["perforar", "dinamita"]).ataques[0].radio, 58, "farol: más área a la dinamita")
+	_igual(Combo.resolver(["rebote", "mina"]).ataques[0].radio, 38, "carambola: más área a las fichas trampa")
+	_igual(Combo.resolver(["perforar", "botella"]).ataques[0].radio, 48, "farol: la botella llega más lejos")
+	# Multiplicadores nuevos: sin contexto (previsión) valen x1.
+	r = Combo.resolver(["bala", "fiebre"])
+	_igual(r.total, 5, "fiebre sin fiebre")
+	_igual(int(r.pasos[1].sin_efecto), 1, "fiebre sin fiebre no hace nada")
+	_igual(Combo.resolver(["bala", "fiebre"], {"fiebre": 2}).total, 10, "fiebre nivel 2: x2")
+	_igual(Combo.resolver(["bala", "fiebre"], {"fiebre": 3}).total, 12.5, "fiebre nivel 3: x2.5")
+	_igual(Combo.resolver(["bala", "pelos"]).total, 5, "por los pelos sin voltereta")
+	_igual(Combo.resolver(["bala", "pelos"], {"voltereta": true}).total, 15, "por los pelos tras rodar")
+	_igual(Combo.resolver(["bala", "ordago"]).total, 5, "órdago sin órdagos")
+	_igual(Combo.resolver(["bala", "ordago"], {"ordagos": 2}).total, 15, "órdago con dos guardados")
+	_igual(Combo.resolver(["pelos", "bala"], {"voltereta": true}).total, 5, "por los pelos solo mira a su izquierda")
+	_igual(Combo.resolver(["bala", "fiebre", "pelos"], {"fiebre": 1, "voltereta": true}).total, 22.5, "fiebre y pelos se acumulan")
+	# La Ruleta Rusa de verdad: o 6 o 36, una de cada seis más o menos.
+	var azar := RandomNumberGenerator.new()
+	azar.seed = 7
+	var premios := 0
+	for _i in 600:
+		var tiro := Combo.resolver(["ruleta_rusa"], {"azar": azar})
+		if tiro.ataques[0].premio:
+			premios += 1
+			_igual(tiro.total, 36, "ruleta rusa: el premio hace x6")
+		else:
+			_igual(tiro.total, 6, "ruleta rusa: sin premio, daño normal")
+	if premios < 60 or premios > 150:
+		_fallos += 1
+		print("MAL  ruleta rusa: %d premios en 600 tiros" % premios)
+	# Los ataques sueltos (los usan los objetos) llevan todos sus campos.
+	var suelto := Combo.ataque_suelto("nova", 3.0, 8)
+	_igual(suelto.dano, 3, "ataque suelto: daño")
+	_igual(suelto.n, 8, "ataque suelto: cantidad")
+	_igual(int(suelto.has("busca") and suelto.has("paredes") and suelto.has("premio")), 1, "ataque suelto: campos nuevos")
+	_igual(int(Combo.ataque_suelto("trucada", 2.0, 1).id == "bala"), 1, "ataque suelto con algo que no es un ataque")
 
 
 func _mazmorras() -> void:

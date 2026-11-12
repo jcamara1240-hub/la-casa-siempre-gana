@@ -82,3 +82,8 @@ func _reiniciar() -> void:
 
 func aplicar_golpe(dano: float, retroceso: Vector2) -> void:
 	super.aplicar_golpe(dano * (DANO_ATURDIDO if _estado == Estado.ATURDIDO else 1.0), retroceso)
+
+
+## Cuando se pasa de 21 queda vendido: ese rato no se acorta.
+func _acelera() -> bool:
+	return _estado != Estado.ATURDIDO

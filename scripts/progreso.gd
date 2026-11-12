@@ -3,8 +3,11 @@ extends RefCounted
 ## Lo que se conserva entre partidas: desbloqueos, jefes vencidos y mesas.
 
 const RUTA := "user://progreso.cfg"
-const RARAS_INICIALES := ["cuchilla", "explosion", "nova", "doble", "rebote", "eco", "escalera", "subir", "doble_nada"]
-const OBJETOS_INICIALES := ["herradura", "zapatos", "gafas", "whisky", "tarjeta", "saco", "iman", "seguro"]
+# Las comunes salen siempre. Las raras y legendarias que no están aquí las abren los jefes.
+const RARAS_INICIALES := ["cuchilla", "explosion", "nova", "doble", "rebote", "eco", "escalera", "subir", "doble_nada",
+	"tommy", "dinamita", "trucada", "pelos", "fiebre"]
+const OBJETOS_INICIALES := ["herradura", "zapatos", "gafas", "whisky", "tarjeta", "saco", "iman", "seguro",
+	"tirantes", "petaca", "gatillo", "naipe_manga", "chaleco", "espuelas", "cronometro", "campana"]
 
 static var partidas := 0
 static var victorias := 0

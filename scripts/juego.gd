@@ -5,6 +5,8 @@ signal estado_cambiado
 signal cartas_cambiadas
 signal transformacion_obtenida(id: String)
 signal logro_obtenido(id: String)
+signal fiebre_cambiada(nivel: int)
+signal desatado_cambiado(activo: bool)
 
 const VIDA_INICIAL := 8
 const RANURAS_INICIALES := 5
@@ -16,14 +18,40 @@ const JEFES_CASINO := ["tragaperras", "ruleta", "baccarat", "blackjack", "dados"
 
 # Multiplicador extra de vida de los jefes en cada piso.
 const REFUERZO_JEFE := [1.0, 1.5, 2.2, 3.0, 4.0]
-const OBJETOS_PROHIBIDOS_EXTREMO := ["herradura", "seguro"]
+const OBJETOS_PROHIBIDOS_EXTREMO := ["herradura", "seguro", "chaleco", "trofeo_caza"]
 
 const STATS_BASE := {
 	"crit": 0.0, "suerte": 0.0, "velocidad": 0.0, "invulnerable": 0.0, "bala_lenta": 0.0, "puro": 0.0,
 	"ciclo": 0.0, "descuento": 0.0, "monedas_sala": 0.0, "iman": 0.0, "intereses": 0.0,
 	"doble_ciclo": 0.0, "seguro": 0.0, "dano_global": 0.0, "crit_mult": 0.0, "moneda_extra": 0.0,
 	"tambaleo": 0.0, "golpe_monedas": 0.0, "quema_global": 0.0,
+	"voltereta_rapida": 0.0, "ordago_extra": 0.0, "ordago_dano": 0.0, "voltereta_dano": 0.0,
+	"fiebre_dura": 0.0, "voltereta_bala": 0.0, "mesas": 0.0, "retroceso": 0.0,
+	"chaleco": 0.0, "espuelas": 0.0, "propina_extra": 0.0, "elite_cura": 0.0, "dano_gordos": 0.0,
+	"roce_extra": 0.0, "campana": 0.0, "espejo": 0.0,
 }
+
+# Órdagos: los "limpia-pantallas". Se rellenan al bajar de piso.
+const ORDAGOS_BASE := 2
+# Fiebre: las bajas seguidas la suben; cada nivel acelera el ciclo de cartas.
+# Sube antes y se enfría antes que en la ronda 1 (0,14 / 2,5 s / 0,9 / 12 %): se vive en el filo.
+const FIEBRE_MAX := 3.0
+const FIEBRE_POR_BAJA := 0.2  # cinco bajas por nivel
+const FIEBRE_POR_JEFE := 1.0
+const FIEBRE_POR_PELOS := 0.35  # rozar una bala rodando
+const FIEBRE_POR_ROCE := 0.22  # una bala que te pasa rozando SIN rodar: más riesgo, más premio
+const FIEBRE_ESPERA := 1.1  # segundos sin matar antes de que empiece a bajar
+const FIEBRE_CAIDA := 1.2  # niveles por segundo, cuando ya baja
+const FIEBRE_ACELERA := 0.15  # +15 % de velocidad de ciclo por nivel
+const FIEBRE_AL_LIMITE := 1.5  # con un corazón o menos la fiebre sube un 50 % más deprisa
+const VOLTERETA_RECIENTE := 2.0  # lo que cuenta como "acabas de rodar" para las cartas
+# Desatado: aguantar la fiebre al máximo un momento suelta unos segundos de frenesí.
+const DESATADO_CARGA := 0.8  # segundos seguidos al máximo para que salte
+const DESATADO_SEG := 5.0
+const DESATADO_POR_BAJA := 0.3  # cada baja mientras dura lo alarga (hasta DESATADO_SEG)
+const DESATADO_CICLO := 1.5  # las cartas, aún más rápidas
+const DESATADO_VELOCIDAD := 1.2  # y el jugador también
+const VELOCIDAD_AL_LIMITE := 1.15
 
 var vida := VIDA_INICIAL
 var vida_max := VIDA_INICIAL
@@ -48,6 +76,21 @@ var cartas: Array = []
 var objetos: Array = []
 var stats: Dictionary = STATS_BASE.duplicate()
 var azar := RandomNumberGenerator.new()
+var ordagos := ORDAGOS_BASE
+## La presión del Director: sube si limpias salas sin que te toquen y baja si te dan.
+var presion := Director.PRESION_INICIAL
+## Solo para pintar: qué parte de la sala llevas matada (-1 fuera de una pelea de oleadas)
+## y lo que acelera las balas la regla de la sala.
+var progreso_sala := -1.0
+var balas_sala := 1.0
+var fiebre := 0.0  # de 0 a 3: el nivel es la parte entera
+var ultima_voltereta := -100.0  # tiempo_partida de la última voltereta
+var desatado := false  # lo lee todo el mundo; solo lo cambia este archivo
+var en_combate := false  # lo mantiene main.gd: hay pelea en la sala
+
+var _fiebre_espera := 0.0
+var _al_maximo_t := 0.0  # lo que lleva la fiebre al máximo, para el desatado
+var _desatado_t := 0.0
 
 var fuente: Font
 var fuente_grande: Font
@@ -156,6 +199,11 @@ func nueva_partida(semilla := 0, id_personaje := "", id_mesa := -1, modo_extremo
 	mejor_combo = 0.0
 	oro_total = 0
 	enemigos_eliminados = 0
+	ordagos = ORDAGOS_BASE
+	presion = Director.PRESION_INICIAL
+	progreso_sala = -1.0
+	balas_sala = 1.0
+	_reiniciar_ritmo()
 	cartas = datos.cartas.duplicate()
 	var ranuras_iniciales := RANURAS_IMPOSIBLE if imposible else int(datos.get("ranuras", RANURAS_INICIALES))
 	while cartas.size() < ranuras_iniciales:
@@ -187,7 +235,7 @@ func puntos_reto(gano: bool) -> int:
 # ---------------------------------------------------------------- guardado
 const CAMPOS_PARTIDA := ["vida", "vida_max", "oro", "piso", "enemigos_eliminados", "racha", "personaje", "mesa", "extremo",
 	"diario", "imposible", "infinito", "deuda", "orden_jefes", "cartas", "objetos", "stats", "transformaciones", "novedades", "tiempo_partida",
-	"mejor_combo", "oro_total"]
+	"mejor_combo", "oro_total", "ordagos", "presion"]
 
 
 func volcar() -> Dictionary:
@@ -198,6 +246,9 @@ func volcar() -> Dictionary:
 
 
 func restaurar(datos: Dictionary) -> void:
+	# Las partidas guardadas antes de que existieran los órdagos empiezan con los de siempre.
+	ordagos = ORDAGOS_BASE
+	_reiniciar_ritmo()
 	for campo in CAMPOS_PARTIDA:
 		if datos.has(campo):
 			set(campo, datos[campo])
@@ -233,6 +284,11 @@ func revisar_logros(gano := false) -> void:
 		"fila_llena": cartas.size() == RANURAS_MAX and not cartas.has(""),
 		"ganar": Progreso.victorias >= 1, "tres_victorias": Progreso.victorias >= 3,
 		"todos_ganan": Progreso.personajes_ganadores.size() >= 4,
+		"afeitado": int(c.get("por_los_pelos", 0)) >= 50,
+		"mal_perdedor": int(c.get("mesas", 0)) >= 20,
+		"roces": int(c.get("roces", 0)) >= 100,
+		"desatado": int(c.get("desatados", 0)) >= 25,
+		"servicio": int(c.get("propinas", 0)) >= 25,
 		"mesa_oro": gano and mesa >= 4, "extremo": gano and extremo,
 		"reto": diario,
 		"cartas": Progreso.cartas_libres() >= CartasDB.CARTAS.size(),
@@ -250,10 +306,157 @@ func jefe_del_piso() -> String:
 
 
 func contexto_combo(con_azar := false) -> Dictionary:
-	var ctx := {"monedas": oro, "racha": racha, "vida": vida, "dano_global": stat("dano_global")}
+	var ctx := {"monedas": oro, "racha": racha, "vida": vida, "dano_global": stat("dano_global"),
+		"fiebre": nivel_fiebre(), "voltereta": rodo_hace_poco(), "ordagos": ordagos}
 	if con_azar:
 		ctx["azar"] = azar
 	return ctx
+
+
+# ---------------------------------------------------------------- fiebre, voltereta y órdagos
+func _reiniciar_ritmo() -> void:
+	fiebre = 0.0
+	_fiebre_espera = 0.0
+	ultima_voltereta = -100.0
+	_al_maximo_t = 0.0
+	_poner_desatado(false)
+	en_combate = false
+
+
+func nivel_fiebre() -> int:
+	return clampi(floori(fiebre), 0, int(FIEBRE_MAX))
+
+
+## Lo que acelera el ciclo de cartas: 1.0 sin fiebre, 1.45 al máximo y x1.5 desatado.
+func factor_fiebre() -> float:
+	return (1.0 + FIEBRE_ACELERA * nivel_fiebre()) * (DESATADO_CICLO if desatado else 1.0)
+
+
+## Te queda un corazón o menos. En extremo siempre es así, y por eso no cuenta.
+func al_limite() -> bool:
+	return vida > 0 and vida <= 2 and not extremo
+
+
+## Lo que queda de desatado, de 1.0 (recién empezado) a 0.0.
+func desatado_resto() -> float:
+	return clampf(_desatado_t / DESATADO_SEG, 0.0, 1.0) if desatado else 0.0
+
+
+## Lo que multiplica la velocidad del jugador ahora mismo (al límite, desatado).
+func factor_velocidad() -> float:
+	return (VELOCIDAD_AL_LIMITE if al_limite() else 1.0) * (DESATADO_VELOCIDAD if desatado else 1.0)
+
+
+## Cuánto aprieta la partida ahora mismo, de 0.0 a 1.0: para la música y los efectos.
+func intensidad() -> float:
+	var valor := 0.45 * fiebre / FIEBRE_MAX
+	if en_combate:
+		valor += 0.3
+	if al_limite():
+		valor += 0.2
+	if desatado:
+		valor = maxf(valor, 0.85 + 0.15 * desatado_resto())
+	return clampf(valor, 0.0, 1.0)
+
+
+func subir_fiebre(cantidad: float) -> void:
+	var antes := nivel_fiebre()
+	if al_limite():
+		cantidad *= FIEBRE_AL_LIMITE
+	fiebre = minf(fiebre + cantidad, FIEBRE_MAX)
+	_fiebre_espera = FIEBRE_ESPERA * (1.0 + stat("fiebre_dura"))
+	_avisar_fiebre(antes)
+
+
+## Cada baja mientras estás desatado lo estira un poco: se encadena si sigues matando.
+func alargar_desatado() -> void:
+	if desatado:
+		_desatado_t = minf(_desatado_t + DESATADO_POR_BAJA, DESATADO_SEG)
+
+
+## Si pasas un rato sin matar, la fiebre se va enfriando. Aquí corre también el desatado.
+func enfriar_fiebre(delta: float) -> void:
+	_mirar_desatado(delta)
+	if fiebre <= 0.0 or desatado:
+		return
+	_fiebre_espera -= delta
+	if _fiebre_espera > 0.0:
+		return
+	var antes := nivel_fiebre()
+	fiebre = maxf(fiebre - FIEBRE_CAIDA / (1.0 + stat("fiebre_dura")) * delta, 0.0)
+	_avisar_fiebre(antes)
+
+
+## Al máximo un rato seguido: desatado. Al acabar, la fiebre baja un escalón.
+func _mirar_desatado(delta: float) -> void:
+	if desatado:
+		_desatado_t -= delta
+		if _desatado_t <= 0.0:
+			var antes := nivel_fiebre()
+			_poner_desatado(false)
+			fiebre = minf(fiebre, FIEBRE_MAX - 1.0)
+			_fiebre_espera = FIEBRE_ESPERA
+			_avisar_fiebre(antes)
+		return
+	if fiebre >= FIEBRE_MAX and en_combate:
+		_al_maximo_t += delta
+		if _al_maximo_t >= DESATADO_CARGA:
+			_desatado_t = DESATADO_SEG
+			_poner_desatado(true)
+	else:
+		_al_maximo_t = 0.0
+
+
+func _poner_desatado(activo: bool) -> void:
+	_al_maximo_t = 0.0
+	if not activo:
+		_desatado_t = 0.0
+	if desatado == activo:
+		return
+	desatado = activo
+	desatado_cambiado.emit(activo)
+	estado_cambiado.emit()
+
+
+## Un golpe te la quita entera (y corta el desatado).
+func vaciar_fiebre() -> void:
+	_poner_desatado(false)
+	if fiebre <= 0.0:
+		return
+	var antes := nivel_fiebre()
+	fiebre = 0.0
+	_fiebre_espera = 0.0
+	_avisar_fiebre(antes)
+
+
+func _avisar_fiebre(antes: int) -> void:
+	if nivel_fiebre() == antes:
+		return
+	fiebre_cambiada.emit(nivel_fiebre())
+	estado_cambiado.emit()  # la barra recalcula la previsión del combo
+
+
+func rodo_hace_poco() -> bool:
+	return tiempo_partida - ultima_voltereta <= VOLTERETA_RECIENTE
+
+
+func gastar_ordago() -> bool:
+	if ordagos <= 0:
+		return false
+	ordagos -= 1
+	estado_cambiado.emit()
+	return true
+
+
+func ganar_ordagos(cuantos: int) -> void:
+	ordagos += cuantos
+	estado_cambiado.emit()
+
+
+## Al bajar de piso: vuelves a tener al menos los de base (más los de tus objetos).
+func rellenar_ordagos() -> void:
+	ordagos = maxi(ordagos, ORDAGOS_BASE + int(stat("ordago_extra")))
+	estado_cambiado.emit()
 
 
 func stat(nombre: String) -> float:
@@ -276,15 +479,18 @@ func dar_objeto(id: String) -> void:
 				anadir_ranura()
 			"monedas":
 				oro += int(efecto[clave])
+			"ordagos":
+				ordagos += int(efecto[clave])
 			_:
-				stats[clave] = float(stats[clave]) + float(efecto[clave])
+				stats[clave] = float(stats.get(clave, 0.0)) + float(efecto[clave])
 	_comprobar_transformaciones()
 	estado_cambiado.emit()
 
 
+## Con get: una partida guardada antes de añadir una estadística no la trae.
 func _sumar_efecto(efecto: Dictionary) -> void:
 	for clave in efecto:
-		stats[clave] = float(stats[clave]) + float(efecto[clave])
+		stats[clave] = float(stats.get(clave, 0.0)) + float(efecto[clave])
 
 
 func _comprobar_transformaciones() -> void:

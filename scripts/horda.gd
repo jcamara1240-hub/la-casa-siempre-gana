@@ -3,7 +3,7 @@ extends Node2D
 ## Mueve a todos los enemigos y responde a "¿quién hay cerca de este punto?".
 ## Para eso reparte a los enemigos en una rejilla, que se rehace en cada fotograma.
 
-signal enemigo_muerto(posicion: Vector2, oro_prob: float, tipo: String, monedas: int)
+signal enemigo_muerto(posicion: Vector2, oro_prob: float, tipo: String, monedas: int, elite: bool)
 signal danio_hecho(posicion: Vector2, cantidad: float, color: Color)
 
 const CELDA := 32.0
@@ -93,6 +93,9 @@ func mas_cercanos(centro: Vector2, cuantos: int, excluir := {}) -> Array:
 func danar(e: Enemigo, dano: float, retroceso: Vector2, color := Color8(247, 236, 210)) -> void:
 	if e.muerto:
 		return
+	# La Bala de Plata: más daño a quien de verdad aguanta.
+	if e.elite or e is Jefe:
+		dano *= 1.0 + Juego.stat("dano_gordos")
 	e.aplicar_golpe(dano, retroceso)
 	Sonido.tocar("golpe", randf_range(0.85, 1.2), -5.0)
 	danio_hecho.emit(e.position + Vector2(0, -8), dano, color)
@@ -119,33 +122,33 @@ func _separar_y_contener() -> void:
 					if l < minimo and l > 0.001:
 						e.position += d / l * (minimo - l) * 0.5
 		for caja in sala.solidos:
-			e.position = _empujar_fuera(e.position, e.radio, caja)
+			e.position = Sala.sacar_de_caja(e.position, e.radio, caja)
+		# Las mesas, de pie o volcadas, se rodean igual que las columnas.
+		for caja in sala.cajas_mesas:
+			e.position = Sala.sacar_de_caja(e.position, e.radio, caja)
 		var zona := Sala.INTERIOR.grow(-e.radio)
 		e.position = e.position.clamp(zona.position, zona.end)
 
 
-func _empujar_fuera(p: Vector2, r: float, caja: Rect2) -> Vector2:
-	var grande: Rect2 = caja.grow(r)
-	if not grande.has_point(p):
-		return p
-	var izq := p.x - grande.position.x
-	var der := grande.end.x - p.x
-	var arr := p.y - grande.position.y
-	var aba := grande.end.y - p.y
-	var menor: float = min(izq, der, arr, aba)
-	if menor == izq:
-		p.x = grande.position.x
-	elif menor == der:
-		p.x = grande.end.x
-	elif menor == arr:
-		p.y = grande.position.y
-	else:
-		p.y = grande.end.y
-	return p
+## El órdago: todos salen despedidos desde el centro y se quedan un momento aturdidos.
+## Los de cerca vuelan más lejos. Los jefes no se mueven y apenas se aturden.
+func empujar_todos(centro: Vector2, fuerza: float, aturdir_seg := 0.0) -> void:
+	for e in enemigos:
+		if e.muerto:
+			continue
+		var d: Vector2 = e.position - centro
+		var largo := d.length()
+		var dir: Vector2 = d / largo if largo > 0.001 else Vector2.RIGHT.rotated(randf() * TAU)
+		if not (e is Jefe):
+			e.empuje += dir * fuerza * clampf(1.0 - largo / 420.0, 0.35, 1.0)
+		if aturdir_seg > 0.0:
+			e.aturdir(aturdir_seg)
 
 
+## Con position y no global_position: el temblor de pantalla mueve el Mundo entero
+## (jugador y enemigos a la vez) y no debe cambiar quién toca a quién.
 func _comprobar_contacto() -> void:
-	for e in en_radio(jugador.global_position, 5.0):
+	for e in en_radio(jugador.position, 5.0):
 		if e.hace_contacto:
 			jugador.recibir_golpe(1)
 			break
@@ -158,7 +161,7 @@ func _humo_del_puro(delta: float) -> void:
 	if _puro_t > 0.0:
 		return
 	_puro_t = 0.5
-	for e in en_radio(jugador.global_position, 42.0):
+	for e in en_radio(jugador.position, 42.0):
 		e.aplicar_quemadura(3.0)
 
 
@@ -172,7 +175,8 @@ func _retirar_muertos() -> void:
 			enemigos.remove_at(i)
 			Juego.enemigos_eliminados += 1
 			Sonido.tocar("muerte", randf_range(0.85, 1.2), -4.0)
-			enemigo_muerto.emit(e.position, e.oro_prob, e.tipo, e.monedas_al_morir)
+			e.al_morir(self)
+			enemigo_muerto.emit(e.position, e.oro_prob, e.tipo, e.monedas_al_morir, e.elite)
 			if e.tipo == "ficha_grande":
 				nacen.append(e.position)
 			if e == jefe:

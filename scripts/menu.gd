@@ -290,7 +290,8 @@ func _dibujar_instrucciones() -> void:
 		"DESLIZA EL DEDO POR LA SALA PARA ANDAR. TU PERSONAJE ATACA SOLO." if Juego.tactil else "MUÉVETE CON WASD O LAS FLECHAS. TU PERSONAJE ATACA SOLO.",
 		"CADA CICLO, TUS CARTAS SE EJECUTAN DE IZQUIERDA A DERECHA.",
 		"EL ORDEN IMPORTA: PONLAS BIEN ENTRE SALA Y SALA.",
+		"BOTONES DE LA DERECHA: RODAR (ESQUIVAS TODO) Y ÓRDAGO (BORRA LAS BALAS)." if Juego.tactil else "ESPACIO: RODAR (ESQUIVAS TODO). Q: ÓRDAGO (BORRA LAS BALAS). E: VOLCAR MESAS.",
 	]
 	for i in lineas.size():
-		draw_string(Juego.fuente, Vector2(0, 308 + i * 12), Idioma.t(lineas[i]), HORIZONTAL_ALIGNMENT_CENTER, 640, 8,
+		draw_string(Juego.fuente, Vector2(0, 306 + i * 12), Idioma.t(lineas[i]), HORIZONTAL_ALIGNMENT_CENTER, 640, 8,
 				Color8(168, 154, 142))

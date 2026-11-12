@@ -5,12 +5,50 @@ const TIPO := GeneradorMazmorra.Tipo
 const ARTICULO_CORAZON := "_corazon"
 const ARTICULO_RANURA := "_ranura"
 const ARTICULO_REBARAJAR := "_rebarajar"
+const ARTICULO_ORDAGO := "_ordago"
 const PREFIJO_OBJETO := "obj:"
 const PRECIO_REBARAJAR := 6
+const PRECIO_ORDAGO := 20
+# El órdago: empuja a todos desde ti, los aturde y te deja un respiro.
+const ORDAGO_EMPUJE := 520.0
+const ORDAGO_ATURDIR := 1.3
+const ORDAGO_RESPIRO := 0.6
+# Ritmo de las oleadas: se solapan sin esperar a que la sala se vacíe
+# (ronda 1: 0,2 s la primera, 4,5 s entre ellas y con 3 vivos).
+const PRIMERA_OLEADA := 0.05
+# Las oleadas entran por porcentaje: cuando has matado la parte que pide el perfil de la
+# sala (Director). ENTRE_OLEADAS es solo el tope: si tardas más que eso, entra igual.
+const ENTRE_OLEADAS := 4.5
+const CAMPANA_SEG := 1.0  # la Campana: lo que tardan en reaccionar los que nacen
+const ULTIMOS := 4  # cuando quedan estos y no viene nadie más, se desesperan
+const OLEADA_MINIMO := 0.9  # aunque queden pocos, una oleada no pisa a la anterior antes de esto
+# Nacen cerca de ti, pero antes se marca el sitio en el suelo.
+const AVISO_NACER := 0.4
+const AVISO_PRIMERA := 0.3  # la primera oleada avisa más: acabas de cruzar la puerta
+const AVISO_EXTREMO := 0.15  # donde un golpe mata, un pelín más de margen
+const ESCALONADO_NACER := 0.035  # cada uno de la oleada sale un pelín después del anterior
+const NACER_CERCA := 60.0
+const NACER_CERCA_EXTREMO := 95.0
+const NACER_LEJOS := 175.0
+# Más enemigos y menos duros que en la ronda 1 (x1,0 de presupuesto y de vida): mueren antes, vienen más.
+const VIDA_ENEMIGOS := 0.85  # hardcore: antes 0,66
+const PRESUPUESTO_EXTRA := 1.8  # hardcore: antes 1,35
+# Propina por rapidez: limpiar la sala antes de este tiempo da monedas (hay que ir a por ellos).
+const PROPINA_BASE := 2.5
+const PROPINA_POR_OLEADA := 1.4
+const PROPINA_DOBLE := 0.7  # por debajo de esta parte del tiempo, el doble
+# Bajas encadenadas: tantas en tan poco tiempo cuentan como remate.
+const CADENA_VENTANA := 0.6
+const CADENA_REMATE := 5
+# Los que al morir paran el tiempo un instante: se nota que eran duros.
+const ENEMIGOS_GORDOS := ["ficha_grande", "portero", "maton", "cubilete", "reina", "joker"]
+const COLOR_CRITICO := Color8(247, 198, 74)
+const COLOR_FIEBRE := Color8(240, 129, 60)
+const COLOR_LIMITE := Color8(214, 61, 79)
 const VIDA_JEFE_EXTREMO := 3.0
-const VIDA_JEFE_NORMAL := 1.4
-const PROB_ELITE := 0.08
-const PRESUPUESTO_MAX := 180
+const VIDA_JEFE_NORMAL := 2.0  # hardcore: antes 1,4
+const PROB_ELITE := 0.18  # hardcore: antes 0,08
+const PRESUPUESTO_MAX := 320
 const TINTE_PISO := [Color.WHITE, Color(0.8, 0.9, 1.1), Color(0.8, 1.05, 0.85), Color(1.1, 0.9, 0.75), Color(1.15, 0.75, 0.8)]
 # tipo, coste en el presupuesto, piso mínimo, salas limpiadas mínimas, peso
 const CATALOGO := [
@@ -27,20 +65,42 @@ const CATALOGO := [
 	["ratero", 2, 1, 2, 10.0],
 	["dado_bomba", 3, 2, 0, 12.0],
 	["reina", 5, 3, 0, 8.0],
+	["crupier", 3, 1, 3, 12.0],
+	["maton", 5, 2, 0, 10.0],
+	["botones", 4, 2, 0, 10.0],
 ]
-const PRECIO_CORAZON := 10
+const PRECIO_CORAZON := 18
 const PRECIO_RANURA := 25
-const MAX_ENEMIGOS := 70
+const MAX_ENEMIGOS := 105  # antes 90; los que esperan a nacer también cuentan
 
 var jugador: CharacterBody2D
 var salas: Dictionary = {}
 var actual: Dictionary = {}
-var en_combate := false
+## Se copia en Juego.en_combate para que la música y los efectos lo sepan.
+var en_combate := false:
+	set(valor):
+		en_combate = valor
+		Juego.en_combate = valor
 
 var _oleadas: Array = []
 var _oleada_t := 0.0
+var _oleadas_total := 0
+var _plan: Dictionary = {}  # el plan procedural de la sala (Director.plan_sala)
+var _oleada_base := 0  # los que había vivos justo al soltar la última oleada
+var _sala_previstos := 0  # enemigos que trae la sala entre todas las oleadas
+var _sala_bajas := 0
+var _golpes_sala := 0
+var _por_nacer: Array = []  # [tiempo, tipo, posición, vida, élite] de los que aún se están avisando
+var _sala_t := 0.0  # cronómetro de la propina
+var _propina_t := 0.0  # lo que hay para cobrarla; 0 = ya no hay propina
+var _cadena := 0
+var _cadena_t := 0.0
+var _limite_avisado := false
+var _crono: Label
 var _salas_limpiadas := 0  # en este piso
 var _sin_golpes := true
+var _favorito := ""
+var _ordago_en_sala := false  # para el logro de vencer a un jefe sin gastar ninguno
 var _cartel_tween: Tween
 var _sonido: Sonido
 var _seleccion: Seleccion
@@ -54,7 +114,9 @@ var _cambiando_sala := false
 var _carta_pendiente := ""
 var _hint_tienda := ""
 var _articulo_mostrado := ""
-var _sacudida := 0.0
+var _jugo: Jugo
+var _lenta_hecha := false  # la cámara lenta de la última baja, una vez por sala
+var _hint_mesa := ""
 
 @onready var _mundo: Node2D = $Mundo
 @onready var _sala: Sala = $Mundo/Sala
@@ -84,12 +146,16 @@ func _ready() -> void:
 	_horda.sala = _sala
 	_ataques.horda = _horda
 	_ataques.jugador = jugador
+	jugador.sala = _sala
+	jugador.horda = _horda
+	jugador.ataques = _ataques
 	_motor.ataques = _ataques
 	_hud.horda = _horda
 	_hud.barra = _barra
 	_cartel.add_theme_font_override("font", Juego.fuente_grande)
 	_cartel.add_theme_font_size_override("font_size", 16)
 	_barra.conectar_motor(_motor)
+	_crear_jugo()
 	_horda.enemigo_muerto.connect(_al_morir_enemigo)
 	_horda.danio_hecho.connect(_texto_danio)
 	_ataques.explosion_hecha.connect(sacudir.bind(2.0))
@@ -139,9 +205,46 @@ func _crear_pantallas_extra() -> void:
 	Juego.transformacion_obtenida.connect(_al_transformarse)
 
 
+## La sensación de cada golpe y las mecánicas nuevas (voltereta, órdago, mesas, fiebre).
+func _crear_jugo() -> void:
+	_jugo = Jugo.new()
+	_mundo.add_child(_jugo)
+	_jugo.preparar(_mundo, $UI, jugador)
+	_ataques.disparo.connect(_jugo.al_disparar)
+	_ataques.impacto.connect(_jugo.al_impactar)
+	_ataques.explosion_en.connect(_jugo.al_explotar)
+	jugador.voltereta.connect(_jugo.al_rodar)
+	jugador.por_los_pelos.connect(_al_rozar_bala)
+	jugador.roce.connect(_al_rozar_sin_rodar)
+	_sala.mesa_volcada.connect(_al_volcar_mesa)
+	_sala.mesa_rota.connect(_al_romper_mesa)
+	_sala.mesa_golpeada.connect(_al_golpear_mesa)
+	Juego.fiebre_cambiada.connect(_al_cambiar_fiebre)
+	Juego.desatado_cambiado.connect(_al_desatar)
+	_crear_crono()
+
+
+## El cronómetro de la propina: pequeño, abajo a la derecha, solo mientras se puede cobrar.
+func _crear_crono() -> void:
+	_crono = Label.new()
+	_crono.position = Vector2(536, 289)
+	_crono.size = Vector2(100, 10)
+	_crono.horizontal_alignment = HORIZONTAL_ALIGNMENT_RIGHT
+	_crono.add_theme_color_override("font_color", COLOR_CRITICO)
+	_crono.add_theme_color_override("font_outline_color", Color8(20, 16, 30))
+	_crono.add_theme_constant_override("outline_size", 2)
+	_crono.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	_crono.visible = false
+	$UI.add_child(_crono)
+	$UI.move_child(_crono, _cartel.get_index())
+
+
 func _ir_al_menu() -> void:
+	_jugo.limpiar()
 	_pantalla.visible = false
 	en_combate = false
+	_por_nacer.clear()
+	_crono.visible = false
 	_barra.en_combate = false
 	_motor.parar()
 	_barra.parar_animacion()
@@ -272,9 +375,9 @@ func mostrar_cartel(titulo: String, subtitulo: String) -> void:
 	_cartel.modulate.a = 1.0
 	_cartel_sub.modulate.a = 1.0
 	_cartel_tween = create_tween()
-	_cartel_tween.tween_interval(1.8)
-	_cartel_tween.tween_property(_cartel, "modulate:a", 0.0, 0.4)
-	_cartel_tween.parallel().tween_property(_cartel_sub, "modulate:a", 0.0, 0.4)
+	_cartel_tween.tween_interval(1.3)  # antes 1,8 s: que no tape la pelea
+	_cartel_tween.tween_property(_cartel, "modulate:a", 0.0, 0.3)
+	_cartel_tween.parallel().tween_property(_cartel_sub, "modulate:a", 0.0, 0.3)
 
 
 func entrar_sala(c: Vector2i, venimos: Vector2i) -> void:
@@ -283,10 +386,18 @@ func entrar_sala(c: Vector2i, venimos: Vector2i) -> void:
 	_hud.posicion_actual = c
 	_horda.limpiar()
 	_ataques.limpiar()
+	_jugo.limpiar()
+	_por_nacer.clear()
+	_propina_t = 0.0
+	_crono.visible = false
+	_cadena = 0
+	_lenta_hecha = false
+	_hint_mesa = ""
 	for r in _recogibles.get_children():
 		r.queue_free()
 	for f in _efectos.get_children():
 		f.queue_free()
+	_ajustar_mesas()
 	_sala.construir(actual, salas)
 	_colocar_jugador(venimos)
 	_hint_tienda = ""
@@ -294,6 +405,9 @@ func entrar_sala(c: Vector2i, venimos: Vector2i) -> void:
 	_barra.info_externa = {}
 	jugador.seguro_listo = Juego.stat("seguro") > 0.0
 	_sin_golpes = true
+	_ordago_en_sala = false
+	if _jugo.has_method("al_entrar_sala"):
+		_jugo.al_entrar_sala(actual.tipo, Juego.piso)
 	match actual.tipo:
 		TIPO.NORMAL:
 			if not actual.limpia:
@@ -327,12 +441,16 @@ func _physics_process(delta: float) -> void:
 	if get_tree().paused:
 		return
 	Juego.tiempo_partida += delta
-	_aplicar_sacudida(delta)
+	Juego.enfriar_fiebre(delta)
 	if en_combate:
 		_actualizar_combate(delta)
 	else:
 		_mirar_puertas()
+	_cadena_t -= delta
+	if _limite_avisado and not Juego.al_limite():
+		_limite_avisado = false
 	_actualizar_hint_tienda()
+	_actualizar_hint_mesa()
 
 
 # ------------------------------------------------------------ combate
@@ -341,19 +459,37 @@ func _empezar_combate() -> void:
 	_barra.en_combate = true
 	_sala.poner_puertas(false)
 	Sonido.tocar("puerta_cierra")
+	_plan = Director.plan_sala(Juego.azar, _salas_limpiadas, Juego.piso, Juego.presion)
 	_oleadas = _planificar_oleadas()
-	_oleada_t = 0.3
+	_oleadas_total = _oleadas.size()
+	_oleada_base = 0
+	_sala_bajas = 0
+	_golpes_sala = 0
+	_sala_previstos = 0
+	for grupo in _oleadas:
+		_sala_previstos += grupo.size()
+	Juego.progreso_sala = 0.0
+	Juego.balas_sala = float(_plan.balas)
+	if _plan.regla != "":
+		var regla: Dictionary = Director.REGLAS[_plan.regla]
+		mostrar_cartel(Idioma.t(regla.nombre), Idioma.t(regla.desc))
+	_oleada_t = PRIMERA_OLEADA
+	_sala_t = 0.0
+	_propina_t = PROPINA_BASE + PROPINA_POR_OLEADA * _oleadas_total
 	_motor.activo = true
 
 
 func _planificar_oleadas() -> Array:
-	var presupuesto := mini(11 + _salas_limpiadas * 3 + (Juego.piso - 1) * 10 + Juego.pisos_extra() * 6, PRESUPUESTO_MAX)
+	var bruto := (11 + _salas_limpiadas * 3 + (Juego.piso - 1) * 10 + Juego.pisos_extra() * 6) * PRESUPUESTO_EXTRA
+	var presupuesto := mini(roundi(bruto * float(_plan.get("presupuesto", 1.0))), PRESUPUESTO_MAX)
 	if Juego.mesa >= 2:
 		presupuesto = int(presupuesto * 1.3)
-	var numero_oleadas := 2 + mini(_salas_limpiadas / 3, 2)
+	# Cada sala tiene un enemigo de la casa, que sale el triple: así no se parecen entre sí.
+	_favorito = ""
+	_favorito = String(_elegir_enemigo(presupuesto)[0])
 	var oleadas: Array = []
-	for i in numero_oleadas:
-		var parte := presupuesto / numero_oleadas + i * 2
+	for parte_oleada in Director.repartir(presupuesto, _plan.get("reparto", [0.3, 0.3, 0.4])):
+		var parte: int = parte_oleada
 		var grupo: Array = []
 		while parte > 0:
 			var elegido: Array = _elegir_enemigo(parte)
@@ -369,50 +505,126 @@ func _elegir_enemigo(presupuesto: int) -> Array:
 	for fila in CATALOGO:
 		if int(fila[1]) <= presupuesto and Juego.piso >= fila[2] and (Juego.piso > 1 or _salas_limpiadas >= fila[3]):
 			validos.append(fila)
-			suma += fila[4]
+			suma += _peso(fila)
 	var tirada := Juego.azar.randf() * suma
 	for fila in validos:
-		tirada -= fila[4]
+		tirada -= _peso(fila)
 		if tirada <= 0.0:
 			return fila
 	return CATALOGO[0]
 
 
+func _peso(fila: Array) -> float:
+	return float(fila[4]) * (3.0 if fila[0] == _favorito else 1.0)
+
+
 func _actualizar_combate(delta: float) -> void:
 	_oleada_t -= delta
-	var vivos := _horda.enemigos.size()
-	if not _oleadas.is_empty() and (_oleada_t <= 0.0 or vivos <= 2):
+	_nacer_pendientes(delta)
+	_contar_propina(delta)
+	var vivos := _horda.enemigos.size() + _por_nacer.size()
+	if _sala_previstos > 0:
+		Juego.progreso_sala = clampf(float(_sala_bajas) / _sala_previstos, 0.0, 1.0)
+	# La siguiente entra cuando has matado el porcentaje que pide el perfil de la sala.
+	var matado := 1.0 - float(vivos) / maxf(_oleada_base, 1.0)
+	var toca: bool = matado >= float(_plan.get("umbral", 0.6)) and _oleada_t <= ENTRE_OLEADAS - OLEADA_MINIMO
+	if not _oleadas.is_empty() and (_oleada_t <= 0.0 or toca):
 		_soltar_oleada(_oleadas.pop_front())
-		_oleada_t = 6.0
+		_oleada_t = ENTRE_OLEADAS
+		_oleada_base = _horda.enemigos.size() + _por_nacer.size()
 		return
 	if _oleadas.is_empty() and vivos == 0:
 		_terminar_combate()
+	elif _oleadas.is_empty() and _por_nacer.is_empty() and vivos <= ULTIMOS and _horda.jefe == null:
+		for e in _horda.enemigos:
+			e.desesperar()
 
 
+## La oleada no sale de golpe: primero se marca en el suelo dónde va a nacer cada uno.
 func _soltar_oleada(grupo: Array) -> void:
 	var azar := Juego.azar
-	var mult := 1.3 + (Juego.piso - 1) * 0.8 + _salas_limpiadas * 0.08
+	var mult := (1.3 + (Juego.piso - 1) * 1.1 + _salas_limpiadas * 0.08) * VIDA_ENEMIGOS  # hardcore: por piso, antes 0,8
 	if Juego.mesa >= 1:
 		mult *= 1.25
-	mult *= pow(1.22, Juego.pisos_extra())
-	var prob_elite := minf(PROB_ELITE + Juego.pisos_extra() * 0.03, 0.4)
-	for tipo in grupo:
-		if _horda.enemigos.size() >= MAX_ENEMIGOS:
-			break
-		var p := _punto_lejos_del_jugador(azar)
-		var e := _horda.crear(tipo, p, mult)
-		if Juego.piso >= 2 and azar.randf() < prob_elite:
-			e.hacer_elite()
+	mult *= pow(1.22, Juego.pisos_extra()) * float(_plan.get("vida", 1.0))
+	var prob_elite := minf((PROB_ELITE + Juego.pisos_extra() * 0.03) * float(_plan.get("elites", 1.0)), 0.55)
+	var numero := _oleadas_total - _oleadas.size()
+	if _jugo.has_method("oleada"):
+		_jugo.oleada(numero, _oleadas_total)
+	if numero > 1:
+		Sonido.tocar("oleada")
+	Sonido.tocar("aviso", randf_range(0.95, 1.1), -4.0)
+	var hueco := MAX_ENEMIGOS - _horda.enemigos.size() - _por_nacer.size()
+	var aviso := AVISO_NACER + (AVISO_PRIMERA if numero == 1 else 0.0) + (AVISO_EXTREMO if Juego.extremo else 0.0)
+	for i in mini(grupo.size(), maxi(hueco, 0)):
+		var p := _punto_de_nacimiento(azar)
+		var espera := aviso + i * ESCALONADO_NACER
+		var elite: bool = (Juego.piso >= 2 or _salas_limpiadas >= 3) and azar.randf() < prob_elite
+		if _jugo.has_method("aviso_nacimiento"):
+			_jugo.aviso_nacimiento(p, espera)
+		_por_nacer.append([espera, grupo[i], p, mult, elite])
 
 
-func _punto_lejos_del_jugador(azar: RandomNumberGenerator) -> Vector2:
+func _nacer_pendientes(delta: float) -> void:
+	var i := _por_nacer.size() - 1
+	while i >= 0:
+		var pendiente: Array = _por_nacer[i]
+		pendiente[0] -= delta
+		if pendiente[0] <= 0.0:
+			_por_nacer.remove_at(i)
+			var e := _horda.crear(pendiente[1], pendiente[2], pendiente[3])
+			e.vel *= float(_plan.get("vel", 1.0))
+			if Juego.stat("campana") > 0.0:
+				e.aturdir(CAMPANA_SEG)
+			if pendiente[4]:
+				e.hacer_elite()
+		i -= 1
+
+
+## Cerca del jugador (entre 70 y 175 píxeles; 95 en extremo), pero nunca encima: así no hay paseos vacíos.
+func _punto_de_nacimiento(azar: RandomNumberGenerator) -> Vector2:
 	var zona := Sala.INTERIOR.grow(-14.0)
+	var centro: Vector2 = jugador.position
+	var cerca := NACER_CERCA_EXTREMO if Juego.extremo else NACER_CERCA
 	var p := Vector2.ZERO
 	for _i in 30:
+		p = centro + Vector2.RIGHT.rotated(azar.randf() * TAU) * azar.randf_range(cerca, NACER_LEJOS)
+		if zona.has_point(p):
+			return p
+	# Arrinconado: cualquier sitio de la sala que no esté encima.
+	for _i in 30:
 		p = Vector2(azar.randf_range(zona.position.x, zona.end.x), azar.randf_range(zona.position.y, zona.end.y))
-		if p.distance_to(jugador.position) > 110.0:
+		if p.distance_to(centro) > cerca:
 			break
 	return p
+
+
+## La propina por rapidez: el reloj corre mientras dura la pelea de una sala normal.
+func _contar_propina(delta: float) -> void:
+	_sala_t += delta
+	if _propina_t <= 0.0 or actual.get("tipo") != TIPO.NORMAL:
+		_crono.visible = false
+		return
+	var queda := _propina_t - _sala_t
+	_crono.visible = queda > 0.0
+	if queda > 0.0:
+		_crono.text = Idioma.t("PROPINA %d") % ceili(queda)
+		_crono.modulate.a = 0.55 if queda > 3.0 else 0.9
+
+
+func _cobrar_propina() -> void:
+	_crono.visible = false
+	if _propina_t <= 0.0 or _sala_t > _propina_t or actual.get("tipo") != TIPO.NORMAL:
+		return
+	# Más rápido aún, el doble.
+	var monedas := (1 + Juego.piso) * (2 if _sala_t <= _propina_t * PROPINA_DOBLE else 1)
+	monedas = roundi(monedas * (1.0 + Juego.stat("propina_extra")))
+	_propina_t = 0.0
+	Juego.ganar_oro(monedas)
+	Progreso.sumar("monedas", monedas)
+	Progreso.sumar("propinas", 1)
+	Sonido.tocar("moneda", 1.3)
+	_jugo.texto(jugador.position + Vector2(0, -26), Idioma.t("¡PROPINA! +%d") % monedas, COLOR_CRITICO, true)
 
 
 func _empezar_jefe() -> void:
@@ -427,6 +639,11 @@ func _empezar_jefe() -> void:
 	vida_jefe *= Juego.refuerzo_jefe()
 	jefe.preparar(vida_jefe)
 	mostrar_cartel(Idioma.t(jefe.nombre), "")
+	# La entrada del jefe, de cine: franjas, la cámara se le acerca y el tiempo se frena.
+	_jugo.cine(1.7, jefe.position, 0.09)
+	_jugo.camara_lenta(0.7, 0.4)
+	_jugo.destello(Color(1, 0.9, 0.8, 0.25), 0.35)
+	sacudir(5.0)
 	Sonido.tocar("jefe_aparece")
 	Sonido.musica("jefe")
 	_horda.anadir_jefe(jefe)
@@ -439,6 +656,13 @@ func _terminar_combate() -> void:
 	_motor.parar()
 	_barra.parar_animacion()
 	actual.limpia = true
+	Juego.progreso_sala = -1.0
+	Juego.balas_sala = 1.0
+	if actual.get("tipo") == TIPO.NORMAL:
+		Juego.presion = Director.ajustar(Juego.presion, _golpes_sala, _propina_t > 0.0 and _sala_t <= _propina_t)
+	_cobrar_propina()
+	if Juego.nivel_fiebre() >= 3:
+		Juego.marcar_logro("rojo_vivo")
 	_sala.poner_puertas(true)
 	Sonido.tocar("puerta_abre")
 	for r in _recogibles.get_children():
@@ -463,22 +687,82 @@ func _terminar_combate() -> void:
 		_prob_carta += 0.25
 
 
-func _al_morir_enemigo(posicion: Vector2, oro_prob: float, tipo: String, monedas: int) -> void:
+func _al_morir_enemigo(posicion: Vector2, oro_prob: float, tipo: String, monedas: int, elite := false) -> void:
 	Progreso.sumar("enemigos", 1)
+	if tipo != "jefe":
+		_sala_bajas += 1
+	if elite and Juego.stat("elite_cura") > 0.0:
+		Juego.curar(1)
 	for _i in monedas:
 		_soltar_moneda(posicion)
 	if Juego.azar.randf() < oro_prob:
 		_soltar_moneda(posicion)
 	if tipo == "jefe":
 		sacudir(8.0)
-		Juego.curar(2)
+		Juego.curar(1)  # hardcore: un jefe ya solo devuelve medio corazón
 		Sonido.tocar("jefe_muere")
 		Juego.novedades += Progreso.al_vencer_jefe(Juego.jefe_del_piso(), Juego.azar)
 		if _sin_golpes:
 			Juego.marcar_logro("sin_tocar")
+		if not _ordago_en_sala:
+			Juego.marcar_logro("sin_despeinarse")
 		for i in 16:
 			_soltar_moneda(posicion)
+		# El golpe final al jefe, a cámara lenta: lo único que de verdad para el juego.
+		_jugo.camara_lenta(1.1, 0.22)
+		_jugo.destello(Color(1, 1, 1, 0.4), 0.3)
+		_jugo.cine(1.8, posicion, 0.1)
+	Juego.subir_fiebre(Juego.FIEBRE_POR_JEFE if tipo == "jefe" else Juego.FIEBRE_POR_BAJA)
+	Juego.alargar_desatado()
+	jugador.remate()
 	_efecto_muerte(posicion, tipo == "jefe")
+	_jugo.trozos(posicion, 20 if tipo == "jefe" else (9 if ENEMIGOS_GORDOS.has(tipo) else 5), 1.6 if tipo == "jefe" else 1.0)
+	# Las bajas normales no paran nada; los gordos, un pelín; los élite, un remate.
+	if elite:
+		_jugo.parar(0.035)
+		sacudir(3.0)
+	elif ENEMIGOS_GORDOS.has(tipo):
+		_jugo.parar(0.02)
+		sacudir(2.0)
+	# Remate (uno por baja, aunque coincidan): jefe, élite, cadena o la última de la sala.
+	var cadena := _mirar_cadena()
+	var ultima := _mirar_ultima_baja(tipo)
+	if tipo == "jefe" or elite or cadena or ultima:
+		_remate(posicion)
+
+
+## Muchas bajas casi a la vez: remate. Vuelve a contar desde cero tras cada uno.
+func _mirar_cadena() -> bool:
+	if _cadena_t <= 0.0:
+		_cadena = 0
+	_cadena += 1
+	_cadena_t = CADENA_VENTANA
+	if _cadena >= CADENA_REMATE:
+		_cadena = 0
+		return true
+	return false
+
+
+## Una baja especial (la última de la sala, un élite, una cadena): efecto gordo y sonido.
+func _remate(posicion: Vector2) -> void:
+	if _jugo.has_method("remate"):
+		_jugo.remate(posicion)
+	Sonido.tocar("remate", randf_range(0.95, 1.08))
+
+
+## La última baja de la sala va a cámara lenta: el remate se saborea (breve, que hay prisa).
+func _mirar_ultima_baja(tipo: String) -> bool:
+	if _lenta_hecha or not en_combate or not _oleadas.is_empty() or not _por_nacer.is_empty() or tipo == "jefe" or tipo == "ficha_grande":
+		return false
+	if actual.get("tipo") == TIPO.JEFE:
+		return false
+	for e in _horda.enemigos:
+		if not e.muerto:
+			return false
+	_lenta_hecha = true
+	_jugo.camara_lenta(0.4, 0.35)
+	sacudir(4.0)
+	return true
 
 
 func _soltar_moneda(posicion: Vector2) -> void:
@@ -498,39 +782,127 @@ func _efecto_muerte(posicion: Vector2, grande: bool) -> void:
 	tw.tween_callback(fx.queue_free)
 
 
+## Los números los pinta el jugo, sin crear nodos. Los golpes dobles salen más grandes.
 func _texto_danio(posicion: Vector2, cantidad: float, color: Color) -> void:
-	if not Juego.numeros_dano or _efectos.get_child_count() > 60:
-		return
-	var l := Label.new()
-	l.text = str(maxi(1, roundi(cantidad)))
-	l.add_theme_color_override("font_color", color)
-	l.position = posicion + Vector2(randf_range(-5, 3), -6)
-	l.z_index = 5
-	_efectos.add_child(l)
-	var tw := l.create_tween()
-	tw.tween_property(l, "position:y", l.position.y - 12.0, 0.4)
-	tw.parallel().tween_property(l, "modulate:a", 0.0, 0.4).set_delay(0.15)
-	tw.tween_callback(l.queue_free)
+	var critico := color.is_equal_approx(COLOR_CRITICO) or _jugo.fue_critico(posicion)
+	_jugo.numero_dano(posicion, cantidad, color, critico)
 
 
 func _al_golpear_jugador() -> void:
 	_sin_golpes = false
-	sacudir(5.0)
+	_golpes_sala += 1
+	_jugo.golpe_jugador()
+	if Juego.vida <= 0:
+		_jugo.cine(2.5, jugador.position, 0.1)
+	sacudir(6.0)
+	_jugo.destello(Color(0.84, 0.24, 0.31, 0.45), 0.2)
+	_jugo.parar(0.08, true)  # antes 0,1: se nota, pero no corta el ritmo
 	if Juego.vida <= 0:
 		_perder()
-
-
-func sacudir(fuerza: float) -> void:
-	if not Juego.sacudida:
 		return
-	_sacudida = maxf(_sacudida, fuerza)
+	# Al límite: corres más y la fiebre sube antes. Se avisa una vez cada vez que entras.
+	if Juego.al_limite() and not _limite_avisado:
+		_limite_avisado = true
+		_jugo.texto(jugador.position + Vector2(0, -24), Idioma.t("¡AL LÍMITE!"), COLOR_LIMITE, true)
 
 
-func _aplicar_sacudida(delta: float) -> void:
-	_sacudida = maxf(0.0, _sacudida - delta * 30.0)
-	_mundo.position = Vector2(randf_range(-1, 1), randf_range(-1, 1)).round() * ceilf(_sacudida * 0.4)
-	if _sacudida <= 0.0:
-		_mundo.position = Vector2.ZERO
+## La sacudida la lleva el jugo; aquí se queda el nombre de siempre.
+func sacudir(fuerza: float, direccion := Vector2.ZERO) -> void:
+	_jugo.sacudir(fuerza, direccion)
+
+
+# ------------------------------------------------------------ voltereta, órdago, mesas y fiebre
+## Q o F (o el botón táctil): borra las balas enemigas y aparta a todos. Solo en combate.
+func lanzar_ordago() -> void:
+	if get_tree().paused or not en_combate:
+		return
+	if not Juego.gastar_ordago():
+		_jugo.texto(jugador.position + Vector2(0, -18), Idioma.t("SIN ÓRDAGOS"), Color8(168, 154, 142))
+		return
+	_ordago_en_sala = true
+	var centro: Vector2 = jugador.position
+	_ataques.borrar_balas_enemigas()
+	_horda.empujar_todos(centro, ORDAGO_EMPUJE, ORDAGO_ATURDIR)
+	# Pitillera de Plata: además hace daño a todos.
+	if Juego.stat("ordago_dano") > 0.0:
+		var dano := (10.0 + (Juego.piso - 1) * 8.0) * Juego.stat("ordago_dano")
+		for e in _horda.enemigos.duplicate():
+			if e.activo():
+				_horda.danar(e, dano, Vector2.ZERO, COLOR_FIEBRE)
+	jugador.proteger(ORDAGO_RESPIRO)
+	Sonido.tocar("ordago")
+	_jugo.onda(centro)
+	_jugo.destello(Color(1, 1, 1, 0.35), 0.25)
+	_jugo.parar(0.05, true)
+	sacudir(8.0)
+
+
+func _al_rozar_bala() -> void:
+	Progreso.sumar("por_los_pelos", 1)
+	_jugo.texto(jugador.position + Vector2(0, -16), Idioma.t("¡POR LOS PELOS!"))
+
+
+## Una bala te ha pasado rozando sin rodar: la fiebre ya la ha subido el jugador.
+func _al_rozar_sin_rodar(posicion: Vector2) -> void:
+	Progreso.sumar("roces", 1)
+	if _jugo.has_method("roce"):
+		_jugo.roce(posicion)
+
+
+func _al_cambiar_fiebre(nivel: int) -> void:
+	if nivel <= 0 or not en_combate or Juego.desatado:
+		return
+	Sonido.tocar("fiebre", 1.0 + 0.12 * nivel)
+	_jugo.texto(jugador.position + Vector2(0, -22), Idioma.t("FIEBRE %d") % nivel, COLOR_FIEBRE, true)
+
+
+## Desatado: un golpe de efecto al empezar (sin parar casi nada: es para correr).
+func _al_desatar(activo: bool) -> void:
+	if not activo:
+		return
+	Progreso.sumar("desatados", 1)
+	Sonido.tocar("desatado")
+	_jugo.texto(jugador.position + Vector2(0, -26), Idioma.t("¡DESATADO!"), COLOR_FIEBRE, true)
+	_jugo.destello(Color(0.94, 0.5, 0.24, 0.3), 0.25)
+	_jugo.parar(0.04, true)
+	sacudir(5.0)
+
+
+func _al_volcar_mesa(posicion: Vector2, direccion: Vector2) -> void:
+	Progreso.sumar("mesas", 1)
+	Sonido.tocar("mesa", randf_range(0.9, 1.1))
+	_jugo.polvo(posicion + direccion * 8.0, 6, -direccion)
+	sacudir(3.0, direccion)
+
+
+func _al_romper_mesa(posicion: Vector2) -> void:
+	Sonido.tocar("mesa_rota")
+	_jugo.polvo(posicion, 8)
+	sacudir(2.0)
+
+
+func _al_golpear_mesa(posicion: Vector2) -> void:
+	_jugo.chispas(posicion, Vector2.ZERO, false)
+
+
+## Lo que depende de la partida y la mesa necesita para hacer daño y aguantar.
+func _ajustar_mesas() -> void:
+	_sala.refuerzo_mesas = Juego.stat("mesas")
+	_sala.dano_mesas = 6.0 + (Juego.piso - 1) * 5.0
+
+
+## "E: VOLCAR" cuando tienes una mesa de pie al lado (con teclado; en el móvil, rodando).
+func _actualizar_hint_mesa() -> void:
+	if Juego.tactil or _sala.mesas.is_empty():
+		return
+	var cerca := _sala.mesa_cerca(jugador.position, 12.0) != null
+	if cerca and _hint_mesa == "" and _aviso.text == "":
+		_hint_mesa = Idioma.t("E: VOLCAR LA MESA")
+		_aviso.text = _hint_mesa
+	elif not cerca and _hint_mesa != "":
+		if _aviso.text == _hint_mesa:
+			_aviso.text = ""
+		_hint_mesa = ""
 
 
 # ------------------------------------------------------------ puertas
@@ -554,12 +926,13 @@ func _mirar_puertas() -> void:
 func _cruzar_puerta(d: Vector2i) -> void:
 	_cambiando_sala = true
 	var destino: Vector2i = actual.pos + d
+	# Fundido casi instantáneo (antes 0,09 + 0,12 s): de una pelea a la siguiente.
 	var ida := create_tween()
-	ida.tween_property(_fundido, "color:a", 1.0, 0.09)
+	ida.tween_property(_fundido, "color:a", 1.0, 0.05)
 	await ida.finished
 	entrar_sala(destino, d)
 	var vuelta := create_tween()
-	vuelta.tween_property(_fundido, "color:a", 0.0, 0.12)
+	vuelta.tween_property(_fundido, "color:a", 0.0, 0.07)
 	_cambiando_sala = false
 
 
@@ -641,6 +1014,7 @@ func _llenar_tienda() -> void:
 		actual.tienda.append({"id": PREFIJO_OBJETO + objeto, "precio": Juego.precio_final(ObjetosDB.PRECIO)})
 	actual.tienda.append({"id": ARTICULO_CORAZON, "precio": Juego.precio_final(PRECIO_CORAZON)})
 	actual.tienda.append({"id": ARTICULO_RANURA, "precio": Juego.precio_final(PRECIO_RANURA)})
+	actual.tienda.append({"id": ARTICULO_ORDAGO, "precio": Juego.precio_final(PRECIO_ORDAGO)})
 	actual.tienda.append({"id": ARTICULO_REBARAJAR, "precio": PRECIO_REBARAJAR})
 
 
@@ -676,6 +1050,10 @@ func _icono_articulo(id: String) -> Sprite2D:
 			icono.texture = load("res://assets/cartas/_cerrada.png")
 		ARTICULO_REBARAJAR:
 			icono.texture = load("res://assets/objetos/rebarajar.png")
+			icono.position = Vector2(0, -12)
+		ARTICULO_ORDAGO:
+			icono.texture = Jugo.textura("res://assets/objetos/ordago.png")
+			icono.scale = Vector2(2, 2)
 			icono.position = Vector2(0, -12)
 		_:
 			icono.texture = CartasDB.textura(id)
@@ -745,6 +1123,9 @@ func _info_articulo(id: String) -> Dictionary:
 		ARTICULO_REBARAJAR:
 			info["nombre"] = Idioma.t("Volver a Barajar")
 			info["desc"] = Idioma.t("Cambia las cartas de la tienda. Cada vez cuesta más.")
+		ARTICULO_ORDAGO:
+			info["nombre"] = Idioma.t("Órdago")
+			info["desc"] = Idioma.t("Uno más para la reserva: borra todas las balas enemigas y aparta a todos.")
 		_:
 			info["nombre"] = CartasDB.nombre(id)
 			info["desc"] = CartasDB.descripcion(id)
@@ -757,10 +1138,17 @@ func _unhandled_input(evento: InputEvent) -> void:
 		return
 	if get_tree().paused:
 		return
-	if evento is InputEventKey and evento.pressed and not evento.echo and evento.physical_keycode == KEY_E:
-		var articulo := _articulo_cerca()
-		if articulo != null:
-			comprar(articulo)
+	if not (evento is InputEventKey) or not evento.pressed or evento.echo:
+		return
+	match evento.physical_keycode:
+		KEY_E:
+			var articulo := _articulo_cerca()
+			if articulo != null:
+				comprar(articulo)
+			else:
+				_sala.volcar_cerca(jugador.position, 12.0, _horda)
+		KEY_Q, KEY_F:
+			lanzar_ordago()
 
 
 func articulo_a_mano() -> Recogible:
@@ -804,6 +1192,7 @@ func comprar(r: Recogible) -> void:
 	match id:
 		ARTICULO_CORAZON: Juego.curar(2)
 		ARTICULO_RANURA: Juego.anadir_ranura()
+		ARTICULO_ORDAGO: Juego.ganar_ordagos(1)
 		_: _dar_carta(id)
 
 
@@ -828,6 +1217,7 @@ func _recoger_objeto(id: String) -> void:
 	mostrar_cartel(ObjetosDB.nombre(id), ObjetosDB.descripcion(id))
 	Sonido.tocar("objeto")
 	Juego.dar_objeto(id)
+	_ajustar_mesas()
 
 
 func _al_transformarse(id: String) -> void:
@@ -838,6 +1228,9 @@ func _al_transformarse(id: String) -> void:
 
 
 func recogido(r: Recogible) -> void:
+	# Lo de la sala que acabas de dejar se borra al final del fotograma: ya no se coge.
+	if r.is_queued_for_deletion():
+		return
 	match r.clase:
 		Recogible.Clase.MONEDA:
 			Juego.ganar_oro(1 + int(Juego.stat("moneda_extra")))
@@ -874,6 +1267,7 @@ func _bajar_piso() -> void:
 		_ganar()
 		return
 	Juego.piso += 1
+	Juego.rellenar_ordagos()
 	Juego.ganar_oro(int(Juego.oro * Juego.stat("intereses")))
 	Sonido.tocar("bajar")
 	var aviso_deuda := Juego.cobrar_deuda()
@@ -932,10 +1326,13 @@ func _ganar() -> void:
 func _acabar(gano: bool) -> void:
 	en_combate = false
 	_barra.en_combate = false
+	_por_nacer.clear()
+	_crono.visible = false
 	_motor.parar()
 	_barra.parar_animacion()
 	_horda.limpiar()
 	_ataques.limpiar()
+	_jugo.limpiar()
 	get_tree().paused = true
 	Sonido.musica("")
 	Guardado.borrar()
