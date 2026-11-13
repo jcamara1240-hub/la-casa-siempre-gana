@@ -245,7 +245,7 @@ static func _maldecir(azar: RandomNumberGenerator, r: Dictionary) -> String:
 	var ranura: int = ranuras[azar.randi() % ranuras.size()]
 	var vieja: String = Juego.cartas[ranura]
 	var tipo: int = CartasDB.CARTAS[vieja].tipo
-	var comunes: Array = CartasDB.CARTAS.keys().filter(func(id): return id != vieja and CartasDB.CARTAS[id].tipo == tipo and CartasDB.CARTAS[id].rareza == 0)
+	var comunes: Array = CartasDB.CARTAS.keys().filter(func(id): return id != vieja and CartasDB.CARTAS[id].tipo == tipo and CartasDB.CARTAS[id].rareza == 0 and not Juego.carta_al_tope(id, ranura))
 	if comunes.is_empty():
 		return Idioma.t("UN GATO NEGRO... PERO NO TIENES CARTAS QUE MALDECIR.")
 	var nueva: String = comunes[azar.randi() % comunes.size()]

@@ -518,7 +518,7 @@ func _dibujar_bolsa() -> void:
 	var ancho := Juego.fuente.get_string_size(texto, HORIZONTAL_ALIGNMENT_LEFT, -1, 8).x
 	var vida_max: int = Juego.vida_max_titular() if _vida_max_visto < 0 else _vida_max_visto
 	var vida: int = Juego.vida_titular() if _vida_visto < 0 else _vida_visto
-	var corazones := vida_max / 2
+	var corazones := (vida_max + 1) / 2
 	var total := 10.0 + ancho + 10.0 + corazones * 10.0
 	var x := roundf(320.0 - total * 0.5)
 	draw_texture_rect_region(_tex_moneda, Rect2(x, 33, 8, 8), Rect2(0, 0, 8, 8))

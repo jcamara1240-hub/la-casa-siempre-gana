@@ -216,7 +216,7 @@ func _mirar_vida(delta: float) -> void:
 	_golpe_t = maxf(_golpe_t - delta, 0.0)
 	if _vida_antes > Juego.vida and Juego.vida >= 0:
 		# El corazón que ha perdido algo: tiembla y suelta trozos.
-		_golpe_i = clampi((Juego.vida) / 2, 0, maxi(Juego.vida_max / 2 - 1, 0))
+		_golpe_i = clampi((Juego.vida) / 2, 0, maxi((Juego.vida_max + 1) / 2 - 1, 0))
 		_golpe_t = 0.45
 		var centro := Vector2(10.5 + _golpe_i * 11, 7.5)
 		for k in 6:
@@ -308,7 +308,7 @@ func _dibujar_corazones() -> void:
 	var golpe := Ambiente.latido() if limite else 0.0
 	if limite:
 		_marco(Rect2(2, 2, 92, 25), Color(COLOR_ROJO, 0.35 + 0.65 * golpe))
-	for i in Juego.vida_max / 2:
+	for i in (Juego.vida_max + 1) / 2:  # con medio corazón de tope, el último solo se llena a medias
 		var puntos := Juego.vida - i * 2
 		var columna := 0 if puntos >= 2 else (1 if puntos == 1 else 2)
 		var p := Vector2(6 + i * 11, 4)
@@ -487,7 +487,7 @@ func _dibujar_corazones_j2() -> void:
 		return
 	var limite: bool = Juego.al_limite(1)
 	var golpe := Ambiente.latido() if limite else 0.0
-	for i in Juego.vida_max2 / 2:
+	for i in (Juego.vida_max2 + 1) / 2:
 		var puntos := Juego.vida2 - i * 2
 		var columna := 0 if puntos >= 2 else (1 if puntos == 1 else 2)
 		var p := Vector2(6 + i * 11, 30)

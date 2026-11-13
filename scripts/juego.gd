@@ -14,6 +14,7 @@ const VIDA_INICIAL := 8
 const RANURAS_INICIALES := 5
 const RANURAS_MAX := 8
 const RANURAS_IMPOSIBLE := 2
+const COPIAS_MAX := 2  # de una misma carta en la fila
 const PISOS_TOTALES := 5
 const RUTA_AJUSTES := "user://ajustes.cfg"
 const JEFES_CASINO := ["tragaperras", "ruleta", "baccarat", "blackjack", "dados", "revolver", "bingo", "trilero", "cajero", "coctelero", "poker"]
@@ -609,7 +610,8 @@ func dar_objeto(id: String) -> void:
 		match String(clave):
 			"vida_max":
 				vida_max += int(efecto[clave])
-				vida = vida_max
+				if not coop or vida > 0:  # al caído no lo levanta un objeto
+					vida = vida_max
 				if coop:  # los corazones de un objeto son para los dos
 					vida_max2 += int(efecto[clave])
 					if vida2 > 0:
@@ -692,10 +694,17 @@ func cobrar_deuda() -> String:
 		oro -= a_pagar
 		estado_cambiado.emit()
 		return Idioma.t("PAGAS TU DEUDA")
+	marcar_logro("deudor")
+	if coop:  # a medias: medio corazón de cada uno
+		vida_max = maxi(vida_max - 1, 2)
+		vida = mini(vida, vida_max)
+		vida_max2 = maxi(vida_max2 - 1, 2)
+		vida2 = mini(vida2, vida_max2)
+		estado_cambiado.emit()
+		return Idioma.t("EL PRESTAMISTA OS COBRA MEDIO CORAZÓN A CADA UNO")
 	vida_max = maxi(vida_max - 2, 2)
 	vida = mini(vida, vida_max)
 	estado_cambiado.emit()
-	marcar_logro("deudor")
 	return Idioma.t("EL PRESTAMISTA TE COBRA UN CORAZÓN")
 
 
@@ -733,6 +742,21 @@ func precio_final(base: int) -> int:
 
 func hay_hueco() -> bool:
 	return cartas.has("")
+
+
+## Cuántas copias de esa carta hay en la fila. "sin": una ranura que no cuenta
+## (la que vas a cambiar: cambiar una copia por otra igual no suma).
+func copias(id: String, sin := -1) -> int:
+	var n := 0
+	for i in cartas.size():
+		if i != sin and cartas[i] == id:
+			n += 1
+	return n
+
+
+## Ya llevas todas las copias que caben de esa carta: ni sale ni se puede poner otra.
+func carta_al_tope(id: String, sin := -1) -> bool:
+	return copias(id, sin) >= COPIAS_MAX
 
 
 func anadir_carta(id: String) -> bool:
@@ -773,8 +797,13 @@ func fila_con_movimiento(origen: int, destino: int) -> Array:
 	return copia
 
 
+## Las ranuras que caben como mucho en esta partida.
+func ranuras_tope() -> int:
+	return RANURAS_IMPOSIBLE if imposible else RANURAS_MAX
+
+
 func anadir_ranura() -> void:
-	if cartas.size() < (RANURAS_IMPOSIBLE if imposible else RANURAS_MAX):
+	if cartas.size() < ranuras_tope():
 		cartas.append("")
 		cartas_cambiadas.emit()
 
@@ -809,13 +838,15 @@ func herir(cantidad: int, i := -1) -> void:
 
 
 ## Saca cartas distintas entre sí. Con suerte > 0 salen más raras (tesoros).
+## Las que ya llevas repetidas hasta el tope no salen: se tiran y se vuelve a sacar,
+## así quien no lleva ninguna al tope ve lo mismo que antes con el mismo azar.
 func robar_cartas(cuantas: int, suerte := 0.0, rng: RandomNumberGenerator = null) -> Array:
 	if rng == null:
 		rng = azar
 	var bolsa: Array = CartasDB.CARTAS.keys().filter(func(id): return carta_en_bolsa(id))
 	var elegidas: Array = []
 	var suerte_total := suerte + stat("suerte")
-	for _i in cuantas:
+	while elegidas.size() < cuantas and not bolsa.is_empty():
 		var pesos: Array = []
 		var suma := 0.0
 		for id in bolsa:
@@ -827,8 +858,9 @@ func robar_cartas(cuantas: int, suerte := 0.0, rng: RandomNumberGenerator = null
 		var tirada := rng.randf() * suma
 		for j in bolsa.size():
 			tirada -= pesos[j]
-			if tirada <= 0.0:
-				elegidas.append(bolsa[j])
+			if tirada <= 0.0 or j == bolsa.size() - 1:
+				if not carta_al_tope(bolsa[j]):
+					elegidas.append(bolsa[j])
 				bolsa.remove_at(j)
 				break
 	return elegidas
