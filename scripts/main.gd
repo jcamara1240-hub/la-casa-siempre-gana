@@ -180,6 +180,7 @@ func _ready() -> void:
 	_cartel.add_theme_font_override("font", Juego.fuente_grande)
 	_cartel.add_theme_font_size_override("font_size", 16)
 	_barra.conectar_motor(_motor)
+	_barra.es_del_dueno = _es_del_dueno
 	_crear_jugo()
 	_horda.enemigo_muerto.connect(_al_morir_enemigo)
 	_horda.rango_muerto.connect(_al_morir_rango)
@@ -1897,6 +1898,12 @@ func _filtrar_panel(evento: InputEvent) -> void:
 		get_viewport().set_input_as_handled()
 
 
+## Lo mismo para la fila de cartas (qué carta cambiar), que lee el mando antes que main:
+## sin cooperativo o sin dueño, cualquiera; si no, solo lo del que tiene el panel.
+func _es_del_dueno(evento: InputEvent) -> bool:
+	return not Juego.coop or _dueno_panel == null or _jugador_de_evento(evento) == _dueno_panel
+
+
 ## De qué jugador es un evento (en cooperativo): el de su mando o su trozo de teclado.
 func _jugador_de_evento(evento: InputEvent) -> Node2D:
 	for j in jugadores:
@@ -1976,10 +1983,11 @@ func _mirar_espera_j2(evento: InputEvent) -> void:
 	if not pulsado:
 		return
 	get_viewport().set_input_as_handled()
-	# Como en la selección: START en otro mando o Ctrl derecho para unirse; lo demás es del J1.
+	# Como en la selección: START en otro mando, o el 5 (o Ctrl derecho) para unirse; lo demás es del J1.
 	if evento is InputEventJoypadButton and evento.device != e1 and Mando.PAUSA.has(evento.button_index):
 		cfg = {"entrada1": e1, "entrada2": evento.device}
-	elif evento is InputEventKey and evento.physical_keycode == KEY_CTRL and evento.location == KEY_LOCATION_RIGHT:
+	elif evento is InputEventKey and (evento.physical_keycode in [KEY_5, KEY_KP_5]
+			or (evento.physical_keycode == KEY_CTRL and evento.location == KEY_LOCATION_RIGHT)):
 		if e1 >= 0:
 			cfg = {"entrada1": e1, "entrada2": Mando.TECLADO}
 		else:

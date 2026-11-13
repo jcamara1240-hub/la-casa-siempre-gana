@@ -85,10 +85,11 @@ func _gui_input(evento: InputEvent) -> void:
 
 ## Con el mando: izquierda y derecha recorren las cartas, abajo va a "Saltar", A elige
 ## y B lleva el cursor a "Saltar" (sin saltar: así no se pierde la carta sin querer).
+## En cooperativo, también con el teclado (el J2 del teclado repartido no tiene ratón).
 func _unhandled_input(evento: InputEvent) -> void:
-	if not visible or not Mando.es_mando(evento):
+	if not visible:
 		return
-	var tecla := Mando.tecla_mando(evento)
+	var tecla := Mando.tecla_panel(evento, Juego.coop)
 	if tecla == KEY_NONE:
 		return
 	get_viewport().set_input_as_handled()
@@ -130,7 +131,7 @@ func _draw() -> void:
 		var id: String = _ids[i]
 		var carta: Dictionary = CartasDB.CARTAS[id]
 		draw_texture_rect(_texturas[i], caja, false)
-		if i == _sobre and Mando.activo:
+		if i == _sobre and (Mando.activo or Juego.coop):
 			draw_rect(caja.grow(3.0), Color8(247, 198, 74), false, 2.0)
 		var y := 44 + ALTO + 14.0
 		var cx := caja.position.x - 20

@@ -38,6 +38,11 @@ var _refresco_t := 0.0
 var _etiqueta_dur := 0.45
 var _t := 0.0
 var _cursor := 0  # la ranura señalada con el mando (modo cartas y fila llena)
+## Cooperativo: ¿es este evento del que tiene el panel abierto? (lo pone main; sin él, de todos).
+## La fila lee el mando antes que main, así que mira ella misma de quién es lo que llega.
+var es_del_dueno: Callable
+var _disp_cartas := -1  # en cooperativo, el mando que está ordenando (-1: cualquiera)
+var _con_teclas := false  # qué carta cambiar se está eligiendo con el teclado (cooperativo)
 
 const COLOR_FONDO := Color8(20, 16, 30)
 const COLOR_CREMA := Color8(247, 236, 210)
@@ -254,28 +259,38 @@ func _process(delta: float) -> void:
 
 # ------------------------------------------------------------ mando
 ## Con el mando, la fila se maneja aquí antes que nadie: así A no rueda mientras ordenas.
+## En cooperativo, qué carta cambiar lo elige solo quien tiene el panel (también con el
+## teclado: el J2 del teclado repartido no tiene ratón), y ordenar es del mando que ha entrado:
+## lo del otro le llega a su jugador, que sigue a lo suyo.
 func _input(evento: InputEvent) -> void:
+	if modo_sustituir:
+		if not es_del_dueno.is_valid() or es_del_dueno.call(evento):
+			_mando_sustituir(evento)
+		return
 	if not Mando.es_mando(evento):
 		return
-	if modo_sustituir:
-		_mando_sustituir(evento)
-	elif modo_cartas:
-		_mando_cartas(evento)
+	if modo_cartas:
+		if _disp_cartas < 0 or evento.device == _disp_cartas:
+			_mando_cartas(evento)
 	elif Mando.accion(evento) == "cartas" and not get_tree().paused:  # en los menús, Select es "volver"
 		if puede_ordenar():
-			entrar_modo_cartas()
+			entrar_modo_cartas(evento.device if Juego.coop else -1)
 		else:
 			Sonido.tocar("perder")
 		get_viewport().set_input_as_handled()
 
 
+## Ni en plena pelea ni con una carta cogida con el ratón (en cooperativo, la del otro).
 func puede_ordenar() -> bool:
-	return not en_combate and not modo_sustituir and not get_tree().paused and not Juego.cartas.is_empty()
+	return not en_combate and not modo_sustituir and not get_tree().paused and not Juego.cartas.is_empty() and _arrastrando == -1
 
 
-func entrar_modo_cartas() -> void:
+## "disp": en cooperativo, el mando que ordena (los demás no tocan la fila ni se quedan quietos).
+func entrar_modo_cartas(disp := -1) -> void:
 	modo_cartas = true
 	Mando.bloqueado = true
+	_disp_cartas = disp
+	Mando.bloqueado_disp = disp
 	_cursor = clampi(_cursor, 0, Juego.cartas.size() - 1)
 	_sobre = _cursor
 	Sonido.tocar("clic")
@@ -286,6 +301,8 @@ func entrar_modo_cartas() -> void:
 func salir_modo_cartas() -> void:
 	modo_cartas = false
 	Mando.bloqueado = false
+	_disp_cartas = -1
+	Mando.bloqueado_disp = -1
 	_sobre = -1
 	if _arrastrando != -1:
 		_arrastrando = -1
@@ -329,11 +346,13 @@ func _mando_cartas(evento: InputEvent) -> void:
 
 
 ## La fila está llena y llega una carta: la cruceta elige cuál se cambia, A la cambia, B cancela.
+## En cooperativo, también las flechas, Intro y Retroceso (o WASD, E y Esc).
 func _mando_sustituir(evento: InputEvent) -> void:
-	var tecla := Mando.tecla_mando(evento)
+	var tecla := Mando.tecla_panel(evento, Juego.coop)
 	if tecla == KEY_NONE:
 		return
 	get_viewport().set_input_as_handled()
+	_con_teclas = evento is InputEventKey
 	match tecla:
 		KEY_LEFT, KEY_RIGHT:
 			_mover_cursor(-1 if tecla == KEY_LEFT else 1)
@@ -352,7 +371,7 @@ func _mover_cursor(paso: int) -> void:
 
 ## Se ve el cursor del mando: en el modo cartas y cuando hay que elegir cuál cambiar.
 func _cursor_visible() -> bool:
-	return modo_cartas or (modo_sustituir and Mando.activo)
+	return modo_cartas or (modo_sustituir and (Mando.activo or _con_teclas))
 
 
 func _ranura_en(p: Vector2) -> int:
@@ -363,7 +382,10 @@ func _ranura_en(p: Vector2) -> int:
 
 
 func _gui_input(evento: InputEvent) -> void:
+	if modo_cartas and _disp_cartas >= 0:
+		return  # cooperativo: la fila la está ordenando un mando; el ratón del otro no la toca
 	if evento is InputEventMouseMotion:
+		_con_teclas = false
 		_raton = evento.position
 		_sobre = _ranura_en(_raton)
 		if _arrastrando != -1:

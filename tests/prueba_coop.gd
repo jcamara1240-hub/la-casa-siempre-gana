@@ -5,6 +5,7 @@ extends SceneTree
 
 const CARTA := 2  # Recogible.Clase
 const CORAZON := 1
+const EVENTO := 7
 
 var _fallos := 0
 var Mando: GDScript = load("res://scripts/mando.gd")
@@ -97,6 +98,8 @@ func _correr() -> void:
 	await _guardado()
 	await _desconexion_y_paneles()
 	await _fin_de_partida()
+	await _paneles_con_teclado()
+	await _fila_con_dos_mandos()
 	await _solitario()
 	print("FALLOS: %d" % _fallos)
 	quit(1 if _fallos > 0 else 0)
@@ -351,6 +354,21 @@ func _ordagos() -> void:
 	_ok(Mando.entrada_de(_tecla_ev(KEY_END, false)) == Mando.TECLADO_DER and Mando.entrada_de(_tecla_ev(KEY_E, false)) == Mando.TECLADO_IZQ, "Fin es del J2 y la E del J1")
 
 
+## Un evento de ratón sobre una ranura de la fila (en sus coordenadas): movimiento si
+## "pulsado" es null; si no, el botón izquierdo pulsado o soltado.
+func _raton_en_ranura(barra, ranura: int, pulsado) -> InputEvent:
+	var p: Vector2 = barra.ORIGEN + Vector2(ranura * barra.ANCHO_RANURA + 16, 20)
+	if pulsado == null:
+		var mov := InputEventMouseMotion.new()
+		mov.position = p
+		return mov
+	var clic := InputEventMouseButton.new()
+	clic.position = p
+	clic.button_index = MOUSE_BUTTON_LEFT
+	clic.pressed = pulsado
+	return clic
+
+
 func _tecla_ev(codigo: Key, derecha: bool) -> InputEventKey:
 	var e := InputEventKey.new()
 	e.keycode = codigo
@@ -490,6 +508,213 @@ func _fin_de_partida() -> void:
 	j2.recibir_golpe(1)
 	await _esperar(2)
 	_ok(m._pantalla.visible and paused, "si caen los dos, fin de partida")
+	m._ir_al_menu()
+
+
+# ------------------------------------------------ teclado repartido: el J2 maneja lo suyo con sus teclas
+## Con el teclado repartido el ratón es del J1: lo que abre el J2 (la caja fuerte y los demás
+## eventos, la carta del suelo, qué carta cambiar) solo lo puede manejar él, con flechas e Intro.
+func _paneles_con_teclado() -> void:
+	m._menu.cerrar()
+	m._coop_cfg = {"personaje2": "tahur", "entrada1": Mando.TECLADO_IZQ, "entrada2": Mando.TECLADO_DER}
+	m.empezar_partida("tahur", 0)
+	await _esperar(3)
+	# Al continuar, el letrero dice que el J2 vuelve con el 5.
+	m._guardar_punto()
+	m._ir_al_menu()
+	m._menu.cerrar()
+	Mando.activo = false
+	m.continuar_partida()
+	await _tecla(KEY_5)
+	await _esperar(2)
+	_ok(m._espera_j2.is_empty() and J.coop and m.jugador2 != null and m.jugador.entrada == Mando.TECLADO_IZQ and m.jugador2.entrada == Mando.TECLADO_DER,
+			"al continuar, el 5 une al J2 con el teclado repartido")
+	if not m._espera_j2.is_empty():
+		await _tecla(KEY_CTRL, true)
+		await _esperar(2)
+	var j1 = m.jugador
+	var j2 = m.jugador2
+	j1.invulnerable = true
+	j2.invulnerable = true
+	j1.position = Vector2(120, 200)
+	j2.position = Vector2(480, 200)
+	await _limpiar_suelo()
+	J.cartas = ["bala", "dados", "", "", ""]
+	J.cartas_cambiadas.emit()
+
+	# La caja fuerte, abierta por el J2.
+	var panel = m._panel
+	m.actual["evento"] = "caja_fuerte"
+	m.actual["evento_hecho"] = false
+	J.oro = 40
+	var npc = m._crear_recogible(EVENTO, "res://assets/personajes/npc.png", j2.position)
+	npc.hframes = 6
+	await _esperar(3)
+	_ok(panel.visible and m._dueno_panel == j2 and J.titular == 1, "el J2 llega a la caja fuerte: el panel es suyo")
+	await _esperar(30)  # el panel tiene un momento de seguro
+	await _tecla(KEY_S)
+	await _tecla(KEY_E)
+	_ok(panel.visible and panel._fase == panel.Fase.MENU and panel._sobre == -1, "las teclas del J1 no tocan el panel del J2")
+	await _tecla(KEY_DOWN)
+	_ok(panel._sobre == 0, "la flecha del J2 señala la primera caja")
+	await _tecla(KEY_ENTER)
+	_ok(panel._fase == panel.Fase.FIN, "e Intro la abre")
+	await _tecla(KEY_DOWN)
+	await _tecla(KEY_ENTER)
+	_ok(not panel.visible and m.actual.get("evento_hecho", false) and not paused, "y con Intro en Marcharse se va")
+	if panel.visible:
+		panel._cerrar()
+	if m._barra.modo_sustituir:
+		m._cerrar_selector()
+	await _limpiar_suelo()
+
+	# El prestamista va igual (todos los eventos usan el mismo panel).
+	m.actual["evento"] = "prestamista"
+	m.actual["evento_hecho"] = false
+	J.deuda = 0
+	J.oro = 0
+	npc = m._crear_recogible(EVENTO, "res://assets/personajes/npc.png", j2.position)
+	npc.hframes = 6
+	await _esperar(3)
+	await _esperar(30)
+	await _tecla(KEY_DOWN)
+	await _tecla(KEY_DOWN)
+	await _tecla(KEY_END)
+	_ok(J.deuda == 60 and J.oro == 40, "el J2 pide el préstamo con sus teclas (Fin también acepta)")
+	if panel.visible:
+		panel._cerrar()
+	await _limpiar_suelo()
+
+	# Y si lo abre el J1, va con las suyas (WASD y E) y las del J2 no cuentan.
+	m.actual["evento"] = "mendigo"
+	m.actual["evento_hecho"] = false
+	J.oro = 10
+	npc = m._crear_recogible(EVENTO, "res://assets/personajes/npc.png", j1.position)
+	npc.hframes = 6
+	await _esperar(3)
+	_ok(panel.visible and m._dueno_panel == j1 and J.titular == 0, "el J1 llega al mendigo: el panel es suyo")
+	await _esperar(30)
+	await _tecla(KEY_DOWN)
+	await _tecla(KEY_ENTER)
+	_ok(panel._fase == panel.Fase.MENU and J.oro == 10, "las teclas del J2 no tocan el panel del J1")
+	await _tecla(KEY_S)
+	await _tecla(KEY_E)
+	_ok(panel._fase == panel.Fase.FIN, "con S y E el J1 le da las monedas")
+	if panel.visible:
+		panel._cerrar()
+	await _limpiar_suelo()
+
+	# La carta del suelo: el selector del J2 va con sus flechas e Intro.
+	J.cartas = ["bala", "dados", "bala", "dados", "bala"]
+	J.cartas_cambiadas.emit()
+	m._crear_recogible(CARTA, Progreso.ruta_dorso(), j2.position)
+	await _esperar(3)
+	var selector = m._selector
+	_ok(selector.visible and m._dueno_panel == j2, "el J2 coge una carta del suelo: el selector es suyo")
+	await _esperar(30)
+	await _tecla(KEY_D)
+	await _tecla(KEY_E)
+	_ok(selector.visible and selector._sobre < 0, "las teclas del J1 no lo tocan")
+	await _tecla(KEY_RIGHT)
+	await _tecla(KEY_RIGHT)
+	var elegida: String = selector._ids[1] if selector._ids.size() > 1 else ""
+	_ok(selector._sobre == 1, "las flechas del J2 cambian de carta")
+	await _tecla(KEY_ENTER)
+	var barra = m._barra
+	_ok(not selector.visible and barra.modo_sustituir and paused, "Intro la elige y, con la fila llena, toca decir cuál cambiar")
+	# Qué carta cambiar: también con sus teclas.
+	var antes: Array = J.cartas.duplicate()
+	await _tecla(KEY_D)
+	await _tecla(KEY_E)
+	_ok(barra.modo_sustituir and J.cartas == antes, "las del J1 no cambian ninguna")
+	await _tecla(KEY_RIGHT)
+	var hueco: int = barra._cursor
+	_ok(barra._cursor_visible(), "se ve el cursor en la fila")
+	await _tecla(KEY_ENTER)
+	_ok(not barra.modo_sustituir and not paused and J.cartas[hueco] == elegida, "Intro cambia la señalada")
+	if selector.visible or barra.modo_sustituir:
+		m._cerrar_selector()
+	await _limpiar_suelo()
+	m._ir_al_menu()
+
+
+# ------------------------------------------------ dos mandos: la fila la maneja quien la coge
+func _fila_con_dos_mandos() -> void:
+	m._menu.cerrar()
+	m._coop_cfg = {"personaje2": "tahur", "entrada1": 0, "entrada2": 1}
+	m.empezar_partida("tahur", 0)
+	await _esperar(3)
+	var j1 = m.jugador
+	var j2 = m.jugador2
+	var barra = m._barra
+	j1.invulnerable = true
+	j2.invulnerable = true
+	j1.position = Vector2(120, 200)
+	j2.position = Vector2(480, 200)
+	await _limpiar_suelo()
+	J.cartas = ["bala", "dados", "bala", "", ""]
+	J.cartas_cambiadas.emit()
+	await _esperar(2)
+	# El J1 ordena la fila con su mando; el J2 sigue a lo suyo.
+	await _pulsar(0, JOY_BUTTON_BACK)
+	_ok(barra.modo_cartas, "Select en el mando del J1 entra a ordenar")
+	var cursor: int = barra._cursor
+	await _pulsar(1, JOY_BUTTON_DPAD_RIGHT)
+	_ok(barra._cursor == cursor, "la cruceta del J2 no mueve el cursor del J1")
+	await _pulsar(1, JOY_BUTTON_A)
+	_ok(barra._arrastrando == -1, "ni su A le coge una carta")
+	await _esperar(30)
+	var p2: Vector2 = j2.position
+	await _eje(1, JOY_AXIS_LEFT_X, 1.0)
+	await _esperar(12)
+	await _eje(1, JOY_AXIS_LEFT_X, 0.0)
+	await _esperar(6)
+	_ok(j2.position.x > p2.x + 15.0 and barra._cursor == cursor, "el J2 sigue andando mientras el J1 ordena")
+	var p1: Vector2 = j1.position
+	await _pulsar(0, JOY_BUTTON_DPAD_RIGHT)
+	_ok(barra._cursor != cursor, "la cruceta del J1 sí mueve su cursor")
+	await _eje(0, JOY_AXIS_LEFT_X, -1.0)
+	await _esperar(12)
+	await _eje(0, JOY_AXIS_LEFT_X, 0.0)
+	_ok(j1.position.distance_to(p1) < 1.0, "y el J1, que ordena, no anda")
+	for i in J.cartas.size():
+		if barra._cursor == 0:
+			break
+		await _pulsar(0, JOY_BUTTON_DPAD_LEFT)
+	await _pulsar(0, JOY_BUTTON_A)
+	var destino: int = barra._destino
+	barra._gui_input(_raton_en_ranura(barra, (destino + 1) % J.cartas.size(), null))
+	_ok(barra._arrastrando != -1 and barra._destino == destino, "mientras un mando ordena, el ratón no le mueve la carta")
+	await _pulsar(0, JOY_BUTTON_B)
+	await _pulsar(0, JOY_BUTTON_B)
+	_ok(not barra.modo_cartas and not Mando.bloqueado, "B en su mando sale de ordenar")
+	# Con una carta cogida con el ratón, Select no entra (si no, A soltaría la carta del otro).
+	barra._gui_input(_raton_en_ranura(barra, 0, true))
+	await _pulsar(0, JOY_BUTTON_BACK)
+	_ok(not barra.modo_cartas, "con una carta cogida con el ratón no se entra a ordenar")
+	barra._gui_input(_raton_en_ranura(barra, 0, false))
+
+	# El J2 coge una carta con la fila llena: qué carta cambiar lo decide él.
+	J.cartas = ["bala", "dados", "bala", "dados", "bala"]
+	J.cartas_cambiadas.emit()
+	m._crear_recogible(CARTA, Progreso.ruta_dorso(), j2.position)
+	await _esperar(3)
+	await _esperar(30)
+	await _pulsar(1, JOY_BUTTON_DPAD_RIGHT)
+	await _pulsar(1, JOY_BUTTON_A)
+	_ok(not m._selector.visible and barra.modo_sustituir and m._dueno_panel == j2, "el J2 elige una carta del suelo con la fila llena")
+	var antes: Array = J.cartas.duplicate()
+	await _pulsar(0, JOY_BUTTON_A)
+	await _pulsar(0, JOY_BUTTON_B)
+	_ok(barra.modo_sustituir and J.cartas == antes, "el mando del J1 ni cambia ni cancela la carta del J2")
+	await _pulsar(1, JOY_BUTTON_DPAD_RIGHT)
+	var hueco: int = barra._cursor
+	var nueva: String = m._carta_pendiente
+	await _pulsar(1, JOY_BUTTON_A)
+	_ok(not barra.modo_sustituir and nueva != "" and J.cartas[hueco] == nueva, "el del J2 sí")
+	if m._selector.visible or barra.modo_sustituir:
+		m._cerrar_selector()
+	await _limpiar_suelo()
 	m._ir_al_menu()
 
 
