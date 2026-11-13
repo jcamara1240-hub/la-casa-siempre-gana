@@ -311,5 +311,56 @@ func _correr() -> void:
 	m._horda.limpiar()
 	m.en_combate = false
 
+	# ---- tope de copias: como mucho dos de cada carta en la fila
+	J.cartas = ["bala", "bala", "abanico", "", ""]
+	_ok(J.carta_al_tope("bala") and not J.carta_al_tope("abanico"), "con dos balas, la bala está al tope y el abanico no")
+	_ok(not J.carta_al_tope("bala", 0), "la ranura que vas a cambiar no cuenta")
+	var sale_bala := false
+	for s_tope in 300:
+		var rng := RandomNumberGenerator.new()
+		rng.seed = s_tope
+		if J.robar_cartas(3, 0.0, rng).has("bala"):
+			sale_bala = true
+	_ok(not sale_bala, "una carta al tope ya no sale en tiendas ni cofres")
+	var oro_tope: int = J.oro
+	m._dar_carta("bala")
+	_ok(J.copias("bala") == 2, "no se puede poner una tercera copia aunque haya hueco")
+	_ok(J.oro > oro_tope, "la tercera copia se paga en monedas")
+	m._dar_carta("abanico")
+	_ok(J.copias("abanico") == 2, "la segunda copia sí entra")
+	J.cartas = ["bala", "bala", "abanico", "abanico", "doble"]
+	m._carta_pendiente = "bala"
+	m._barra.modo_sustituir = true
+	m._al_sustituir(4)
+	_ok(J.cartas[4] == "doble" and m._barra.modo_sustituir, "al sustituir tampoco cuela la tercera copia")
+	m._cerrar_selector()
+
+	# ---- la tienda no cobra por nada
+	J.imposible = true
+	J.cartas = ["bala", "abanico"]
+	J.oro = 500
+	var ranura = load("res://scripts/recogible.gd").new()
+	ranura.datos = {"id": m.ARTICULO_RANURA, "precio": 10}
+	m.comprar(ranura, m.jugador)
+	_ok(J.oro == 500 and J.cartas.size() == 2, "en el imposible la ranura no se cobra: no cabe")
+	J.imposible = false
+	ranura.free()
+	m.actual["tienda"] = [{"id": "bala", "precio": 5, "vendido": true}, {"id": m.ARTICULO_REBARAJAR, "precio": 3}]
+	var rebarajar = load("res://scripts/recogible.gd").new()
+	rebarajar.datos = m.actual.tienda[1]
+	m.comprar(rebarajar, m.jugador)
+	_ok(J.oro == 500, "rebarajar sin cartas a la venta no se cobra")
+	rebarajar.free()
+
+	# ---- la deuda en cooperativo: medio corazón de cada uno
+	J.activar_coop("tahur")
+	J.oro = 0
+	J.deuda = 60
+	var max1: int = J.vida_max
+	var max2: int = J.vida_max2
+	J.cobrar_deuda()
+	_ok(J.vida_max == max1 - 1 and J.vida_max2 == max2 - 1 and J.vida <= J.vida_max and J.vida2 <= J.vida_max2, "la deuda cobra medio corazón a cada jugador")
+	J.quitar_coop()
+
 	print("FALLOS: %d" % _fallos)
 	quit(1 if _fallos > 0 else 0)

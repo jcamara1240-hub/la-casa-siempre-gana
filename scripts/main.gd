@@ -1508,17 +1508,22 @@ func comprar(r: Recogible, quien: Node2D = null) -> void:
 		quien = jugador
 	var i: int = quien.indice if Juego.coop else 0
 	var id: String = r.datos.id
-	if int(r.datos.precio) <= Juego.oro:
-		Sonido.tocar("comprar")
 	if id == ARTICULO_CORAZON and Juego.vida_de(i) >= Juego.vida_max_de(i):
 		_aviso.text = Idioma.t("YA TIENES LA VIDA LLENA")
 		return
-	if id == ARTICULO_RANURA and Juego.cartas.size() >= Juego.RANURAS_MAX:
+	if id == ARTICULO_RANURA and Juego.cartas.size() >= Juego.ranuras_tope():
 		_aviso.text = Idioma.t("NO CABEN MÁS RANURAS")
+		return
+	if CartasDB.CARTAS.has(id) and Juego.carta_al_tope(id):
+		_aviso.text = Idioma.t("YA LLEVAS DOS DE ESA CARTA")
+		return
+	if id == ARTICULO_REBARAJAR and not actual.tienda.any(func(a): return CartasDB.CARTAS.has(a.id) and not a.get("vendido", false)):
+		_aviso.text = Idioma.t("NO QUEDAN CARTAS QUE REBARAJAR")
 		return
 	if not Juego.gastar_oro(int(r.datos.precio)):
 		_aviso.text = Idioma.t("NO TE LLEGA")
 		return
+	Sonido.tocar("comprar")
 	if id == ARTICULO_REBARAJAR:
 		_rebarajar(r)
 		return
@@ -1546,7 +1551,7 @@ func _rebarajar(r: Recogible) -> void:
 	var nuevas := Juego.robar_cartas(3, 0.0, Juego.azar_para(int(actual.semilla), "rebarajar%d" % veces))
 	var i := 0
 	for articulo in actual.tienda:
-		if CartasDB.CARTAS.has(articulo.id) and not articulo.get("vendido", false):
+		if i < nuevas.size() and CartasDB.CARTAS.has(articulo.id) and not articulo.get("vendido", false):
 			articulo["id"] = nuevas[i]
 			articulo["precio"] = Juego.precio_final(CartasDB.PRECIO_RAREZA[CartasDB.CARTAS[nuevas[i]].rareza])
 			i += 1
@@ -1654,6 +1659,11 @@ func _al_elegir_carta(id: String) -> void:
 
 
 func _dar_carta(id: String) -> void:
+	if Juego.carta_al_tope(id):  # la tercera copia no entra: te la compran
+		Juego.ganar_oro(Apuestas.CARTA_SOBRANTE)
+		Sonido.tocar("comprar")
+		_aviso.text = Idioma.t("YA LLEVAS DOS DE ESA: TE LA COMPRAN POR %d.") % Apuestas.CARTA_SOBRANTE
+		return
 	if Juego.anadir_carta(id):
 		return
 	get_tree().paused = true
@@ -1664,6 +1674,9 @@ func _dar_carta(id: String) -> void:
 func _al_sustituir(ranura: int) -> void:
 	if Juego.dejaria_sin_ataques(ranura, _carta_pendiente):
 		_aviso.text = Idioma.t("NECESITAS AL MENOS UNA CARTA DE ATAQUE")
+		return
+	if Juego.carta_al_tope(_carta_pendiente, ranura):
+		_aviso.text = Idioma.t("YA LLEVAS DOS DE ESA CARTA")
 		return
 	_aviso.text = ""
 	Juego.sustituir_carta(ranura, _carta_pendiente)

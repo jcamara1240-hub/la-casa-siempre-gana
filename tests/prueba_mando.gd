@@ -307,8 +307,10 @@ func _correr() -> void:
 		await _pulsar(JOY_BUTTON_B)
 
 	# La fila llena: se elige con la cruceta cuál se cambia, o se cancela.
-	for i in 10:
-		m._dar_carta("bala")
+	# (con cartas distintas: de una misma solo caben dos)
+	var sueltas: Array = CartasDB.CARTAS.keys().filter(func(id): return not juego.cartas.has(id) and id != "rayo")
+	for id in sueltas:
+		m._dar_carta(id)
 		if barra.modo_sustituir:
 			break
 	_ok(barra.modo_sustituir and paused, "con la fila llena hay que elegir cuál cambiar")
