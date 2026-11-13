@@ -53,6 +53,8 @@ static var familia := "xbox"  # "xbox", "playstation" o "nintendo": solo cambia 
 static var vibracion := true
 ## La fila de cartas tiene el mando: el stick no mueve al jugador.
 static var bloqueado := false
+## En cooperativo, el mando que está ordenando la fila (-1: cualquiera, como en solitario).
+static var bloqueado_disp := -1
 static var vibraciones := 0  # cuántas se han pedido (lo miran las pruebas)
 
 static var _ejes := {}  # Vector2i(dispositivo, eje) -> valor
@@ -94,6 +96,30 @@ static func accion(evento: InputEvent) -> String:
 
 static func es_mando(evento: InputEvent) -> bool:
 	return evento is InputEventJoypadButton or evento is InputEventJoypadMotion
+
+
+## ¿Está la fila de cartas quitándole el stick a ese mando? En cooperativo, solo al que ordena.
+static func bloquea(disp: int) -> bool:
+	return bloqueado and (bloqueado_disp < 0 or bloqueado_disp == disp)
+
+
+## La tecla de menú de los paneles (eventos, elegir carta, qué carta cambiar): la del mando y,
+## si "con_teclado" (en cooperativo, donde el J2 del teclado repartido no tiene ratón), también
+## la del teclado: flechas o WASD mueven, Intro, E o Fin aceptan y Esc o Retroceso vuelven.
+static func tecla_panel(evento: InputEvent, con_teclado: bool) -> Key:
+	if es_mando(evento):
+		return tecla_mando(evento)
+	if not con_teclado or not (evento is InputEventKey) or not evento.pressed or evento.echo:
+		return KEY_NONE
+	var k: Key = evento.physical_keycode if evento.physical_keycode != KEY_NONE else evento.keycode
+	match k:
+		KEY_UP, KEY_W: return KEY_UP
+		KEY_DOWN, KEY_S: return KEY_DOWN
+		KEY_LEFT, KEY_A: return KEY_LEFT
+		KEY_RIGHT, KEY_D: return KEY_RIGHT
+		KEY_ENTER, KEY_KP_ENTER, KEY_E, KEY_END, KEY_DELETE, KEY_KP_0: return KEY_ENTER
+		KEY_ESCAPE, KEY_BACKSPACE: return KEY_ESCAPE
+	return KEY_NONE
 
 
 ## Hacia dónde empuja el mando: el stick izquierdo (analógico, con zona muerta) o la cruceta.

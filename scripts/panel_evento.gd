@@ -395,11 +395,12 @@ func _gui_input(evento: InputEvent) -> void:
 
 ## Con el mando: arriba y abajo recorren los botones (los que se pueden pulsar), A pulsa
 ## y B lleva el cursor al último, que es el de marcharse (o el de cobrar). Con las copas,
-## izquierda y derecha eligen y A levanta la señalada.
+## izquierda y derecha eligen y A levanta la señalada. En cooperativo, también con el teclado
+## (el J2 del teclado repartido no tiene ratón: flechas e Intro).
 func _unhandled_input(evento: InputEvent) -> void:
-	if not visible or not Mando.es_mando(evento):
+	if not visible:
 		return
-	var tecla := Mando.tecla_mando(evento)
+	var tecla := Mando.tecla_panel(evento, Juego.coop)
 	if tecla == KEY_NONE:
 		return
 	get_viewport().set_input_as_handled()

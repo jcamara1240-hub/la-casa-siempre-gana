@@ -353,7 +353,7 @@ func _direccion_coop() -> Vector2:
 		var y := float((der and Input.is_physical_key_pressed(KEY_DOWN)) or (izq and Input.is_physical_key_pressed(KEY_S))) \
 				- float((der and Input.is_physical_key_pressed(KEY_UP)) or (izq and Input.is_physical_key_pressed(KEY_W)))
 		direccion = Vector2(x, y).normalized()
-	if direccion == Vector2.ZERO and entrada >= 0 and not Mando.bloqueado:
+	if direccion == Vector2.ZERO and entrada >= 0 and not Mando.bloquea(entrada):
 		direccion = Mando.direccion(entrada)
 	if Juego.stat("tambaleo") > 0.0 and direccion != Vector2.ZERO:
 		direccion = direccion.rotated(sin(_anim_t * 3.2) * 0.55)
