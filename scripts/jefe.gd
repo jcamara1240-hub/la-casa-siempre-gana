@@ -12,6 +12,12 @@ const RITMO_ENFADADO := 1.2
 const DENSIDAD := 1.4
 const DENSIDAD_HASTA := 28
 const MURO_VEL := 220.0  # antes 190
+# En pareja los jefes aprietan: más ritmo, un ataque extra cada pocos segundos y, con
+# poca vida, furia (golpes dobles, invocados y ataques más seguidos).
+const RITMO_PAREJA := 1.15
+const FURIA_PAREJA := 0.3
+const PAREJA_ATAQUE_SEG := 5.0
+const PAREJA_ATAQUE_FURIA_SEG := 3.0
 const NOMBRES := PersonajesDB.JEFES
 
 var nombre := "JEFE"
@@ -19,6 +25,11 @@ var id_jefe := ""  # el de PersonajesDB.JEFES: lo apunta crear()
 var vida_base := 300.0
 
 var _letrero: Label
+var _letrero_pareja: Label
+var _furia_pareja := false
+var _reloj_pareja := PAREJA_ATAQUE_SEG
+var _turno_pareja := 0
+var _rotulo_t := 0.0
 
 
 static func crear(id: String) -> Jefe:
@@ -103,6 +114,8 @@ func actualizar(delta: float, horda: Horda) -> void:
 		return
 	if not muerto:
 		_comportamiento(delta * ritmo(), horda)
+		if Juego.coop and _acelera():
+			_tick_pareja(delta, horda)
 		var zona := Sala.INTERIOR.grow(-radio - 2.0)
 		position = position.clamp(zona.position, zona.end)
 
@@ -124,7 +137,81 @@ func enfadado() -> bool:
 func ritmo() -> float:
 	if not _acelera():
 		return 1.0
-	return (RITMO_JEFE_EXTREMO if Juego.extremo else RITMO_JEFE) * (RITMO_ENFADADO if enfadado() else 1.0)
+	var r := (RITMO_JEFE_EXTREMO if Juego.extremo else RITMO_JEFE) * (RITMO_ENFADADO if enfadado() else 1.0)
+	return r * (RITMO_PAREJA if Juego.coop else 1.0)
+
+
+## En pareja y con poca vida: golpea el doble y ataca más seguido.
+func furioso() -> bool:
+	return Juego.coop and vida < vida_max * FURIA_PAREJA
+
+
+## Lo que quita un golpe suyo (en vidas de corazón): 2 si está furioso.
+func dano_golpe() -> int:
+	return 2 if furioso() else 1
+
+
+func _blanco_lejano(horda: Horda) -> Node2D:
+	var lista: Array = horda.vivos()
+	var lejano: Node2D = _blanco(horda)
+	var mejor := -1.0
+	for j in lista:
+		var d: float = j.global_position.distance_squared_to(global_position)
+		if d > mejor:
+			mejor = d
+			lejano = j
+	return lejano
+
+
+func _tick_pareja(delta: float, horda: Horda) -> void:
+	if furioso() and not _furia_pareja:
+		_furia_pareja = true
+		_invocar(horda, ["ficha", "ficha", "dado", "dado"])
+		_letrero_pareja = Label.new()
+		_letrero_pareja.position = Vector2(-60, -52)
+		_letrero_pareja.size = Vector2(120, 9)
+		_letrero_pareja.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		_letrero_pareja.add_theme_color_override("font_color", Color8(230, 70, 60))
+		_letrero_pareja.text = Idioma.t("¡A POR LOS DOS!")
+		add_child(_letrero_pareja)
+		_reloj_pareja = 1.0
+	if _rotulo_t > 0.0:
+		_rotulo_t -= delta
+		if _rotulo_t <= 0.0 and _letrero != null:
+			_letrero.text = ""
+	_reloj_pareja -= delta
+	if _reloj_pareja <= 0.0:
+		_reloj_pareja = PAREJA_ATAQUE_FURIA_SEG if _furia_pareja else PAREJA_ATAQUE_SEG
+		_turno_pareja += 1
+		if not _ataque_pareja_propio(horda, _turno_pareja):
+			_ataque_pareja(horda, _turno_pareja)
+
+
+## Cada jefe puede sustituir el ataque genérico de pareja por uno suyo: devuelve true
+## si ha atacado (el genérico se salta).
+func _ataque_pareja_propio(_horda: Horda, _turno: int) -> bool:
+	return false
+
+
+## Un rótulo temporal sobre el jefe (avisa del ataque de pareja).
+func _rotular(texto: String, seg: float) -> void:
+	if _letrero == null:
+		return
+	_letrero.text = texto
+	_rotulo_t = seg
+
+
+func _dentro(p: Vector2) -> Vector2:
+	var zona := Sala.INTERIOR.grow(-24.0)
+	return p.clamp(zona.position, zona.end)
+
+
+## El ataque extra de la pareja: un abanico al más lejano, un anillo y, furioso, un muro.
+func _ataque_pareja(horda: Horda, turno: int) -> void:
+	_abanico_a(horda, _blanco_lejano(horda), 5, 0.2, 120.0, "moneda")
+	_anillo(horda, 12, 85.0, turno * 0.3, "moneda")
+	if furioso():
+		_muro(horda, turno % 2 == 0, "moneda")
 
 
 ## Los momentos en que el jefe está vendido (aturdido, pillado) no se acortan.
@@ -152,7 +239,11 @@ func _anillo(horda: Horda, cuantas: int, velocidad: float, giro: float, clase: S
 
 
 func _abanico(horda: Horda, cuantas: int, apertura: float, velocidad: float, clase: String) -> void:
-	var hacia: Vector2 = (_blanco(horda).global_position - position).normalized()
+	_abanico_a(horda, _blanco(horda), cuantas, apertura, velocidad, clase)
+
+
+func _abanico_a(horda: Horda, blanco: Node2D, cuantas: int, apertura: float, velocidad: float, clase: String) -> void:
+	var hacia: Vector2 = (blanco.global_position - position).normalized()
 	for i in cuantas:
 		horda.ataques.bala_enemiga(position, hacia.rotated((i - (cuantas - 1) * 0.5) * apertura) * velocidad * ritmo_balas(), clase)
 

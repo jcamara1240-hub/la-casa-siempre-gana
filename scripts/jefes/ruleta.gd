@@ -100,3 +100,18 @@ func _volver() -> void:
 	_reloj = 2.4
 	_letrero.text = ""
 	_vel = Vector2.RIGHT.rotated(randf() * TAU) * 135.0
+
+
+## En pareja, en turnos alternos: doble apuesta. Un radio de zonas avisadas por jugador que
+## gira desde la rueda, cada barrido un poco más tarde que el anterior.
+func _ataque_pareja_propio(horda: Horda, turno: int) -> bool:
+	if turno % 2 == 0:
+		return false
+	_rotular(Idioma.t("¡DOBLE APUESTA!"), 1.6)
+	for j in horda.vivos():
+		var base: float = (j.global_position - position).angle()
+		for k in 4:
+			for r in 4:
+				var p := position + Vector2.RIGHT.rotated(base + k * 0.55) * (45.0 + r * 40.0)
+				horda.ataques.zona_peligro(_dentro(p), 20.0, 0.9 + k * 0.3)
+	return true

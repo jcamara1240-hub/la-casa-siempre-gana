@@ -66,3 +66,18 @@ func _golpear(horda: Horda) -> void:
 		4:
 			_invocar(horda, ["dado_bomba", "ficha"])
 			_anillo(horda, 10, 90.0, _t, "burbuja")
+
+
+## En pareja y furioso: tercera fase. Alterna de víctima: fuego sobre uno mientras caen
+## zonas de peligro avisadas sobre el otro.
+func _ataque_pareja_propio(horda: Horda, turno: int) -> bool:
+	if not furioso():
+		return false
+	_rotular(Idioma.t("¡UNO A UNO!"), 1.6)
+	var fuego := horda.objetivo_por_turno(turno)
+	var zonas := horda.objetivo_por_turno(turno + 1)
+	_abanico_a(horda, fuego, 7, 0.16, 130.0, "naipe_negro")
+	for i in 3:
+		var p: Vector2 = zonas.global_position + Vector2.RIGHT.rotated(TAU * i / 3.0 + _t) * (0.0 if i == 0 else 55.0)
+		horda.ataques.zona_peligro(_dentro(p), 32.0, 0.9 + i * 0.15)
+	return true

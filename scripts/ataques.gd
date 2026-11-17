@@ -407,7 +407,7 @@ func causa_en(origen: Vector2) -> Dictionary:
 	if horda == null:
 		return {"tipo": "bala"}
 	if horda.jefe != null and is_instance_valid(horda.jefe) and not horda.jefe.muerto:
-		return {"tipo": "jefe", "id": horda.jefe.id_jefe}
+		return Horda.causa_de(horda.jefe)
 	var cerca: Array = horda.en_radio(origen, 6.0)  # la rejilla: barato aunque salgan muchas balas
 	if not cerca.is_empty():
 		return Horda.causa_de(cerca[0])

@@ -134,6 +134,18 @@ func _anfitrion() -> void:
 	m._panel._cerrar()
 	_ok(not m._panel.visible and not paused, "cierro mi evento y la partida sigue")
 	await _segundos(1.0)
+	# Reanimación: el J2 cae, el J1 se queda a su lado y lo levanta.
+	m.jugador.invulnerable = true
+	J.vida2 = 1
+	j2._invulnerable_t = 0.0
+	j2.recibir_golpe(1)
+	await _segundos(1.0)
+	_ok(j2.caido and J.vida2 <= 0, "el J2 cae fuera de juego")
+	m.jugador.position = j2.position + Vector2(8, 0)
+	_ok(await _hasta(func(): return not j2.caido, 10.0), "el J1, a su lado, lo reanima")
+	_ok(J.vida2 == m.REANIMAR_VIDA, "y se levanta con %d de vida (%d)" % [m.REANIMAR_VIDA, J.vida2])
+	m.jugador.invulnerable = false
+	await _segundos(1.0)
 	# Una sala con pelea: los enemigos viajan.
 	var c := _sala_de_pelea()
 	_ok(c.x > -99, "hay una sala con pelea")
@@ -291,6 +303,10 @@ func _invitado() -> void:
 	root.push_input(_tecla(KEY_ESCAPE))
 	_ok(not m._menu.visible and m._panel.visible, "al cerrar el menú vuelvo a ver su evento")
 	_ok(await _hasta(func(): return not m._panel.visible and not paused, 20.0), "y cuando lo cierra él, sigo")
+	# Reanimación vista desde el invitado: caigo, me reanima el anfitrión y me levanto.
+	_ok(await _hasta(func(): return m.jugador2.caido, 20.0), "me quedo fuera de juego")
+	_ok(await _hasta(func(): return m.jugador2.reanimar > 0.3, 20.0), "el anfitrión me reanima: se llena la barra")
+	_ok(await _hasta(func(): return not m.jugador2.caido and J.vida2 == 2, 20.0), "y me levanto con 2 de vida (%d)" % J.vida2)
 	# La sala de pelea del anfitrión.
 	_ok(await _hasta(func(): return m.actual.get("tipo") == TIPO.NORMAL and pareja.n_sala >= 2, 20.0), "cuando el anfitrión cambia de sala, aquí también")
 	_ok(await _hasta(func(): return m._horda.get_child_count() > 0, 20.0), "y se ven sus enemigos (%d)" % m._horda.get_child_count())

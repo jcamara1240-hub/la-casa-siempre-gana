@@ -250,8 +250,8 @@ func _resolver_sala() -> bool:
 	for r in m._recogibles.get_children():
 		if not is_instance_valid(r):
 			continue
-		if r.clase == COFRE and not m.actual.cofre_abierto:
-			m.jugador.position = r.position
+		if r.clase == COFRE and not m.actual.get(m._clave_cofre(int(r.datos.get("dueno", 0))), false):
+			_dueno_de(r).position = r.position
 			await _esperar(4)
 			await _atender_objetos()
 	await _atender_objetos()
@@ -290,7 +290,7 @@ func _atender_objetos() -> void:
 		if not is_instance_valid(r):
 			continue
 		if r.clase == CARTA or r.clase == OBJETO:
-			m.jugador.position = r.position
+			_dueno_de(r).position = r.position
 			await _esperar(3)
 	await _esperar(4)
 	if m._selector.visible:
@@ -305,6 +305,13 @@ func _atender_objetos() -> void:
 		if m._barra.modo_sustituir:
 			m._barra.sustitucion_cancelada.emit()
 		await _esperar(2)
+
+
+## Quien tiene que ir a por eso: en pareja, el dueño del pedestal, la carta o el cofre.
+func _dueno_de(r: Node) -> Node2D:
+	if _coop and int(r.datos.get("dueno", 0)) == 1:
+		return m.jugador2
+	return m.jugador
 
 
 func _valor(id: String) -> float:
@@ -359,7 +366,9 @@ func _comprar() -> void:
 		if not is_instance_valid(r) or r.clase != ARTICULO or r.is_queued_for_deletion() or r.datos.id == "_rebarajar":
 			continue
 		if J.oro >= int(r.datos.precio):
-			m.comprar(r)
+			var quien := _dueno_de(r)
+			quien.position = r.position
+			m.comprar(r, quien)
 			await _esperar(2)
 			await _atender_objetos()
 

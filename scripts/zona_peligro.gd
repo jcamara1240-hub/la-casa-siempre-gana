@@ -41,7 +41,7 @@ func _quemar() -> void:
 	var lista: Array = _dueno.jugadores if _dueno.jugadores.size() > 1 else [_dueno.jugador]
 	for j in lista:
 		if not j.caido and position.distance_to(j.global_position) <= _radio:
-			j.recibir_golpe(1, causa)
+			j.recibir_golpe(int(causa.get("dano", 1)), causa)
 
 
 func _draw() -> void:

@@ -95,6 +95,7 @@ func _correr() -> void:
 	await _cartas()
 	await _ordagos()
 	await _equilibrio()
+	await _botin_por_jugador()
 	await _guardado()
 	await _desconexion_y_paneles()
 	await _fin_de_partida()
@@ -400,7 +401,8 @@ func _equilibrio() -> void:
 	rng.seed = 1234
 	var solo := _coste(m._planificar_oleadas(rng))
 	J.coop = true
-	_ok(coop >= solo * 1.4 and coop <= solo * 1.6 + 6, "en cooperativo la sala trae x1,5 de enemigos (%d frente a %d)" % [coop, solo])
+	var k: float = m.COOP_PRESUPUESTO
+	_ok(coop >= solo * (k - 0.1) and coop <= solo * (k + 0.1) + 6, "en cooperativo la sala trae x%s de enemigos (%d frente a %d)" % [str(k), coop, solo])
 	J.coop = false
 	m._empezar_jefe()
 	var vida_solo: float = m._horda.jefe.vida_max
@@ -414,7 +416,62 @@ func _equilibrio() -> void:
 	m.en_combate = false
 	m._barra.en_combate = false
 	m._jugo.limpiar()
-	_ok(absf(vida_coop / vida_solo - m.COOP_VIDA_JEFE) < 0.01, "y los jefes x1,6 de vida")
+	_ok(absf(vida_coop / vida_solo - m.COOP_VIDA_JEFE) < 0.01, "y los jefes x%s de vida" % str(m.COOP_VIDA_JEFE))
+	await _esperar(2)
+
+
+# ------------------------------------------------ botín distinto por jugador
+func _botin_por_jugador() -> void:
+	var j1 = m.jugador
+	var j2 = m.jugador2
+	J.coop = true
+	await _limpiar_suelo()
+	j1.position = Vector2(300, 250)
+	j2.position = Vector2(320, 60)
+	await _esperar(2)
+	var sem := int(m.actual.semilla)
+	var clase_carta: int = load("res://scripts/recogible.gd").Clase.CARTA
+	var carta1 = m._crear_recogible(clase_carta, Progreso.ruta_dorso(), Vector2(200, 200))
+	var carta2 = m._crear_recogible(clase_carta, Progreso.ruta_dorso(), Vector2(440, 200))
+	m._dar_dueno(carta1, 0)
+	m._dar_dueno(carta2, 1)
+	await _esperar(2)
+	j1.position = carta2.position
+	j2.position = Vector2(320, 60)
+	await _esperar(4)
+	_ok(not m._selector.visible and not carta2.is_queued_for_deletion(), "el J1 no coge la carta del J2")
+	j1.position = Vector2(300, 250)
+	j2.position = carta2.position
+	await _esperar(4)
+	var esperadas2: Array = J.robar_cartas(2, 0.0, J.azar_para(sem, "eleccion#1"))
+	_ok(m._selector.visible and m._selector._ids == esperadas2, "la oferta del J2 sale de la etiqueta eleccion#1")
+	m._selector.elegida.emit(String(m._selector._ids[0]))
+	await _esperar(3)
+	j2.position = Vector2(320, 60)
+	j1.position = carta1.position
+	await _esperar(4)
+	var esperadas1: Array = J.robar_cartas(2, 0.0, J.azar_para(sem, "eleccion"))
+	_ok(m._selector.visible and m._selector._ids == esperadas1, "y la del J1 de la etiqueta eleccion de siempre")
+	m._selector.elegida.emit(String(m._selector._ids[0]))
+	await _esperar(3)
+	# La tienda: cada uno su fila, con objetos distintos.
+	var tienda_antes: Array = m.actual.tienda
+	m.actual.tienda = []
+	m._llenar_tienda()
+	var t: Array = m.actual.tienda
+	var del1: Array = t.filter(func(a): return int(a.get("dueno", -1)) == 0)
+	var del2: Array = t.filter(func(a): return int(a.get("dueno", -1)) == 1)
+	var obj1: String = String(del1.back().id) if not del1.is_empty() else ""
+	var obj2: String = String(del2.back().id) if not del2.is_empty() else ""
+	_ok(del1.size() > 0 and del1.size() == del2.size() and obj1 != obj2, "la tienda tiene la oferta de cada uno, con objeto distinto")
+	J.coop = false
+	m.actual.tienda = []
+	m._llenar_tienda()
+	var solo: Array = m.actual.tienda.slice(0, 3).map(func(a): return a.id)
+	_ok(solo == del1.slice(0, 3).map(func(a): return a.id) and not m.actual.tienda[0].has("dueno"), "en solitario la tienda es la de siempre (la del J1)")
+	m.actual.tienda = tienda_antes
+	J.coop = true
+	await _limpiar_suelo()
 	await _esperar(2)
 
 

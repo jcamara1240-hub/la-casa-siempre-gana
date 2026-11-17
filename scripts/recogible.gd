@@ -36,6 +36,8 @@ func tocando() -> bool:
 func quien_toca() -> Node2D:
 	var lista: Array = _principal.jugadores if _principal.jugadores.size() > 1 else [_principal.jugador]
 	for j in lista:
+		if Juego.coop and datos.has("dueno") and int(datos.dueno) != j.indice:
+			continue  # es del otro
 		if not j.caido and position.distance_to(j.position) <= RADIO[clase]:
 			return j
 	return null

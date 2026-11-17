@@ -66,3 +66,19 @@ func _comportamiento(delta: float, horda: Horda) -> void:
 func _volver() -> void:
 	_estado = Modo.NADAR
 	_reloj = 1.5
+
+
+## En pareja, en turnos alternos: la marea. Una estela de remolinos avisados que va del pez
+## al más lejano y un remolino sobre cada jugador; castiga el quedarse juntos y quietos.
+func _ataque_pareja_propio(horda: Horda, turno: int) -> bool:
+	if turno % 2 == 0:
+		return false
+	_rotular(Idioma.t("¡MAREA!"), 1.4)
+	var lejano := _blanco_lejano(horda)
+	var hacia: Vector2 = (lejano.global_position - position).normalized()
+	for i in 6:
+		horda.ataques.zona_peligro(_dentro(position + hacia * (50.0 + i * 38.0)), 24.0, 0.9 + i * 0.1)
+	for j in horda.vivos():
+		horda.ataques.zona_peligro(_dentro(j.global_position), 30.0, 1.1)
+	_anillo(horda, 8, 70.0, _t, "burbuja")
+	return true

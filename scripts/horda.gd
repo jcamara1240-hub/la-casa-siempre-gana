@@ -164,7 +164,7 @@ func _comprobar_contacto() -> void:
 func _contacto_con(j: Node2D) -> void:
 	for e in en_radio(j.position, 5.0):
 		if e.hace_contacto:
-			j.recibir_golpe(1, causa_de(e))
+			j.recibir_golpe(e.dano_golpe(), causa_de(e))
 			break
 
 
@@ -180,6 +180,22 @@ func objetivo_para(pos: Vector2) -> Node2D:
 			continue
 		var d: float = pos.distance_squared_to(j.position)
 		if d < mejor_d:
+			mejor_d = d
+			mejor = j
+	return mejor if mejor != null else jugador
+
+
+## El jugador en pie más lejano de "pos" (los tiradores le disparan: fuego cruzado).
+func objetivo_lejano(pos: Vector2) -> Node2D:
+	if jugadores.size() <= 1:
+		return jugador
+	var mejor: Node2D = null
+	var mejor_d := -1.0
+	for j in jugadores:
+		if j.caido:
+			continue
+		var d: float = pos.distance_squared_to(j.position)
+		if d > mejor_d:
 			mejor_d = d
 			mejor = j
 	return mejor if mejor != null else jugador
@@ -201,8 +217,8 @@ func objetivo_por_turno(turno: int) -> Node2D:
 ## Lo que se apunta como causa del golpe que da este enemigo (o el jefe de la sala).
 static func causa_de(e: Enemigo) -> Dictionary:
 	if e is Jefe:
-		return {"tipo": "jefe", "id": e.id_jefe}
-	return {"tipo": "enemigo", "id": e.tipo, "rango": e.rango}
+		return {"tipo": "jefe", "id": e.id_jefe, "dano": e.dano_golpe() if e.has_method("dano_golpe") else 1}
+	return {"tipo": "enemigo", "id": e.tipo, "rango": e.rango, "dano": e.dano_golpe()}
 
 
 func _humo_del_puro(delta: float) -> void:

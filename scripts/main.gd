@@ -76,8 +76,11 @@ const PRECIO_CORAZON := 18
 const PRECIO_RANURA := 25
 const MAX_ENEMIGOS := 105  # antes 90; los que esperan a nacer también cuentan
 # Cooperativo local: dos jugadores en la misma sala.
-const COOP_PRESUPUESTO := 1.5  # enemigos por sala
-const COOP_VIDA_JEFE := 1.6
+const COOP_PRESUPUESTO := 1.7  # enemigos por sala
+const COOP_VIDA_JEFE := 1.8
+const COOP_VIDA_ENEMIGOS := 1.15
+const COOP_ELITES := 1.6  # más élites en pareja
+const COOP_ULTIMOS := 6  # se desesperan antes: hay más gente a la que perseguir
 const REANIMAR_SEG := 3.0  # lo que hay que quedarse al lado del caído para levantarlo
 const REANIMAR_RADIO := 24.0
 const REANIMAR_VIDA := 2  # se levanta con un corazón
@@ -668,7 +671,7 @@ func _planificar_oleadas(rng: RandomNumberGenerator) -> Array:
 	var oleadas: Array = []
 	_elites = []
 	# El rango de cada enemigo (normal, raro o élite) se decide aquí, con el azar de la sala.
-	var prob := Enemigo.prob_rangos(Juego.piso, Juego.mesa, Juego.pisos_extra(), float(_plan.get("elites", 1.0)))
+	var prob := Enemigo.prob_rangos(Juego.piso, Juego.mesa, Juego.pisos_extra(), float(_plan.get("elites", 1.0)) * (COOP_ELITES if Juego.coop else 1.0))
 	var puede_raro: bool = Juego.piso >= 2 or _salas_limpiadas >= 1
 	var puede_elite: bool = Juego.piso >= 2 or _salas_limpiadas >= 3
 	for parte_oleada in Director.repartir(presupuesto, _plan.get("reparto", [0.3, 0.3, 0.4])):
@@ -721,7 +724,7 @@ func _actualizar_combate(delta: float) -> void:
 		return
 	if _oleadas.is_empty() and vivos == 0:
 		_terminar_combate()
-	elif _oleadas.is_empty() and _por_nacer.is_empty() and vivos <= ULTIMOS and _horda.jefe == null:
+	elif _oleadas.is_empty() and _por_nacer.is_empty() and vivos <= (COOP_ULTIMOS if Juego.coop else ULTIMOS) and _horda.jefe == null:
 		for e in _horda.enemigos:
 			e.desesperar()
 
@@ -735,6 +738,8 @@ func _soltar_oleada(grupo: Array, elites: Array = []) -> void:
 	if Juego.clausula("plomo"):
 		mult *= 1.25
 	mult *= pow(1.22, Juego.pisos_extra()) * float(_plan.get("vida", 1.0))
+	if Juego.coop:
+		mult *= COOP_VIDA_ENEMIGOS
 	var numero := _oleadas_total - _oleadas.size()
 	if _jugo.has_method("oleada"):
 		_jugo.oleada(numero, _oleadas_total)
@@ -885,7 +890,13 @@ func _terminar_combate() -> void:
 	_salas_limpiadas += 1
 	if Juego.azar_para(int(actual.semilla), "carta").randf() < _prob_carta:
 		_prob_carta = 0.4
-		_crear_recogible(Recogible.Clase.CARTA, Progreso.ruta_dorso(), Sala.CENTRO)
+		if Juego.coop and jugadores.size() > 1:
+			# Una carta para cada uno, con su propia oferta.
+			for i in 2:
+				var carta := _crear_recogible(Recogible.Clase.CARTA, Progreso.ruta_dorso(), Sala.CENTRO + Vector2(-18 if i == 0 else 18, 0))
+				_dar_dueno(carta, i)
+		else:
+			_crear_recogible(Recogible.Clase.CARTA, Progreso.ruta_dorso(), Sala.CENTRO)
 	else:
 		_prob_carta += 0.25
 
@@ -1326,9 +1337,32 @@ func _actualizar_hint_maquina() -> void:
 
 
 func _crear_cofre() -> void:
+	if Juego.coop and jugadores.size() > 1:
+		for i in 2:
+			var cofre := _crear_recogible(Recogible.Clase.COFRE, "res://assets/objetos/cofre.png", Sala.CENTRO + Vector2(-76 + 32 * i, 0))
+			cofre.hframes = 2
+			cofre.frame = 1 if actual.get(_clave_cofre(i), false) else 0
+			_dar_dueno(cofre, i)
+		return
 	var c := _crear_recogible(Recogible.Clase.COFRE, "res://assets/objetos/cofre.png", Sala.CENTRO + Vector2(-46, 0))
 	c.hframes = 2
 	c.frame = 1 if actual.cofre_abierto else 0
+
+
+## Lo suelto en pareja que es de uno solo: lleva su dueño y se tiñe de su color.
+func _dar_dueno(r: Recogible, i: int) -> void:
+	r.datos["dueno"] = i
+	if i < jugadores.size():
+		r.modulate = Color.WHITE.lerp(jugadores[i].color_jugador(), 0.55)
+
+
+## Sufijo de las etiquetas de azar: el J1 (y el solitario) no lo llevan, así que su botín es el de siempre.
+func _sufijo(i: int) -> String:
+	return "#1" if Juego.coop and i == 1 else ""
+
+
+func _clave_cofre(i: int) -> String:
+	return "cofre_abierto1" if Juego.coop and i == 1 else "cofre_abierto"
 
 
 func _crear_premio_tesoro() -> void:
@@ -1363,12 +1397,16 @@ func _crear_tienda() -> void:
 
 
 func _llenar_tienda() -> void:
-	var rng := Juego.azar_para(int(actual.semilla), "tienda")
-	for id in Juego.robar_cartas(3, 0.0, rng):
-		actual.tienda.append({"id": id, "precio": Juego.precio_final(CartasDB.PRECIO_RAREZA[CartasDB.CARTAS[id].rareza])})
-	var objeto := Juego.robar_objeto([], rng)
-	if objeto != "":
-		actual.tienda.append({"id": PREFIJO_OBJETO + objeto, "precio": Juego.precio_final(ObjetosDB.PRECIO)})
+	var ya_ofrecidos: Array = []
+	for i in (2 if Juego.coop else 1):
+		var rng := Juego.azar_para(int(actual.semilla), "tienda" + _sufijo(i))
+		var suyo := {"dueno": i} if Juego.coop else {}
+		for id in Juego.robar_cartas(3, 0.0, rng):
+			actual.tienda.append({"id": id, "precio": Juego.precio_final(CartasDB.PRECIO_RAREZA[CartasDB.CARTAS[id].rareza])}.merged(suyo))
+		var objeto := Juego.robar_objeto(ya_ofrecidos, rng)
+		if objeto != "":
+			ya_ofrecidos.append(objeto)
+			actual.tienda.append({"id": PREFIJO_OBJETO + objeto, "precio": Juego.precio_final(ObjetosDB.PRECIO)}.merged(suyo))
 	if not Juego.clausula("sin_cura"):
 		actual.tienda.append({"id": ARTICULO_CORAZON, "precio": Juego.precio_final(PRECIO_CORAZON)})
 	actual.tienda.append({"id": ARTICULO_RANURA, "precio": Juego.precio_final(PRECIO_RANURA)})
@@ -1378,13 +1416,27 @@ func _llenar_tienda() -> void:
 
 func _pintar_tienda() -> void:
 	var total: int = actual.tienda.size()
+	# En pareja: la fila de cada uno arriba (J1 a la izquierda, J2 a la derecha) y la común debajo.
+	var filas := {0: [], 1: [], -1: []}
+	for i in total:
+		filas[int(actual.tienda[i].get("dueno", -1)) if Juego.coop else -1].append(i)
 	for i in total:
 		var articulo: Dictionary = actual.tienda[i]
 		if articulo.get("vendido", false):
 			continue
 		var p := Vector2(320 + (i - (total - 1) * 0.5) * 72.0, 136)
+		if Juego.coop:
+			var dueno := int(articulo.get("dueno", -1))
+			var fila: Array = filas[dueno]
+			var k := fila.find(i)
+			if dueno >= 0:
+				p = Vector2((140.0 if dueno == 0 else 500.0) + (k - (fila.size() - 1) * 0.5) * 60.0, 112)
+			else:
+				p = Vector2(320 + (k - (fila.size() - 1) * 0.5) * 72.0, 196)
 		var r := _crear_recogible(Recogible.Clase.ARTICULO, "res://assets/objetos/pedestal.png", p)
 		r.datos = articulo
+		if Juego.coop and articulo.has("dueno"):
+			_dar_dueno(r, int(articulo.dueno))
 		r.offset = Vector2(0, 8)
 		r.add_child(_icono_articulo(String(articulo.id)))
 		r.add_child(_etiqueta_precio(int(articulo.precio)))
@@ -1471,6 +1523,8 @@ func _articulo_cerca(quien: Node2D = null) -> Recogible:
 func _toca(r: Recogible, quien: Node2D) -> bool:
 	if quien == null:
 		return r.tocando()
+	if Juego.coop and r.datos.has("dueno") and int(r.datos.dueno) != quien.indice:
+		return false
 	return not quien.caido and r.position.distance_to(quien.position) <= Recogible.RADIO[r.clase]
 
 
@@ -1602,6 +1656,8 @@ func comprar(r, quien: Node2D = null) -> void:
 	if quien == null:
 		quien = jugador
 	var i: int = quien.indice if Juego.coop else 0
+	if Juego.coop and r.datos.has("dueno") and int(r.datos.dueno) != i:
+		return  # el pedestal es del otro
 	var id: String = r.datos.id
 	if id == ARTICULO_CORAZON and Juego.vida_de(i) >= Juego.vida_max_de(i):
 		_aviso.text = Idioma.t("YA TIENES LA VIDA LLENA")
@@ -1612,7 +1668,7 @@ func comprar(r, quien: Node2D = null) -> void:
 	if CartasDB.CARTAS.has(id) and Juego.carta_al_tope(id):
 		_aviso.text = Idioma.t("YA LLEVAS DOS DE ESA CARTA")
 		return
-	if id == ARTICULO_REBARAJAR and not actual.tienda.any(func(a): return CartasDB.CARTAS.has(a.id) and not a.get("vendido", false)):
+	if id == ARTICULO_REBARAJAR and not actual.tienda.any(func(a): return CartasDB.CARTAS.has(a.id) and not a.get("vendido", false) and (not Juego.coop or int(a.get("dueno", i)) == i)):
 		_aviso.text = Idioma.t("NO QUEDAN CARTAS QUE REBARAJAR")
 		return
 	if not Juego.gastar_oro(int(r.datos.precio)):
@@ -1620,7 +1676,7 @@ func comprar(r, quien: Node2D = null) -> void:
 		return
 	Sonido.tocar("comprar")
 	if id == ARTICULO_REBARAJAR:
-		_rebarajar(r)
+		_rebarajar(r, i)
 		return
 	r.datos["vendido"] = true
 	r.queue_free()
@@ -1638,14 +1694,18 @@ func comprar(r, quien: Node2D = null) -> void:
 		_: _dar_carta(id)
 
 
-func _rebarajar(r: Recogible) -> void:
+func _rebarajar(r: Recogible, quien := 0) -> void:
 	r.datos["precio"] = int(r.datos.precio) + 3
 	# Cada vez que rebarajas sale la siguiente tanda de esa tienda: la misma para todos.
-	var veces := int(actual.get("rebarajadas", 0)) + 1
-	actual["rebarajadas"] = veces
-	var nuevas := Juego.robar_cartas(3, 0.0, Juego.azar_para(int(actual.semilla), "rebarajar%d" % veces))
+	# En pareja cada uno lleva su cuenta y solo cambian las cartas del que paga.
+	var clave := "rebarajadas" + ("1" if Juego.coop and quien == 1 else "")
+	var veces := int(actual.get(clave, 0)) + 1
+	actual[clave] = veces
+	var nuevas := Juego.robar_cartas(3, 0.0, Juego.azar_para(int(actual.semilla), "rebarajar%d" % veces + _sufijo(quien)))
 	var i := 0
 	for articulo in actual.tienda:
+		if Juego.coop and int(articulo.get("dueno", quien)) != quien:
+			continue
 		if i < nuevas.size() and CartasDB.CARTAS.has(articulo.id) and not articulo.get("vendido", false):
 			articulo["id"] = nuevas[i]
 			articulo["precio"] = Juego.precio_final(CartasDB.PRECIO_RAREZA[CartasDB.CARTAS[nuevas[i]].rareza])
@@ -1685,6 +1745,8 @@ func recogido(r: Recogible, quien: Node2D = null) -> void:
 	if quien == null:
 		quien = jugador
 	var i: int = quien.indice if Juego.coop else 0
+	if Juego.coop and r.datos.has("dueno") and int(r.datos.dueno) != i:
+		return  # es del otro
 	match r.clase:
 		Recogible.Clase.MONEDA:
 			Juego.ganar_oro(1 + int(Juego.stat("moneda_extra")))
@@ -1702,7 +1764,7 @@ func recogido(r: Recogible, quien: Node2D = null) -> void:
 			r.queue_free()
 			_tomar_panel(quien)
 			Sonido.tocar("carta_coger")
-			abrir_selector(Juego.robar_cartas(2, 0.0, Juego.azar_para(int(actual.semilla), "eleccion")), Idioma.t("ELIGE UNA CARTA"))
+			abrir_selector(Juego.robar_cartas(2, 0.0, Juego.azar_para(int(actual.semilla), "eleccion" + _sufijo(i))), Idioma.t("ELIGE UNA CARTA"))
 		Recogible.Clase.EVENTO:
 			if actual.get("evento_hecho", false) or _panel.visible:
 				return
@@ -1710,13 +1772,13 @@ func recogido(r: Recogible, quien: Node2D = null) -> void:
 			get_tree().paused = true
 			_panel.abrir(actual.evento, Juego.azar_para(int(actual.semilla), "evento"))
 		Recogible.Clase.COFRE:
-			if actual.cofre_abierto:
+			if actual.get(_clave_cofre(i), false):
 				return
-			actual.cofre_abierto = true
+			actual[_clave_cofre(i)] = true
 			_tomar_panel(quien)
 			r.frame = 1
 			Sonido.tocar("carta_coger")
-			abrir_selector(Juego.robar_cartas(3, 1.5, Juego.azar_para(int(actual.semilla), "cofre")), Idioma.t("¡TESORO!"))
+			abrir_selector(Juego.robar_cartas(3, 1.5, Juego.azar_para(int(actual.semilla), "cofre" + _sufijo(i))), Idioma.t("¡TESORO!"))
 		Recogible.Clase.OBJETO:
 			actual["premio_cogido"] = true
 			r.queue_free()
@@ -1965,7 +2027,7 @@ func _vivos_salvo(quien: Node2D) -> int:
 func _caer(quien: Node2D) -> void:
 	quien.caer()
 	Sonido.tocar("perder")
-	_jugo.texto(quien.position + Vector2(0, -26), Idioma.t("¡J1 FUERA DE JUEGO!") if quien.indice == 0 else Idioma.t("¡J2 FUERA DE JUEGO!"), COLOR_LIMITE, true)
+	_jugo.texto(quien.position + Vector2(0, -26), Idioma.t("¡%s FUERA DE JUEGO!") % (quien.nombre_online if quien.nombre_online != "" else Idioma.t("J1") if quien.indice == 0 else Idioma.t("J2")), COLOR_LIMITE, true)
 
 
 func _levantar(quien: Node2D, vida: int) -> void:

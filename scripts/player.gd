@@ -52,6 +52,8 @@ var _patada := Vector2.ZERO  # el dibujo retrocede un poco al disparar
 const COLORES_JUGADOR := [Color8(247, 198, 74), Color8(111, 195, 232)]  # J1 oro, J2 celeste
 const TINTE_J2 := Color(0.72, 0.9, 1.3)  # si los dos llevan el mismo personaje
 const ETIQUETA_SEG := 1.8
+const RADIO_REANIMAR := 24.0  # el aro que marca hasta dónde llega el compañero para levantarlo
+const RESPIRO_LEVANTAR := 1.8
 ## 0 el J1, 1 el J2. Con un solo jugador, 0 y entrada TODO: todo como siempre.
 var indice := 0
 ## Lo que le mueve (ver Mando: TODO, TECLADO, TECLADO_IZQ, TECLADO_DER o el número del mando).
@@ -495,7 +497,7 @@ func levantar() -> void:
 	reanimar = 0.0
 	_sprite.rotation = 0.0
 	_sprite.modulate = _tinte
-	proteger(1.2)
+	proteger(RESPIRO_LEVANTAR)
 	queue_redraw()
 
 
@@ -509,6 +511,13 @@ func _draw() -> void:
 	if nombre_online != "":
 		nombre = nombre_online
 	if caido:
+		# El aro de reanimación: late, con el color del compañero.
+		var otro: Color = COLORES_JUGADOR[1 - clampi(indice, 0, 1)]
+		var pulso := 0.5 + 0.5 * sin(Time.get_ticks_msec() * 0.006)
+		var radio := RADIO_REANIMAR * (0.94 + 0.06 * pulso)
+		draw_arc(CENTRO_CUERPO, radio, 0.0, TAU, 40, Color(otro, 0.3 + 0.4 * pulso), 1.0)
+		if reanimar > 0.0:
+			_texto_centrado(Idioma.t("REANIMANDO..."), Vector2(0, -22), Color8(108, 207, 148))
 		_texto_centrado(Idioma.t("FUERA DE JUEGO"), Vector2(0, -15), Color8(214, 61, 79))
 		# La barra de reanimación: se llena mientras el otro está al lado.
 		var barra := Rect2(-12, -12, 24, 4)

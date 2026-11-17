@@ -30,6 +30,18 @@ const VEL_RITMO_EXTREMO := 1.25  # donde un golpe mata, tocarte no puede ser tan
 const VEL_BALAS := 1.6  # hardcore: antes 1,3
 const VEL_BALAS_EXTREMO := 1.3  # antes 1,15
 const CADENCIA := 0.6  # las esperas entre ataques: hardcore, antes 0,84
+# Con pareja (Juego.coop, local u online) la sala aprieta más.
+const PAREJA_VEL := 1.12
+const PAREJA_CADENCIA := 0.8  # acorta la espera entre ataques, no los avisos
+const PAREJA_BALAS := 1.1
+const PAREJA_ANIMO_RADIO := 120.0
+const PAREJA_VENGANZA_ELITE := 14
+const DANO_ELITE_PAREJA := 2
+const COLOR_ELITE_PAREJA := Color(1.0, 0.55, 0.4)
+const TIRADORES := ["camara", "crupier", "botones", "sota", "joker"]  # disparan al más lejano
+const RODEAN := ["ficha", "cubilete", "reina", "dado_bomba", "ratero"]  # flanquean
+const FLANCO_DIST := 70.0
+const FLANCO_ANG := 0.55
 const ORO_RITMO := 0.5  # vienen más: cada uno suelta algo menos, para que el oro no se dispare
 const TOPE_INVOCADOS := 75
 # Lo que tarda cada uno de los nuevos en avisar (fotograma 3) antes de atacar.
@@ -155,7 +167,7 @@ func configurar(nombre: String, multiplicador_vida: float) -> void:
 	tipo = nombre
 	vida = float(datos.vida) * multiplicador_vida
 	vida_max = vida
-	vel = float(datos.vel) * (VEL_RITMO_EXTREMO if Juego.extremo else VEL_RITMO)
+	vel = float(datos.vel) * (VEL_RITMO_EXTREMO if Juego.extremo else VEL_RITMO) * (PAREJA_VEL if Juego.coop else 1.0)
 	radio = datos.radio
 	oro_prob = float(datos.oro) * ORO_RITMO
 	# Los que tienen uniformes distintos eligen uno por su sitio de nacimiento (sin gastar azar).
@@ -178,7 +190,7 @@ func hacer_elite() -> void:
 	vida_max = vida
 	scale = Vector2.ONE * 1.4
 	radio *= 1.3
-	self_modulate = Color(1.0, 0.82, 0.4)
+	self_modulate = COLOR_ELITE_PAREJA if Juego.coop else Color(1.0, 0.82, 0.4)
 	monedas_al_morir += 4  # antes 2: el botín del élite está garantizado
 	oro_prob = 1.0
 
@@ -295,12 +307,13 @@ static func nombre_de(nombre: String, lista_mods: Array) -> String:
 ## Lo que se pinta sobre la cabeza: el modificador del raro; el nombre del élite al aparecer
 ## y luego sus dos modificadores, que en plena horda se leen mejor.
 func etiqueta() -> String:
+	var pre := "x2 " if elite and Juego.coop else ""
 	if rango == Rango.ELITE and _t < ETIQUETA_NOMBRE_SEG:
-		return nombre_rango.to_upper()
+		return pre + nombre_rango.to_upper()
 	var cortos: Array = []
 	for m in mods:
 		cortos.append(Idioma.t(String(MODS[m].corto)))
-	return "+".join(cortos)
+	return pre + "+".join(cortos)
 
 
 ## El golpe que de verdad entra: el blindaje se come casi todo el primero y el escudo, lo de frente.
@@ -351,9 +364,18 @@ func _tick_mods(delta: float, horda: Horda, dist: float) -> void:
 
 
 ## Lo que multiplica la velocidad de las balas enemigas.
+static func cadencia() -> float:
+	return CADENCIA * (PAREJA_CADENCIA if Juego.coop else 1.0)
+
+
+## El golpe que da a quien toca: los élites pegan doble con pareja.
+func dano_golpe() -> int:
+	return DANO_ELITE_PAREJA if elite and Juego.coop else 1
+
+
 static func ritmo_balas() -> float:
 	# Hardcore: cada piso las balas van un 5 % más rápidas.
-	return (VEL_BALAS_EXTREMO if Juego.extremo else VEL_BALAS) * (1.0 + 0.05 * (Juego.piso - 1)) * Juego.balas_sala
+	return (VEL_BALAS_EXTREMO if Juego.extremo else VEL_BALAS) * (1.0 + 0.05 * (Juego.piso - 1)) * Juego.balas_sala * (PAREJA_BALAS if Juego.coop else 1.0)
 
 
 func activo() -> bool:
@@ -384,6 +406,8 @@ func actualizar(delta: float, horda: Horda) -> void:
 	var hacia := _blanco(horda).global_position - position
 	var dist := hacia.length()
 	var direccion: Vector2 = hacia / maxf(dist, 0.001)
+	if Juego.coop and dist > FLANCO_DIST and RODEAN.has(tipo):
+		direccion = direccion.rotated(FLANCO_ANG * (1.0 if cos(_fase) >= 0.0 else -1.0))
 	var movimiento := _decidir(direccion, dist, delta * factor * _furia, horda)
 	position += (movimiento * factor + empuje) * delta
 	empuje = empuje.lerp(Vector2.ZERO, clampf(delta * 8.0, 0.0, 1.0))
@@ -472,7 +496,7 @@ func _animar_vecinos(delta: float, horda: Horda) -> void:
 	if _aura_t > 0.0:
 		return
 	_aura_t = 0.4
-	for otro in horda.en_radio(position, ANIMO_RADIO):
+	for otro in horda.en_radio(position, PAREJA_ANIMO_RADIO if Juego.coop else ANIMO_RADIO):
 		if otro != self and not (otro is Jefe):
 			otro._animo_t = 0.7
 
@@ -482,7 +506,7 @@ func _animar_vecinos(delta: float, horda: Horda) -> void:
 func al_morir(horda: Horda) -> void:
 	if horda.enemigos.is_empty() or tipo == "jefe":
 		return
-	var balas := VENGANZA_ELITE if elite else VENGANZA_BOMBA if tipo == "dado_bomba" and not _reventado else 0
+	var balas := (PAREJA_VENGANZA_ELITE if Juego.coop else VENGANZA_ELITE) if elite else VENGANZA_BOMBA if tipo == "dado_bomba" and not _reventado else 0
 	var giro := randf() * TAU
 	for i in balas:
 		horda.ataques.bala_enemiga(position, Vector2.RIGHT.rotated(giro + TAU * i / balas) * 95.0 * ritmo_balas(), "moneda")
@@ -503,6 +527,8 @@ func _adelantar(horda: Horda, segundos: float) -> Vector2:
 
 ## A quién va: el jugador (en cooperativo, el que esté en pie más cerca).
 func _blanco(horda: Horda) -> Node2D:
+	if Juego.coop and TIRADORES.has(tipo):
+		return horda.objetivo_lejano(position)
 	return horda.objetivo_para(position)
 
 
@@ -530,7 +556,7 @@ func _portero(direccion: Vector2, dist: float, delta: float) -> Vector2:
 		2:
 			if _accion <= 0.0:
 				_modo = 0
-				_accion = randf_range(2.4, 3.4) * CADENCIA
+				_accion = randf_range(2.4, 3.4) * cadencia()
 			return _dir_embestida * PLACAJE_VEL
 	if _accion <= 0.0 and dist > 50.0 and dist < 180.0:
 		_modo = 1
@@ -552,7 +578,7 @@ func _crupier(direccion: Vector2, dist: float, delta: float, horda: Horda) -> Ve
 		frame = 3  # aviso
 		if _accion <= 0.0:
 			_modo = 0
-			_accion = randf_range(2.0, 2.8) * CADENCIA
+			_accion = randf_range(2.0, 2.8) * cadencia()
 			for i in 3:
 				horda.ataques.bala_enemiga(position, direccion.rotated((i - 1) * 0.28) * 105.0 * ritmo_balas(), "naipe_bala")
 		return Vector2.ZERO
@@ -588,7 +614,7 @@ func _maton(direccion: Vector2, delta: float, horda: Horda) -> Vector2:
 				_rafaga -= 1
 				if _rafaga <= 0:
 					_modo = 0
-					_accion = randf_range(2.8, 3.6) * CADENCIA
+					_accion = randf_range(2.8, 3.6) * cadencia()
 			return Vector2.ZERO
 	frame = int(_t * 6.0) % 3
 	if _accion <= 0.0:
@@ -604,7 +630,7 @@ func _botones(direccion: Vector2, dist: float, delta: float, horda: Horda) -> Ve
 		frame = 3
 		if _accion <= 0.0:
 			_modo = 0
-			_accion = randf_range(3.2, 4.2) * CADENCIA
+			_accion = randf_range(3.2, 4.2) * cadencia()
 			var blanco := _blanco(horda)
 			var destino: Vector2 = blanco.position
 			if blanco is CharacterBody2D:
@@ -626,7 +652,7 @@ func _botones(direccion: Vector2, dist: float, delta: float, horda: Horda) -> Ve
 func _camara(direccion: Vector2, delta: float, horda: Horda) -> void:
 	_accion -= delta
 	if _accion <= 0.0:
-		_accion = randf_range(1.5, 2.1) * CADENCIA
+		_accion = randf_range(1.5, 2.1) * cadencia()
 		# Hardcore: la cámara ya no dispara a donde estás, sino a donde vas.
 		var rapidez := 120.0 * ritmo_balas()
 		var hacia := _adelantar(horda, position.distance_to(_blanco(horda).global_position) / rapidez * 0.8) - position
@@ -656,7 +682,7 @@ func _reina(delta: float, horda: Horda) -> void:
 	_accion -= delta
 	if _accion > 0.0:
 		return
-	_accion = 2.2 * CADENCIA
+	_accion = 2.2 * cadencia()
 	for otro in horda.en_radio(position, 70.0):
 		if otro != self and otro.vida < otro.vida_max and not (otro is Jefe):
 			otro.vida = minf(otro.vida + otro.vida_max * 0.25, otro.vida_max)
@@ -666,7 +692,7 @@ func _sota(direccion: Vector2, dist: float, delta: float, horda: Horda) -> Vecto
 	_accion -= delta
 	frame = 3 if _accion < 0.35 else int(_t * 6.0) % 3
 	if _accion <= 0.0:
-		_accion = randf_range(1.7, 2.6) * CADENCIA
+		_accion = randf_range(1.7, 2.6) * cadencia()
 		horda.ataques.bala_enemiga(position, direccion * 95.0 * ritmo_balas(), "naipe_bala")
 	if dist < 75.0:
 		return -direccion * vel
@@ -692,7 +718,7 @@ func _naipe(direccion: Vector2, delta: float) -> Vector2:
 			return Vector2.ZERO
 	if _accion <= 0.0:
 		_modo = 0
-		_accion = randf_range(1.2, 2.2) * CADENCIA
+		_accion = randf_range(1.2, 2.2) * cadencia()
 	return _dir_embestida * 330.0
 
 
@@ -700,7 +726,7 @@ func _joker(direccion: Vector2, delta: float, horda: Horda) -> void:
 	_accion -= delta
 	if _accion > 0.0:
 		return
-	_accion = randf_range(2.2, 3.0) * CADENCIA
+	_accion = randf_range(2.2, 3.0) * cadencia()
 	var zona := Sala.INTERIOR.grow(-16.0)
 	var blanco := _blanco(horda)
 	var objetivo: Vector2 = blanco.global_position + Vector2.RIGHT.rotated(randf() * TAU) * randf_range(85.0, 130.0)
@@ -716,7 +742,7 @@ func _cubilete(delta: float, horda: Horda) -> void:
 	_accion -= delta
 	if _accion > 0.0:
 		return
-	_accion = randf_range(3.5, 4.5) * CADENCIA
+	_accion = randf_range(3.5, 4.5) * cadencia()
 	if horda.enemigos.size() < TOPE_INVOCADOS:
 		for i in 2:
 			horda.crear("dado", position + Vector2.RIGHT.rotated(randf() * TAU) * 14.0).nacer_ya()

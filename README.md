@@ -30,6 +30,7 @@ Solo te mueves. Tu personaje ataca por su cuenta, y lo que hace depende de una f
 - Se puede jugar con mando, con vibración y ayudas con los botones de cada marca.
 - Cooperativo local para dos jugadores en la misma pantalla: cada uno con sus corazones, una fila de cartas compartida y reanimaciones.
 - Cooperativo online: lo mismo, cada uno en su casa. Uno crea una sala y le pasa el código de cuatro letras al otro. Viene apagado hasta que se configura un relé (`servidor/rele/`, pasos en `servidor/README.md`).
+- En pareja el juego aprieta: cada uno recibe su propia carta de sala, cofre y tienda; los enemigos son más rápidos y atacan más seguido, los tiradores disparan al que está más lejos, los élites pegan doble y los jefes se enfurecen por debajo del 30 % de vida y el Pez, el Dueño y la Ruleta tienen ataques propios para dos jugadores. Si uno cae, el otro lo levanta quedándose a su lado.
 - En español, inglés, portugués de Brasil, francés, alemán e italiano.
 
 | | |

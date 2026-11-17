@@ -148,7 +148,7 @@ func _actuar_enemiga() -> void:
 		return
 	var tocado := _dueno.jugador_tocado(position, 7.0)
 	if tocado != null:
-		tocado.recibir_golpe(1, causa)
+		tocado.recibir_golpe(int(causa.get("dano", 1)), causa)
 		queue_free()
 
 
